@@ -107,3 +107,9 @@ Then open:
 ```text
 http://127.0.0.1:8770
 ```
+
+The macOS launcher accepts the same port through an environment variable:
+
+```bash
+LEDGER_PORT=8770 ./start_ledger_public.command
+```
