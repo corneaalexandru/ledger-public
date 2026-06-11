@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 DATA_DIR = ROOT / "local_ledger_data"
 WORKBOOK_PATH = ROOT / "local_ledger_workbook.xlsx"
+STARTER_DIR = ROOT / "starter"
+STARTER_WORKBOOK_PATH = STARTER_DIR / "ledger_starter_workbook.xlsx"
 LEGACY_DATA_DIR = ROOT / "mock_google_sheet"
 LEGACY_WORKBOOK_PATH = ROOT / "mock_ledger_google_sheet.xlsx"
 SHEET_DIR = DATA_DIR
@@ -183,8 +185,8 @@ if SHEETS != CORE_SHEETS:
     raise RuntimeError("Public server schema drifted from ledger_core.schemas.")
 
 STORE = LocalCsvLedgerStore(DATA_DIR, sheets=SHEETS, fx=DEFAULT_CONVERTER)
-STORE_MODE = "local"
-STORE_DETAILS: dict[str, str] = {"data_dir": str(DATA_DIR), "workbook": str(WORKBOOK_PATH)}
+STORE_MODE = "google"
+STORE_DETAILS: dict[str, str] = {}
 
 
 def money(value: float) -> float:
@@ -460,7 +462,7 @@ def default_transactions() -> list[dict]:
                     "category_id": category,
                     "subcategory_id": subcategory,
                     "transaction_class": klass,
-                    "source_system": "Local Ledger",
+                    "source_system": "Ledger Public Starter",
                     "country_code": "AE",
                     "statement_currency": "EUR",
                     "statement_amount": f"{amount:.2f}",
@@ -701,6 +703,72 @@ def default_phase_rows() -> list[dict]:
     ]
 
 
+def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
+    category_headers = ["category_id", "subcategory_id", "transaction_class", "direction", "example", "notes"]
+    categories = [
+        ("Salary", "salary", "salary", "inflow", "Employer payroll", "Recurring earned income"),
+        ("Consulting", "consulting", "consulting", "inflow", "Client invoice", "Variable earned income"),
+        ("Housing", "rent", "expense", "outflow", "Monthly rent", "Housing and rent"),
+        ("Food", "groceries", "expense", "outflow", "Supermarket", "Groceries and household food"),
+        ("Food", "dining", "expense", "outflow", "Restaurant", "Dining and social spending"),
+        ("Home", "utilities", "expense", "outflow", "Electricity/water", "Recurring utilities"),
+        ("Travel", "travel", "expense", "outflow", "Flights/hotels", "Travel and mobility"),
+        ("Health", "medical", "expense", "outflow", "Clinic/pharmacy", "Medical and wellbeing"),
+        ("Insurance", "insurance", "expense", "outflow", "Policy premium", "Protection and insurance"),
+        ("Education", "learning", "expense", "outflow", "Course/books", "Learning and professional growth"),
+        ("Investing", "portfolio_contribution", "transfer", "outflow", "Brokerage transfer", "Capital moved into investment accounts"),
+        ("Transfers", "internal_transfer", "transfer", "neutral", "Own-account transfer", "Internal movement between accounts"),
+        ("Taxes", "tax", "expense", "outflow", "Income tax", "Taxes and government fees"),
+        ("Fees", "bank_fee", "expense", "outflow", "Bank/platform fee", "Financial service charges"),
+    ]
+
+    account_headers = ["account_type", "capital_bucket", "ledger_status", "example", "notes"]
+    account_types = [
+        ("bank_account", "liquid", "accountable", "Everyday current account", "Daily cash account"),
+        ("savings_account", "reserve", "accountable", "Emergency reserve", "Short-term liquid reserve"),
+        ("brokerage", "investment", "accountable", "Brokerage account", "Investable market assets"),
+        ("pension", "retirement", "accountable", "Pension account", "Long-term retirement capital"),
+        ("credit_card", "liability", "accountable", "Credit card", "Short-term liability"),
+        ("receivable", "receivable", "accountable", "Private receivable", "Money owed to user"),
+    ]
+
+    fx_headers = ["currency", "rate_to_eur", "rate_to_usd", "rate_date", "source", "notes"]
+    fx_rows = [
+        ("EUR", "1.0000", "1.0870", TODAY.isoformat(), "starter", "Base reporting currency"),
+        ("USD", "0.9200", "1.0000", TODAY.isoformat(), "starter", "Offline starter rate"),
+        ("AED", "0.2500", "0.2720", TODAY.isoformat(), "starter", "Offline starter rate"),
+        ("RON", "0.2000", "0.2170", TODAY.isoformat(), "starter", "Offline starter rate"),
+        ("GBP", "1.1700", "1.2720", TODAY.isoformat(), "starter", "Offline starter rate"),
+        ("CHF", "1.0400", "1.1300", TODAY.isoformat(), "starter", "Offline starter rate"),
+    ]
+
+    rule_headers = ["rule_id", "field", "contains", "category_id", "subcategory_id", "transaction_class", "notes"]
+    rules = [
+        ("rule_0001", "merchant", "market", "Food", "groceries", "expense", "Starter categorization example"),
+        ("rule_0002", "merchant", "restaurants", "Food", "dining", "expense", "Starter categorization example"),
+        ("rule_0003", "memo", "rent", "Housing", "rent", "expense", "Starter categorization example"),
+        ("rule_0004", "memo", "salary", "Salary", "salary", "salary", "Starter categorization example"),
+        ("rule_0005", "merchant", "IBKR", "Investing", "portfolio_contribution", "transfer", "Starter transfer example"),
+    ]
+
+    instruction_headers = ["step", "instruction", "details"]
+    instructions = [
+        ("1", "Upload this workbook to Google Drive", "Open it with Google Sheets so each workbook tab becomes a Google Sheet tab."),
+        ("2", "Create a service-account JSON key", "Save it as credentials/ledger-service-account.json inside Ledger Public."),
+        ("3", "Share the Google Sheet", "Share it with the client_email from the JSON key as Editor."),
+        ("4", "Run start_ledger_public.command", "The setup wizard writes .env once and starts the local Ledger app."),
+        ("5", "Run init-google-sheet if prompted", "This repairs headers and copies the Excel-safe portfolio plan tab into the canonical Google tab."),
+    ]
+
+    return {
+        "setup_instructions": (instruction_headers, [dict(zip(instruction_headers, row)) for row in instructions]),
+        "reference_categories": (category_headers, [dict(zip(category_headers, row)) for row in categories]),
+        "reference_account_types": (account_headers, [dict(zip(account_headers, row)) for row in account_types]),
+        "fx_rates": (fx_headers, [dict(zip(fx_headers, row)) for row in fx_rows]),
+        "classification_rules": (rule_headers, [dict(zip(rule_headers, row)) for row in rules]),
+    }
+
+
 def ensure_local_data(reset: bool = False) -> None:
     migrate_legacy_data_paths()
     SHEET_DIR.mkdir(parents=True, exist_ok=True)
@@ -758,11 +826,10 @@ def write_workbook_part(zf: zipfile.ZipFile, path: str, content: str) -> None:
     zf.writestr(info, content)
 
 
-def write_local_workbook() -> None:
-    migrate_legacy_data_paths()
-    SHEET_DIR.mkdir(parents=True, exist_ok=True)
-    sheet_names = list(SHEETS)
-    with zipfile.ZipFile(WORKBOOK_PATH, "w") as zf:
+def write_workbook(path: Path, workbook_sheets: dict[str, tuple[list[str], list[dict]]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheet_names = list(workbook_sheets)
+    with zipfile.ZipFile(path, "w") as zf:
         write_workbook_part(
             zf,
             "[Content_Types].xml",
@@ -810,7 +877,32 @@ def write_local_workbook() -> None:
             + "</Relationships>",
         )
         for i, sheet_name in enumerate(sheet_names, start=1):
-            write_workbook_part(zf, f"xl/worksheets/sheet{i}.xml", worksheet_xml(SHEETS[sheet_name], read_rows(sheet_name)))
+            headers, rows = workbook_sheets[sheet_name]
+            write_workbook_part(zf, f"xl/worksheets/sheet{i}.xml", worksheet_xml(headers, rows))
+
+
+def write_local_workbook() -> None:
+    migrate_legacy_data_paths()
+    SHEET_DIR.mkdir(parents=True, exist_ok=True)
+    write_workbook(
+        WORKBOOK_PATH,
+        {sheet_name: (headers, read_rows(sheet_name)) for sheet_name, headers in SHEETS.items()},
+    )
+
+
+def write_starter_workbook(path: Path = STARTER_WORKBOOK_PATH) -> Path:
+    workbook_sheets = {
+        "accounts_register": (ACCOUNTS_HEADERS, [normalize_row("accounts_register", row) for row in default_accounts()]),
+        "transactions_register": (TRANSACTIONS_HEADERS, [normalize_row("transactions_register", row) for row in default_transactions()]),
+        "trades_register": (TRADES_HEADERS, default_trades()),
+        "portfolio_strategy_instruments": (PORTFOLIO_HEADERS, [normalize_row("portfolio_strategy_instruments", row) for row in default_portfolio_rows()]),
+        # XLSX sheet names are limited to 31 chars. Setup copies this into the canonical Google tab.
+        "portfolio_monthly_investment_pl": (MIP_HEADERS, default_mip_rows()),
+        "portfolio_exit_phases": (PHASE_HEADERS, default_phase_rows()),
+    }
+    workbook_sheets.update(default_reference_sheets())
+    write_workbook(path, workbook_sheets)
+    return path
 
 
 def active_rows(rows: list[dict]) -> list[dict]:
@@ -1458,7 +1550,7 @@ class LedgerPublicHandler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": True, "refreshed": True})
             tx_id = self.path_id(parsed.path, "/api/transactions/", "/statement/file")
             if tx_id:
-                return self.send_bytes(b"Local statement attachment for Ledger Public.\n", "text/plain; charset=utf-8", "sample-statement.txt")
+                return self.send_bytes(b"Statement attachment placeholder for Ledger Public.\n", "text/plain; charset=utf-8", "sample-statement.txt")
             tx_id = self.path_id(parsed.path, "/api/transactions/", "/statement")
             if tx_id:
                 return self.send_json(transaction_statement(tx_id))
@@ -1732,13 +1824,13 @@ def transaction_statement(transaction_id: str) -> dict:
         "ok": True,
         "transaction_id": transaction_id,
         "summary": {
-            "memo": row.get("memo", "Local transaction"),
+            "memo": row.get("memo", "Ledger Public transaction"),
             "amount": row.get("statement_amount", "0"),
             "currency": row.get("statement_currency", "EUR"),
             "date": row.get("transaction_date", TODAY.isoformat()),
         },
         "files": [{"file_name": "sample-statement.txt", "content_type": "text/plain", "url": f"/api/transactions/{transaction_id}/statement/file?file=sample-statement.txt"}],
-        "body": "Ledger Public statement preview. Attachments are stored only in this local package.",
+        "body": "Ledger Public statement preview. Attachments are linked to transactions without storing private files in the public repository.",
     }
 
 
@@ -1813,7 +1905,7 @@ def resolve_path(value: str) -> Path:
 
 def configure_store(args: argparse.Namespace, env: dict[str, str]) -> None:
     global STORE, STORE_MODE, STORE_DETAILS
-    mode = (args.store or env_setting(env, "LEDGER_STORE", "local")).strip().lower()
+    mode = (args.store or env_setting(env, "LEDGER_STORE", "google")).strip().lower()
     if mode not in {"local", "google"}:
         raise SystemExit("LEDGER_STORE must be either 'local' or 'google'.")
 
@@ -1860,18 +1952,25 @@ def run_server(port: int, host: str, open_browser: bool = False) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Standalone Ledger Public server with local or Google Sheets storage.")
+    parser = argparse.ArgumentParser(description="Ledger Public server with user-owned Google Sheets storage.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--open", action="store_true", help="Open Ledger Public in the default browser after the server starts.")
-    parser.add_argument("--store", choices=["local", "google"], help="Storage backend. Defaults to LEDGER_STORE or local.")
+    parser.add_argument("--store", choices=["google", "local"], help="Storage backend. Defaults to LEDGER_STORE or google. Local is a legacy/test fallback.")
     parser.add_argument("--env-file", default=".env", help="Optional environment file for Ledger Public settings.")
     parser.add_argument("--spreadsheet-id", help="Google Sheet ID for --store google.")
     parser.add_argument("--credentials-file", help="Service-account JSON file for --store google.")
     parser.add_argument("--init-google-sheet", action="store_true", help="Create or repair required tabs and headers in the configured Google Sheet.")
-    parser.add_argument("--init-only", action="store_true", help="Create or refresh the local CSV tabs and XLSX workbook, then exit.")
-    parser.add_argument("--reset-data", action="store_true", help="Reset local CSV tabs to the bundled sample defaults.")
+    parser.add_argument("--create-starter-workbook", action="store_true", help="Create the starter XLSX database, then exit.")
+    parser.add_argument("--starter-workbook", default=str(STARTER_WORKBOOK_PATH), help="Path for --create-starter-workbook.")
+    parser.add_argument("--init-only", action="store_true", help="Initialize the configured store, then exit.")
+    parser.add_argument("--reset-data", action="store_true", help="Reset legacy local CSV tabs. Only valid with --store local.")
     args = parser.parse_args()
+
+    if args.create_starter_workbook:
+        path = write_starter_workbook(resolve_path(args.starter_workbook))
+        print(f"Starter workbook created at {path}")
+        return
 
     env = load_env_file(resolve_path(args.env_file))
     configure_store(args, env)
@@ -1889,7 +1988,10 @@ def main() -> None:
 
     if args.init_only:
         if STORE_MODE == "google":
-            print(f"Google Sheets configuration ready: {STORE_DETAILS.get('spreadsheet_id', '')}")
+            if args.init_google_sheet:
+                print(f"Google Sheet tabs ready: {STORE_DETAILS.get('spreadsheet_id', '')}")
+            else:
+                print(f"Google Sheets configuration ready: {STORE_DETAILS.get('spreadsheet_id', '')}")
         else:
             print(f"Local ledger workbook created at {WORKBOOK_PATH}")
         return

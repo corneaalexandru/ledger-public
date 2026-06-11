@@ -11,6 +11,11 @@ from ledger_core.store import next_id, normalize_ids
 
 
 GOOGLE_SCOPES = ("https://www.googleapis.com/auth/spreadsheets",)
+SHEET_IMPORT_ALIASES = {
+    # XLSX tab names are limited to 31 chars. The starter workbook uses this
+    # Excel-safe name, then setup copies it into the canonical Google tab.
+    "portfolio_monthly_investment_plan": "portfolio_monthly_investment_pl",
+}
 
 
 @dataclass(frozen=True)
@@ -40,13 +45,16 @@ class GoogleSheetsLedgerStore:
         return self._service
 
     def list_rows(self, sheet_name: str) -> list[dict]:
+        return self._list_rows_from_tab(sheet_name, sheet_name)
+
+    def _list_rows_from_tab(self, tab_name: str, sheet_name: str) -> list[dict]:
         headers = self.sheets[sheet_name]
         values = (
             self.service.spreadsheets()
             .values()
             .get(
                 spreadsheetId=self.config.spreadsheet_id,
-                range=f"{quote_sheet_name(sheet_name)}!A1:{column_name(len(headers))}",
+                range=f"{quote_sheet_name(tab_name)}!A1:{column_name(len(headers))}",
                 valueRenderOption="UNFORMATTED_VALUE",
             )
             .execute()
@@ -120,6 +128,11 @@ class GoogleSheetsLedgerStore:
             sheet["properties"]["title"]: sheet["properties"]["sheetId"]
             for sheet in metadata.get("sheets", [])
         }
+        alias_rows = {}
+        for sheet_name, alias in SHEET_IMPORT_ALIASES.items():
+            if sheet_name not in existing and alias in existing:
+                alias_rows[sheet_name] = self._list_rows_from_tab(alias, sheet_name)
+
         requests = [
             {"addSheet": {"properties": {"title": sheet_name}}}
             for sheet_name in self.sheets
@@ -130,14 +143,19 @@ class GoogleSheetsLedgerStore:
                 spreadsheetId=self.config.spreadsheet_id,
                 body={"requests": requests},
             ).execute()
+
         for sheet_name, headers in self.sheets.items():
-            self.service.spreadsheets().values().update(
-                spreadsheetId=self.config.spreadsheet_id,
-                range=f"{quote_sheet_name(sheet_name)}!A1",
-                valueInputOption="USER_ENTERED",
-                body={"values": [headers]},
-            ).execute()
-        return {"ok": True, "sheets": list(self.sheets)}
+            rows = self.list_rows(sheet_name) if sheet_name in existing else []
+            if sheet_name in alias_rows and not rows:
+                self.write_rows(sheet_name, alias_rows[sheet_name])
+            else:
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=self.config.spreadsheet_id,
+                    range=f"{quote_sheet_name(sheet_name)}!A1",
+                    valueInputOption="USER_ENTERED",
+                    body={"values": [headers]},
+                ).execute()
+        return {"ok": True, "sheets": list(self.sheets), "imported_aliases": sorted(alias_rows)}
 
     def _mutate_status(self, sheet_name: str, id_field: str, ids: list[str], ledger_status: str) -> dict:
         row_ids = normalize_ids(ids)

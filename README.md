@@ -1,118 +1,64 @@
 # Ledger Public
 
-A standalone public version of the Ledger finance dashboard.
+Ledger Public is the shareable version of Ledger. It uses the same UI and core logic as the private Ledger app, but each user connects their own Google Sheet and service-account JSON.
 
-Ledger Public has two storage modes:
-
-- **Google Sheets mode**: user-owned Google Sheet plus user-owned service-account JSON, closest to Ledger Private.
-- **Local demo mode**: local CSV files and a generated workbook for no-setup testing or offline use.
-
-The repository does not include private financial data, real spreadsheet IDs, `.env` files, or credentials.
+No private data, real spreadsheet ID, `.env`, or credentials are included.
 
 ## Quick Start
 
-### macOS
+1. Download or clone this repository.
+2. Upload `starter/ledger_starter_workbook.xlsx` to Google Drive and open it with Google Sheets.
+3. Create a Google service-account JSON key.
+4. Double-click `start_ledger_public.command`.
+5. Follow the one-time setup wizard.
 
-1. Download the repository ZIP from GitHub.
-2. Unzip it.
-3. Double-click `start_ledger_public.command`.
-4. Open `http://127.0.0.1:8765` if the browser does not open automatically.
+The launcher will:
 
-If macOS blocks the launcher, right-click `start_ledger_public.command`, choose `Open`, then confirm.
+- Pull the latest app version when this folder is a git clone.
+- Install Google Sheets requirements when missing.
+- Ask for the service-account JSON and Google Sheet ID only when setup is not complete.
+- Start Ledger Public at `http://127.0.0.1:8765`.
 
-### Windows
+## Starter Database
 
-1. Download the repository ZIP from GitHub.
-2. Unzip it.
-3. Double-click `start_ledger_public.bat`.
-4. Open `http://127.0.0.1:8765` if the browser does not open automatically.
+The starter workbook contains mock accounts, transactions, trades, portfolio plan rows, categories, FX rates, and starter classification rules.
 
-### Terminal
-
-```bash
-python3 server.py --open
+```text
+starter/ledger_starter_workbook.xlsx
 ```
 
-If port `8765` is busy:
+Upload it to Google Drive, open it as a Google Sheet, then use that Sheet as the Ledger database.
+
+Because XLSX tab names are limited to 31 characters, one starter tab uses the Excel-safe name `portfolio_monthly_investment_pl`. During setup, Ledger repairs the Google Sheet and copies that data into the canonical `portfolio_monthly_investment_plan` tab.
+
+## Manual Start
 
 ```bash
-python3 server.py --port 8770 --open
-```
-
-## Requirements
-
-- Python 3.10+ recommended.
-- Local demo mode requires no `pip install` step.
-- Google Sheets mode requires `python3 -m pip install -r requirements-google.txt`.
-
-## Google Sheets Mode
-
-Use this when another user wants Ledger Public to behave like the private Google-backed Ledger app with their own sheet and credentials.
-
-```bash
-cp .env.example .env
 python3 -m pip install -r requirements-google.txt
-python3 server.py --store google --init-google-sheet --init-only
+python3 scripts/setup_google.py
 python3 server.py --store google --open
 ```
 
-See [GOOGLE_SHEETS_SETUP.md](GOOGLE_SHEETS_SETUP.md) for the full setup.
-
-## Local Demo Mode
-
-Local mode is the no-setup fallback. It contains the app logic, backend, UI, and a first-run data generator. It does not version user ledger files.
-
-On first run, the server creates local ledger files:
-
-- `local_ledger_data/*.csv`
-- `local_ledger_workbook.xlsx`
-
-Those files are ignored by Git. A user can edit/import their own local data, then run `git pull` later to get the newest app logic without pulling or overwriting the sample data again.
-
-In local mode, the app reads and writes the CSV tabs. The workbook is regenerated from those CSV files whenever the local data changes.
-
-## Features
-
-- Accounts, transactions, trades, portfolio, planning, and settings screens.
-- Account/transaction/trade create, edit, duplicate, restore, and delete flows.
-- Local statement import preview and apply flow.
-- Local trade price refresh.
-- Print-to-PDF from relevant pages.
-- Offline FX conversion for multi-currency accounts, transactions, trades, and portfolio rows.
-- Local reset back to bundled sample data.
-
-## Reset Local Data
-
-This overwrites the local ignored data folder with fresh sample rows:
+Change port:
 
 ```bash
-python3 server.py --reset-data --init-only
+LEDGER_PORT=8770 ./start_ledger_public.command
 ```
 
-## Local Ledger Workbook
+## Updating
 
-Open `local_ledger_workbook.xlsx` in Excel, Numbers, or upload it into Google Sheets to inspect the local source tabs.
+The macOS launcher runs `git pull --ff-only` automatically when the app folder is a git clone. If the repository was downloaded as a ZIP, download a fresh ZIP to update.
 
-This workbook is only for local demo mode. Google Sheets mode reads and writes the configured spreadsheet directly.
-
-## Updating The App Without Touching Data
-
-```bash
-git pull
-python3 server.py --open
-```
-
-`git pull` updates tracked code and documentation only. It leaves `local_ledger_data/` and `local_ledger_workbook.xlsx` alone because they are local runtime data.
-
-Back up `local_ledger_data/` before sharing or moving a user's ledger to another computer.
+User data stays in the user's Google Sheet. Pulling app updates does not overwrite the Sheet or the local `.env`/credentials files.
 
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) - install and run instructions.
-- [GOOGLE_SHEETS_SETUP.md](GOOGLE_SHEETS_SETUP.md) - Google Sheet and auth setup.
+- [GOOGLE_SHEETS_SETUP.md](GOOGLE_SHEETS_SETUP.md) - detailed Google setup.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - common fixes.
-- [SECURITY.md](SECURITY.md) - what is and is not included in Ledger Public.
+- [SECURITY.md](SECURITY.md) - public safety rules.
+- [CHANGELOG.md](CHANGELOG.md) - release history.
 
 ## Important
 
-This is a public package. Do not commit private bank exports, real statement files, service account keys, or `.env` files into a fork. Keep personal data in the ignored `local_ledger_data/` runtime folder or in a private repository.
+Do not commit private bank exports, real statement files, service-account keys, `.env`, or personal ledger data into a fork. Keep those in the user's Google Sheet or ignored local credential files.

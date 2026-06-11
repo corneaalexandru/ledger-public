@@ -1,11 +1,14 @@
-.PHONY: run reset check
+.PHONY: run setup starter check
 
 run:
-	python3 server.py --open
+	python3 server.py --store google --open
 
-reset:
-	python3 server.py --reset-data --init-only
+setup:
+	python3 scripts/setup_google.py
+
+starter:
+	python3 server.py --create-starter-workbook
 
 check:
 	python3 -m py_compile server.py
-	python3 server.py --init-only
+	python3 scripts/check_public_release.py

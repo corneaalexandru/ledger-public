@@ -6,18 +6,10 @@ This repository is designed to be safe for public sharing.
 
 - Static UI files.
 - Local Python server.
-- First-run sample data generator.
 - Public-safe Google Sheets adapter code.
+- Starter workbook with mock data only.
 - `.env.example` with placeholder values only.
-
-## Local Runtime Data
-
-The app creates these files on first run:
-
-- `local_ledger_data/*.csv`
-- `local_ledger_workbook.xlsx`
-
-They are ignored by Git. Treat them as the user's private local ledger, even when they started from sample rows.
+- One-time setup wizard.
 
 ## Not Included
 
@@ -29,14 +21,26 @@ They are ignored by Git. Treat them as the user's private local ledger, even whe
 - Real bank exports.
 - Private ledger data.
 
-## Before Publishing Changes
+## Ignored User Files
 
-Run this from the repository root:
+These stay local and must not be committed:
 
-```bash
-grep -RInE "PRIVATE KEY|client_secret|refresh_token|service_account|\\.env" .
+```text
+.env
+.ledger_public_setup/
+credentials/*.json
+google_ledger_backups/
+local_ledger_backups/
 ```
 
-Do not commit anything private. Keep personal ledger rows in the ignored local runtime files, or in a separate private repository.
+Legacy local runtime folders are also ignored so older installs cannot accidentally commit personal rows.
 
-For Google Sheets mode, keep the user's service-account JSON in `credentials/` or another ignored path.
+## Before Publishing Changes
+
+Run:
+
+```bash
+python3 scripts/check_public_release.py
+```
+
+Do not commit anything private. Keep personal data in the user's Google Sheet and credentials in ignored local files.

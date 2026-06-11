@@ -13,9 +13,13 @@ __pycache__/
 # User-owned Google auth files. Never commit service-account credentials.
 credentials/*
 !credentials/.gitkeep
+.ledger_public_setup/
 
-# Runtime ledger data. Generated on first run and intentionally not versioned,
-# so users can pull app updates without overwriting their local ledger.
+# Starter database template is tracked. User-created workbooks remain ignored.
+!starter/ledger_starter_workbook.xlsx
+
+# Legacy/local runtime data. Ignored so older installs and test runs do not
+# commit personal ledger rows.
 local_ledger_data/
 local_ledger_workbook.xlsx
 local_ledger_backups/

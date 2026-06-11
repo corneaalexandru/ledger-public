@@ -9566,12 +9566,20 @@ function settingsSyncDashboard() {
   const healthNote = health.ok === false
     ? Object.entries(health.counts || {}).map(([key, value]) => `${labelize(key)} ${formatNumber(value)}`).slice(0, 3).join(" · ")
     : "No active data-health issues reported.";
+  const snapshotLabel = snapshot.mode === "google_sheets"
+    ? "Google Sheets"
+    : snapshot.path
+      ? "SQLite ready"
+      : "Runtime store";
+  const snapshotNote = snapshot.spreadsheet_id
+    ? `Sheet ${snapshot.spreadsheet_id}`
+    : snapshot.path || "Active store is configured at startup.";
   return `
     <section class="settings-layout settings-layout-single">
       ${panel("Data & Sync", settingsRows([
         ["Refresh policy", "Manual refresh", "Use the sidebar refresh when Google Sheets changes."],
         ["Memory cache", `${formatNumber(memorySheets)} sheets`, `TTL ${formatNumber(cache.ttl_seconds || 0)} seconds.`],
-        ["Snapshot cache", snapshot.path ? "SQLite ready" : "Local runtime", snapshot.path || "Public/local mode uses runtime files directly."],
+        ["Snapshot cache", snapshotLabel, snapshotNote],
         ["Data health", healthValue, healthNote],
         ["Imports", "Local attachments", "Statements are linked to transactions and preserved in the project."],
         ["Portfolio instruments", "Manual values refresh", "Updates active instrument prices and brokerage account investment totals."],

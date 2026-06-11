@@ -1,15 +1,6 @@
 # Install And Run
 
-## Download From GitHub
-
-1. Open the public GitHub repository.
-2. Click `Code`.
-3. Click `Download ZIP`.
-4. Unzip the downloaded file.
-
 ## macOS
-
-### Option A: Double-click
 
 Double-click:
 
@@ -23,62 +14,35 @@ If macOS blocks it:
 2. Choose `Open`.
 3. Confirm.
 
-### Option B: Terminal
+The launcher updates the app, installs missing Google requirements, runs setup once, then starts Ledger.
+
+## Terminal
 
 ```bash
 git clone https://github.com/corneaalexandru/ledger-public.git
 cd ledger-public
-python3 server.py --open
-```
-
-## Windows
-
-Double-click:
-
-```text
-start_ledger_public.bat
-```
-
-Or run:
-
-```bat
-cd ledger-public
-py server.py --open
-```
-
-## Linux
-
-```bash
-cd ledger-public
-python3 server.py --open
-```
-
-## Google Sheets Mode
-
-Google Sheets mode is the real-user mode closest to Ledger Private. It uses the user's own Google Sheet and auth file.
-
-```bash
-cd ledger-public
-cp .env.example .env
 python3 -m pip install -r requirements-google.txt
-```
-
-Edit `.env`:
-
-```env
-LEDGER_STORE=google
-LEDGER_SPREADSHEET_ID=your_google_sheet_id_here
-GOOGLE_APPLICATION_CREDENTIALS=./credentials/ledger-service-account.json
-```
-
-Then initialize the tabs and start:
-
-```bash
-python3 server.py --store google --init-google-sheet --init-only
+python3 scripts/setup_google.py
 python3 server.py --store google --open
 ```
 
-See [GOOGLE_SHEETS_SETUP.md](GOOGLE_SHEETS_SETUP.md).
+## Google Sheet Database
+
+1. Upload `starter/ledger_starter_workbook.xlsx` to Google Drive.
+2. Open it with Google Sheets.
+3. Copy the spreadsheet ID from the URL.
+4. Save your service-account JSON in `credentials/`.
+5. Share the Google Sheet with the `client_email` from that JSON file as Editor.
+6. Run the setup wizard or double-click the launcher.
+
+The wizard writes:
+
+```text
+.env
+.ledger_public_setup/google_configured
+```
+
+Those files are ignored by Git and should stay private.
 
 ## Stop The Server
 
@@ -88,55 +52,14 @@ In the terminal window running Ledger Public, press:
 Ctrl+C
 ```
 
-## Local Demo Data
-
-When using local mode, the first run creates local CSV tabs in:
-
-```text
-local_ledger_data/
-```
-
-It also creates:
-
-```text
-local_ledger_workbook.xlsx
-```
-
-These files are ignored by Git. They are the user's local ledger data, not app code.
-
-## Update The App Later
-
-To get the newest app logic without replacing local data:
-
-```bash
-git pull
-python3 server.py --open
-```
-
-Future pulls do not overwrite `local_ledger_data/` or `local_ledger_workbook.xlsx`.
-
-## Reset Local Data
-
-This overwrites the user's local ignored data with fresh sample rows:
-
-```bash
-python3 server.py --reset-data --init-only
-```
-
 ## Change Port
 
 ```bash
-python3 server.py --port 8770 --open
+LEDGER_PORT=8770 ./start_ledger_public.command
 ```
 
 Then open:
 
 ```text
 http://127.0.0.1:8770
-```
-
-The macOS launcher accepts the same port through an environment variable:
-
-```bash
-LEDGER_PORT=8770 ./start_ledger_public.command
 ```

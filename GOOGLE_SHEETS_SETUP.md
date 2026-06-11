@@ -1,18 +1,19 @@
 # Google Sheets Setup
 
-Ledger Public can run in two modes:
+Ledger Public uses a user-owned Google Sheet as its database.
 
-- `local`: no setup, local CSV files, good for demo/offline use.
-- `google`: user-owned Google Sheet plus user-owned auth file, closest to Ledger Private.
+## 1. Create The Starter Sheet
 
-The public repository does not include any real spreadsheet ID, `.env`, or credentials.
+Upload this file to Google Drive:
 
-## 1. Install Google Dependencies
+```text
+starter/ledger_starter_workbook.xlsx
+```
 
-Local mode uses only Python. Google mode needs the Google client packages:
+Open it with Google Sheets. Copy the spreadsheet ID from the URL:
 
-```bash
-python3 -m pip install -r requirements-google.txt
+```text
+https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit
 ```
 
 ## 2. Create A Service Account
@@ -22,76 +23,54 @@ In Google Cloud:
 1. Create or choose a project.
 2. Enable the Google Sheets API.
 3. Create a service account.
-4. Create a JSON key for that service account.
+4. Create a JSON key.
 5. Save the JSON file locally, for example:
 
 ```text
 credentials/ledger-service-account.json
 ```
 
-The `credentials/` folder is ignored by Git except for its placeholder file.
+## 3. Share The Sheet
 
-## 3. Share The Google Sheet
+Open the JSON file and find `client_email`.
 
-Create a Google Sheet for Ledger.
+Share the Google Sheet with that email as Editor.
 
-Open the service-account JSON and find its email address. It looks like:
+## 4. Run The Wizard
+
+On macOS, double-click:
 
 ```text
-name@project-id.iam.gserviceaccount.com
+start_ledger_public.command
 ```
 
-Share the Google Sheet with that email as an editor.
-
-## 4. Configure Ledger Public
-
-Copy the example environment file:
+Or run manually:
 
 ```bash
-cp .env.example .env
+python3 -m pip install -r requirements-google.txt
+python3 scripts/setup_google.py
 ```
 
-Set:
+The wizard writes `.env` once:
 
 ```env
 LEDGER_STORE=google
 LEDGER_SPREADSHEET_ID=your_google_sheet_id_here
-GOOGLE_APPLICATION_CREDENTIALS=./credentials/ledger-service-account.json
+GOOGLE_APPLICATION_CREDENTIALS=credentials/ledger-service-account.json
 ```
 
-## 5. Create Or Repair Tabs
-
-Run this once to create the Ledger tabs and headers in your Google Sheet:
-
-```bash
-python3 server.py --store google --init-google-sheet --init-only
-```
-
-## 6. Start The App
+## 5. Start Ledger
 
 ```bash
 python3 server.py --store google --open
 ```
 
-On macOS, after `.env` is configured:
+## Notes
+
+XLSX sheet names are limited to 31 characters. The starter workbook therefore contains `portfolio_monthly_investment_pl`. During setup, Ledger creates the canonical `portfolio_monthly_investment_plan` tab in Google Sheets and copies the starter rows into it.
+
+Re-run setup at any time with:
 
 ```bash
-./start_ledger_public.command
+python3 scripts/setup_google.py --force
 ```
-
-## Local Demo Mode
-
-To run without Google:
-
-```bash
-python3 server.py --store local --open
-```
-
-Local mode creates ignored runtime files:
-
-```text
-local_ledger_data/
-local_ledger_workbook.xlsx
-```
-
-Those files are not used by Google mode unless you explicitly switch back to `local`.
