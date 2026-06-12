@@ -2415,6 +2415,11 @@ html[data-theme="light"] .skeleton-table span::after {
   grid-column: 1 / -1;
 }
 
+.monthly-target-grid-detail {
+  display: block;
+  margin-top: 18px;
+}
+
 .transaction-metrics.reports-metrics {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -5209,9 +5214,26 @@ input.is-invalid {
   min-width: 1480px;
 }
 
+.monthly-target-detail-table {
+  min-width: 1040px;
+}
+
 .monthly-target-table th:first-child,
 .monthly-target-table td:first-child {
   width: 300px;
+}
+
+.monthly-target-detail-table th:first-child,
+.monthly-target-detail-table td:first-child {
+  width: auto;
+}
+
+.monthly-target-detail-table .monthly-target-category-group-row:first-child td {
+  padding-top: 0;
+}
+
+.monthly-target-detail-table .monthly-target-category-cell {
+  grid-template-columns: minmax(210px, max-content) minmax(220px, 1fr);
 }
 
 .planning-target-table th:first-child,

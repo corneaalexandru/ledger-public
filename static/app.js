@@ -11766,6 +11766,9 @@ function transactionMonthlyTargetsDashboard(data = {}) {
       ${panel("Top Months Above Ceiling", monthlyTargetAboveCeiling(selectedTargets))}
     `
     : "";
+  const targetDetailPanel = isFilteredMonth
+    ? monthlyTargetSingleMonthDetails(selectedTargets[0])
+    : panel(selection.title, monthlyTargetsTable(selectedTargets), "full");
   return `
     <section class="transaction-metrics monthly-target-metrics">
       ${transactionMetric("Income Baseline", formatWholeCurrency(totalIncome, "EUR"), incomeDetail)}
@@ -11775,9 +11778,9 @@ function transactionMonthlyTargetsDashboard(data = {}) {
       ${transactionMetric("Retention Gap", retentionGap === null ? "-" : signedWholeAmount(retentionGap, "EUR"), monthlyTargetRetentionGapMetricDetail(comparableRows.length))}
       ${transactionMetric("Spend Above Ceiling", formatWholeCurrency(overspending, "EUR"), "actual spend above ceiling")}
     </section>
-    <section class="monthly-target-grid${showAggregatePanels ? "" : " monthly-target-grid-single"}">
+    <section class="monthly-target-grid${showAggregatePanels ? "" : " monthly-target-grid-single"}${isFilteredMonth ? " monthly-target-grid-detail" : ""}">
       ${aggregatePanels}
-      ${panel(selection.title, monthlyTargetsTable(selectedTargets), "full")}
+      ${targetDetailPanel}
     </section>
   `;
 }
@@ -12097,25 +12100,49 @@ function monthlyTargetCategoryDetailRows(row = {}) {
   `;
 }
 
-function monthlyTargetCategoryGroupRow(label, count = 0) {
+function monthlyTargetSingleMonthDetails(row = {}) {
+  return `
+    <section class="minimal-table-wrap monthly-target-table-wrap monthly-target-detail-wrap">
+      <table class="minimal-table monthly-target-table monthly-target-detail-table">
+        <tbody>
+          ${monthlyTargetCategoryStandaloneRows(row)}
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
+function monthlyTargetCategoryStandaloneRows(row = {}) {
+  const incomeRows = monthlyTargetIncomeCategories(row);
+  const expenseRows = row.categories || [];
+  return `
+    ${monthlyTargetCategoryGroupRow("Income Category Model", incomeRows.length, true)}
+    ${incomeRows.map((category) => monthlyTargetCategoryDetailRow(row, category, "income", true)).join("")}
+    ${monthlyTargetCategoryGroupRow("Expense Category Model", expenseRows.length, true)}
+    ${expenseRows.map((category) => monthlyTargetCategoryDetailRow(row, category, "expense", true)).join("")}
+  `;
+}
+
+function monthlyTargetCategoryGroupRow(label, count = 0, standalone = false) {
   if (!count) return "";
   return `
     <tr class="monthly-target-category-group-row">
-      <td></td>
-      <td colspan="7">
+      ${standalone ? "" : "<td></td>"}
+      <td colspan="${standalone ? 4 : 7}">
         <span class="table-sub">${safe(label)}</span>
       </td>
     </tr>
   `;
 }
 
-function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense") {
+function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense", standalone = false) {
   const categoryLabel = taxonomyLabel(category.category || mode);
   const categoryOverspending = monthlyTargetCategoryOverspending(category, mode);
+  const categoryCellColspan = standalone ? "" : " colspan=\"4\"";
   return `
     <tr class="clickable-row monthly-target-category-row" data-action="filter-monthly-target-category" data-monthly-target-month="${safe(row.month || "")}" data-category="${safe(category.category || "")}" data-transaction-class="${safe(mode)}" tabindex="0">
-      <td></td>
-      <td colspan="4">
+      ${standalone ? "" : "<td></td>"}
+      <td${categoryCellColspan}>
         <span class="monthly-target-category-cell">
           <span class="monthly-target-category-name">
             <span class="bar-row-icon" aria-hidden="true">${icons[insightIconFor(category.category || mode, "category")] || icons.pie}</span>
