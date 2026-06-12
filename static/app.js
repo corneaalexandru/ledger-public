@@ -4231,7 +4231,12 @@ function yearlyTargetsTable(rows = []) {
         <tbody>
           ${rows.map((row) => `
             <tr class="clickable-row ${String(state.selectedYearlyTargetYear) === String(row.year) ? "is-selected" : ""}" data-action="open-yearly-target" data-yearly-target-year="${safe(row.year)}" tabindex="0">
-              <td><span class="table-main">${safe(row.year)}</span></td>
+              <td>
+                <span class="target-period-cell">
+                  <span class="table-main">${safe(row.year)}</span>
+                  ${yearlyTargetProgressBar(row)}
+                </span>
+              </td>
               <td class="align-right">
                 <span class="table-main">${safe(formatWholeCurrency(row.income_baseline_eur || 0, "EUR"))}</span>
                 <span class="table-sub">${safe(row.income_target_label || "Income baseline")}</span>
@@ -11696,7 +11701,12 @@ function monthlyTargetSortValue(row = {}, field = "month") {
 function monthlyTargetTableRow(row = {}, includeDetails = false) {
   return `
     <tr class="clickable-row" data-action="filter-monthly-target" data-monthly-target-month="${safe(row.month || "")}" tabindex="0">
-      <td><span class="table-main">${safe(monthLabel(row.month))}</span></td>
+      <td>
+        <span class="target-period-cell">
+          <span class="table-main">${safe(monthLabel(row.month))}</span>
+          ${monthlyTargetProgressBar(row)}
+        </span>
+      </td>
       <td class="align-right">${targetAmountCell(row.income_target_eur, "EUR", monthlyTargetIncomeCellDetail(row))}</td>
       <td class="align-right">
         ${targetAmountCell(row.expense_ceiling_eur, "EUR", `${formatPercent(row.expense_target_pct || 0)} ceiling`)}
@@ -11802,22 +11812,48 @@ function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense
 }
 
 function monthlyTargetCategoryProgressBar(category = {}, mode = "expense") {
-  const target = Math.max(0, numericValue(category.target_eur));
-  const actual = Math.max(0, numericValue(category.actual_eur));
-  const cappedActual = target > 0 ? Math.min(actual, target) : 0;
-  const overAmount = Math.max(actual - target, 0);
-  const basis = Math.max(target, actual, 1);
-  const plannedPct = clampValue(percentOf(target, basis), 0, 100);
+  return targetProgressBar({
+    target: category.target_eur,
+    actual: category.actual_eur,
+    className: `is-${mode === "income" ? "income" : "expense"}`,
+  });
+}
+
+function monthlyTargetProgressBar(row = {}) {
+  return targetProgressBar({
+    target: row.savings_target_eur,
+    actual: monthlyTargetActualRetained(row),
+    actualAvailable: monthlyTargetActualsAreDue(row),
+    className: "is-retention is-compact",
+  });
+}
+
+function yearlyTargetProgressBar(row = {}) {
+  return targetProgressBar({
+    target: row.target_savings_eur,
+    actual: row.actual_savings_eur,
+    className: "is-retention is-compact",
+  });
+}
+
+function targetProgressBar({ target = 0, actual = 0, actualAvailable = true, className = "" } = {}) {
+  const targetValue = Math.max(0, numericValue(target));
+  const actualValue = actualAvailable ? Math.max(0, numericValue(actual)) : 0;
+  const cappedActual = targetValue > 0 ? Math.min(actualValue, targetValue) : 0;
+  const overAmount = actualAvailable ? Math.max(actualValue - targetValue, 0) : 0;
+  const basis = Math.max(targetValue, actualValue, 1);
+  const plannedPct = clampValue(percentOf(targetValue, basis), 0, 100);
   const achievedPct = clampValue(percentOf(cappedActual, basis), 0, 100);
   const overPct = clampValue(percentOf(overAmount, basis), 0, 100);
   const overLeftPct = plannedPct;
-  const status = !actual
+  const status = !actualAvailable || !actualValue
     ? "empty"
-    : actual > target
+    : actualValue > targetValue
       ? "over"
       : "active";
+  const classes = ["target-progress-strip", className, `is-${status}`].filter(Boolean).join(" ");
   return `
-    <span class="target-progress-strip is-${mode === "income" ? "income" : "expense"} is-${status}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%; --over-left-pct: ${overLeftPct}%; --over-pct: ${overPct}%;" aria-hidden="true">
+    <span class="${safe(classes)}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%; --over-left-pct: ${overLeftPct}%; --over-pct: ${overPct}%;" aria-hidden="true">
       <span class="target-progress-planned"></span>
       <span class="target-progress-achieved"></span>
       <span class="target-progress-over"></span>

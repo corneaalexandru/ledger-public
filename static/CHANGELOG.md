@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-12
 
+- Added compact target progress bars beside year and month labels in target summary tables.
 - Matched Settings to the plain About bullet-list style.
 - Standardized Settings and About into simpler line-by-line document rows.
 - Removed the redundant label, filename, and release-history text above the About changelog content.

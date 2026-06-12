@@ -5156,6 +5156,14 @@ input.is-invalid {
   height: 18px;
 }
 
+.target-period-cell {
+  display: grid;
+  grid-template-columns: max-content minmax(86px, 128px);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .target-progress-strip {
   --planned-pct: 100%;
   --achieved-pct: 0%;
@@ -5167,6 +5175,13 @@ input.is-invalid {
   min-width: 220px;
   height: 16px;
   justify-self: stretch;
+}
+
+.target-progress-strip.is-compact {
+  width: 100%;
+  min-width: 86px;
+  max-width: 128px;
+  height: 10px;
 }
 
 .target-progress-planned,
@@ -5196,6 +5211,12 @@ input.is-invalid {
   width: var(--over-pct);
   height: 8px;
   background: #c43b32;
+}
+
+.target-progress-strip.is-compact .target-progress-planned,
+.target-progress-strip.is-compact .target-progress-achieved,
+.target-progress-strip.is-compact .target-progress-over {
+  height: 5px;
 }
 
 .target-progress-strip.is-over .target-progress-achieved {
