@@ -7,7 +7,7 @@ No private data, real spreadsheet ID, `.env`, or credentials are included.
 ## Quick Start
 
 1. Download or clone this repository.
-2. Upload `starter/ledger_starter_workbook.xlsx` to Google Drive and open it with Google Sheets.
+2. Create a blank Google Sheet in your Google Drive.
 3. Create a Google service-account JSON key.
 4. Double-click `start_ledger_public.command`.
 5. Follow the one-time setup wizard.
@@ -23,16 +23,10 @@ The launcher will:
 
 ## Starter Database
 
-The starter workbook contains mock accounts, transactions, trades, portfolio plan rows, categories, FX rates, and starter classification rules.
+Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, and portfolio plan rows without requiring XLSX upload or conversion.
 Project Currency can be set during setup and changed later in Settings. Source/native rows remain stored in their original currencies.
 
-```text
-starter/ledger_starter_workbook.xlsx
-```
-
-Upload it to Google Drive, open it as a Google Sheet, then use that Sheet as the Ledger database.
-
-Because XLSX tab names are limited to 31 characters, one starter tab uses the Excel-safe name `portfolio_monthly_investment_pl`. During setup, Ledger repairs the Google Sheet and copies that data into the canonical `portfolio_monthly_investment_plan` tab.
+Create a blank Google Sheet, share it with the service-account email as Editor, then paste its URL or ID into the setup wizard. Ledger will create the required tabs in Google Sheets format.
 
 ## Manual Start
 

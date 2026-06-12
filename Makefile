@@ -1,13 +1,10 @@
-.PHONY: run setup starter check
+.PHONY: run setup check
 
 run:
 	python3 server.py --store google --open
 
 setup:
 	python3 scripts/setup_google.py
-
-starter:
-	python3 server.py --create-starter-workbook
 
 check:
 	python3 -m py_compile server.py

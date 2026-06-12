@@ -13,8 +13,8 @@ from ledger_core.store import next_id, normalize_ids
 
 GOOGLE_SCOPES = ("https://www.googleapis.com/auth/spreadsheets",)
 SHEET_IMPORT_ALIASES = {
-    # XLSX tab names are limited to 31 chars. The starter workbook uses this
-    # Excel-safe name, then setup copies it into the canonical Google tab.
+    # Legacy converted workbooks used this Excel-safe tab name. Native Google
+    # Sheet setup writes the canonical tab directly.
     "portfolio_monthly_investment_plan": "portfolio_monthly_investment_pl",
 }
 GOOGLE_DATE_FIELDS = {
@@ -38,10 +38,12 @@ class GoogleSheetsLedgerStore:
         *,
         sheets: dict[str, list[str]] | None = None,
         fx: FXConverter | None = None,
+        starter_rows: dict[str, list[dict]] | None = None,
     ) -> None:
         self.config = config
         self.sheets = sheets or SHEETS
         self.fx = fx or DEFAULT_CONVERTER
+        self.starter_rows = starter_rows or {}
         self._normalizer = LocalCsvLedgerStore(Path("."), sheets=self.sheets, fx=self.fx)
         self._service = None
 
@@ -132,7 +134,7 @@ class GoogleSheetsLedgerStore:
     def refresh(self) -> dict:
         return {"ok": True, "mode": "google_sheets", "spreadsheet_id": self.config.spreadsheet_id}
 
-    def ensure_sheets(self) -> dict:
+    def ensure_sheets(self, *, seed_empty: bool = False) -> dict:
         metadata = self.service.spreadsheets().get(spreadsheetId=self.config.spreadsheet_id).execute()
         existing = {
             sheet["properties"]["title"]: sheet["properties"]["sheetId"]
@@ -154,10 +156,16 @@ class GoogleSheetsLedgerStore:
                 body={"requests": requests},
             ).execute()
 
+        created = {request["addSheet"]["properties"]["title"] for request in requests}
+        available = set(existing) | created
+        seeded_sheets = []
         for sheet_name, headers in self.sheets.items():
-            rows = self.list_rows(sheet_name) if sheet_name in existing else []
+            rows = self.list_rows(sheet_name) if sheet_name in available else []
             if sheet_name in alias_rows and not rows:
                 self.write_rows(sheet_name, alias_rows[sheet_name])
+            elif seed_empty and not rows and self.starter_rows.get(sheet_name):
+                self.write_rows(sheet_name, self.starter_rows[sheet_name])
+                seeded_sheets.append(sheet_name)
             else:
                 self.service.spreadsheets().values().update(
                     spreadsheetId=self.config.spreadsheet_id,
@@ -165,7 +173,12 @@ class GoogleSheetsLedgerStore:
                     valueInputOption="USER_ENTERED",
                     body={"values": [headers]},
                 ).execute()
-        return {"ok": True, "sheets": list(self.sheets), "imported_aliases": sorted(alias_rows)}
+        return {
+            "ok": True,
+            "sheets": list(self.sheets),
+            "imported_aliases": sorted(alias_rows),
+            "seeded_sheets": seeded_sheets,
+        }
 
     def _mutate_status(self, sheet_name: str, id_field: str, ids: list[str], ledger_status: str) -> dict:
         row_ids = normalize_ids(ids)

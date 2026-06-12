@@ -2,15 +2,11 @@
 
 Ledger Public uses a user-owned Google Sheet as its database.
 
-## 1. Create The Starter Sheet
+## 1. Create The Ledger Sheet
 
-Upload this file to Google Drive:
+Create a blank Google Sheet in Google Drive. Do not upload or convert an XLSX file.
 
-```text
-starter/ledger_starter_workbook.xlsx
-```
-
-Open it with Google Sheets. Copy the spreadsheet ID from the URL:
+Copy the spreadsheet ID from the URL:
 
 ```text
 https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit
@@ -60,7 +56,8 @@ GOOGLE_APPLICATION_CREDENTIALS=credentials/ledger-service-account.json
 LEDGER_PROJECT_CURRENCY=EUR
 ```
 
-The wizard asks for Project Currency during setup. Supported values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
+The wizard creates and seeds the required Ledger tabs directly in native Google Sheets format.
+It also asks for Project Currency during setup. Supported values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
 Profile details are managed later in Settings > Profile and stored locally in `.ledger_profile.json`.
 
 ## 5. Start Ledger
@@ -68,10 +65,6 @@ Profile details are managed later in Settings > Profile and stored locally in `.
 ```bash
 python3 server.py --store google --open
 ```
-
-## Notes
-
-XLSX sheet names are limited to 31 characters. The starter workbook therefore contains `portfolio_monthly_investment_pl`. During setup, Ledger creates the canonical `portfolio_monthly_investment_plan` tab in Google Sheets and copies the starter rows into it.
 
 Re-run setup at any time with:
 

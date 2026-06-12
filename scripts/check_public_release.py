@@ -24,14 +24,12 @@ FORBIDDEN_TRACKED_PREFIXES = ("credentials/", "local_ledger_backups/", "google_l
 ALLOWED_TRACKED_FILES = {
     ".env.example",
     "credentials/.gitkeep",
-    "starter/ledger_starter_workbook.xlsx",
 }
 
 
 def main() -> int:
     run([sys.executable, "-m", "py_compile", "server.py"])
     run([sys.executable, "-m", "py_compile", "scripts/setup_google.py"])
-    verify_starter_workbook()
     reject_tracked_runtime_data()
     verify_clean_first_run_requires_google_setup()
     print("Ledger Public release check passed.")
@@ -62,14 +60,6 @@ def reject_tracked_runtime_data() -> None:
     )
     if bad:
         raise SystemExit("Runtime data is tracked:\n" + "\n".join(bad))
-
-
-def verify_starter_workbook() -> None:
-    workbook = ROOT / "starter" / "ledger_starter_workbook.xlsx"
-    if not workbook.exists():
-        raise SystemExit("Missing starter/ledger_starter_workbook.xlsx")
-    if workbook.stat().st_size < 1000:
-        raise SystemExit("Starter workbook looks too small.")
 
 
 def verify_clean_first_run_requires_google_setup() -> None:

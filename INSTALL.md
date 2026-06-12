@@ -28,12 +28,13 @@ python3 server.py --store google --open
 
 ## Google Sheet Database
 
-1. Upload `starter/ledger_starter_workbook.xlsx` to Google Drive.
-2. Open it with Google Sheets.
-3. Copy the spreadsheet ID from the URL.
-4. Save your service-account JSON in `credentials/`.
-5. Share the Google Sheet with the `client_email` from that JSON file as Editor.
-6. Run the setup wizard or double-click the launcher.
+1. Create a blank Google Sheet in Google Drive.
+2. Save your service-account JSON in `credentials/`.
+3. Share the Google Sheet with the `client_email` from that JSON file as Editor.
+4. Copy the spreadsheet ID from the URL.
+5. Run the setup wizard or double-click the launcher.
+
+Ledger creates and seeds the required tabs directly in Google Sheets format. Do not upload or convert an XLSX workbook.
 
 The wizard writes:
 

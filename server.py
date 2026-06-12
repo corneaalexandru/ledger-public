@@ -34,8 +34,6 @@ STATIC_DIR = ROOT / "static"
 CHANGELOG_PATH = ROOT / "CHANGELOG.md"
 DATA_DIR = ROOT / "local_ledger_data"
 WORKBOOK_PATH = ROOT / "local_ledger_workbook.xlsx"
-STARTER_DIR = ROOT / "starter"
-STARTER_WORKBOOK_PATH = STARTER_DIR / "ledger_starter_workbook.xlsx"
 LEGACY_DATA_DIR = ROOT / "mock_google_sheet"
 LEGACY_WORKBOOK_PATH = ROOT / "mock_ledger_google_sheet.xlsx"
 SHEET_DIR = DATA_DIR
@@ -374,6 +372,7 @@ def default_accounts() -> list[dict]:
             "ledger_status": "accountable",
             "review_status": "reviewed",
             "notes": "Main operating account",
+            "country_code": "AE",
         },
         {
             "account_id": "acct_000002",
@@ -389,6 +388,7 @@ def default_accounts() -> list[dict]:
             "ledger_status": "accountable",
             "review_status": "reviewed",
             "notes": "Six-month liquidity reserve",
+            "country_code": "AE",
         },
         {
             "account_id": "acct_000003",
@@ -402,6 +402,7 @@ def default_accounts() -> list[dict]:
             "ledger_status": "accountable",
             "review_status": "reviewed",
             "notes": "ETF and equity portfolio held in USD",
+            "country_code": "US",
         },
         {
             "account_id": "acct_000004",
@@ -415,6 +416,7 @@ def default_accounts() -> list[dict]:
             "ledger_status": "accountable",
             "review_status": "reviewed",
             "notes": "Long-term pension capital in local currency",
+            "country_code": "RO",
         },
         {
             "account_id": "acct_000005",
@@ -430,6 +432,7 @@ def default_accounts() -> list[dict]:
             "ledger_status": "accountable",
             "review_status": "reviewed",
             "notes": "Paid monthly",
+            "country_code": "AE",
         },
     ]
 
@@ -768,11 +771,11 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
 
     instruction_headers = ["step", "instruction", "details"]
     instructions = [
-        ("1", "Upload this workbook to Google Drive", "Open it with Google Sheets so each workbook tab becomes a Google Sheet tab."),
+        ("1", "Create a blank Google Sheet", "Use Google Drive > New > Google Sheets. No XLSX upload or conversion is required."),
         ("2", "Create a service-account JSON key", "Save it as credentials/ledger-service-account.json inside Ledger Public."),
         ("3", "Share the Google Sheet", "Share it with the client_email from the JSON key as Editor."),
-        ("4", "Run start_ledger_public.command", "The setup wizard writes .env once and starts the local Ledger app."),
-        ("5", "Run init-google-sheet if prompted", "This repairs headers and copies the Excel-safe portfolio plan tab into the canonical Google tab."),
+        ("4", "Run start_ledger_public.command", "The setup wizard writes .env once and creates the native Ledger tabs."),
+        ("5", "Start Ledger Public", "The app reads and writes the Google Sheet directly after setup."),
     ]
 
     return {
@@ -781,6 +784,17 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
         "reference_account_types": (account_headers, [dict(zip(account_headers, row)) for row in account_types]),
         "fx_rates": (fx_headers, [dict(zip(fx_headers, row)) for row in fx_rows]),
         "classification_rules": (rule_headers, [dict(zip(rule_headers, row)) for row in rules]),
+    }
+
+
+def default_google_sheet_rows() -> dict[str, list[dict]]:
+    return {
+        "accounts_register": default_accounts(),
+        "transactions_register": default_transactions(),
+        "trades_register": default_trades(),
+        "portfolio_strategy_instruments": default_portfolio_rows(),
+        "portfolio_monthly_investment_plan": default_mip_rows(),
+        "portfolio_exit_phases": default_phase_rows(),
     }
 
 
@@ -903,21 +917,6 @@ def write_local_workbook() -> None:
         WORKBOOK_PATH,
         {sheet_name: (headers, read_rows(sheet_name)) for sheet_name, headers in SHEETS.items()},
     )
-
-
-def write_starter_workbook(path: Path = STARTER_WORKBOOK_PATH) -> Path:
-    workbook_sheets = {
-        "accounts_register": (ACCOUNTS_HEADERS, [normalize_row("accounts_register", row) for row in default_accounts()]),
-        "transactions_register": (TRANSACTIONS_HEADERS, [normalize_row("transactions_register", row) for row in default_transactions()]),
-        "trades_register": (TRADES_HEADERS, default_trades()),
-        "portfolio_strategy_instruments": (PORTFOLIO_HEADERS, [normalize_row("portfolio_strategy_instruments", row) for row in default_portfolio_rows()]),
-        # XLSX sheet names are limited to 31 chars. Setup copies this into the canonical Google tab.
-        "portfolio_monthly_investment_pl": (MIP_HEADERS, default_mip_rows()),
-        "portfolio_exit_phases": (PHASE_HEADERS, default_phase_rows()),
-    }
-    workbook_sheets.update(default_reference_sheets())
-    write_workbook(path, workbook_sheets)
-    return path
 
 
 def active_rows(rows: list[dict]) -> list[dict]:
@@ -1985,6 +1984,7 @@ def configure_store(args: argparse.Namespace, env: dict[str, str]) -> None:
         GoogleSheetsConfig(spreadsheet_id=spreadsheet_id, credentials_path=credentials_path),
         sheets=SHEETS,
         fx=DEFAULT_CONVERTER,
+        starter_rows=default_google_sheet_rows(),
     )
     STORE_MODE = "google"
     STORE_DETAILS = {
@@ -2016,17 +2016,10 @@ def main() -> None:
     parser.add_argument("--env-file", default=".env", help="Optional environment file for Ledger Public settings.")
     parser.add_argument("--spreadsheet-id", help="Google Sheet ID for --store google.")
     parser.add_argument("--credentials-file", help="Service-account JSON file for --store google.")
-    parser.add_argument("--init-google-sheet", action="store_true", help="Create or repair required tabs and headers in the configured Google Sheet.")
-    parser.add_argument("--create-starter-workbook", action="store_true", help="Create the starter XLSX database, then exit.")
-    parser.add_argument("--starter-workbook", default=str(STARTER_WORKBOOK_PATH), help="Path for --create-starter-workbook.")
+    parser.add_argument("--init-google-sheet", action="store_true", help="Create or repair required native Google Sheet tabs and seed empty tabs.")
     parser.add_argument("--init-only", action="store_true", help="Initialize the configured store, then exit.")
     parser.add_argument("--reset-data", action="store_true", help="Reset legacy local CSV tabs. Only valid with --store local.")
     args = parser.parse_args()
-
-    if args.create_starter_workbook:
-        path = write_starter_workbook(resolve_path(args.starter_workbook))
-        print(f"Starter workbook created at {path}")
-        return
 
     env = load_env_file(resolve_path(args.env_file))
     configure_store(args, env)
@@ -2039,7 +2032,7 @@ def main() -> None:
     if args.init_google_sheet:
         if STORE_MODE != "google":
             raise SystemExit("--init-google-sheet requires --store google or LEDGER_STORE=google.")
-        STORE.ensure_sheets()
+        STORE.ensure_sheets(seed_empty=True)
         print(f"Google Sheet tabs ready: {STORE_DETAILS.get('spreadsheet_id', '')}")
 
     if args.init_only:

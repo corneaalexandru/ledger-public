@@ -15,7 +15,6 @@ ENV_PATH = ROOT / ".env"
 SETUP_DIR = ROOT / ".ledger_public_setup"
 SETUP_MARKER = SETUP_DIR / "google_configured"
 DEFAULT_CREDENTIALS = Path("credentials/ledger-service-account.json")
-STARTER_WORKBOOK = ROOT / "starter" / "ledger_starter_workbook.xlsx"
 SUPPORTED_PROJECT_CURRENCIES = ("EUR", "USD", "AED", "RON", "GBP", "CHF", "CAD", "AUD", "INR", "JPY")
 
 
@@ -32,9 +31,9 @@ def main() -> int:
     print("\nLedger Public Google setup")
     print("==========================")
     print("This wizard runs once. It writes .env and never commits credentials.")
-    print(f"\nStarter workbook: {STARTER_WORKBOOK}")
-    print("Upload that XLSX file to Google Drive, open it with Google Sheets,")
-    print("then copy the spreadsheet ID from the Google Sheet URL.")
+    print("\nCreate a blank Google Sheet in Drive before continuing.")
+    print("Do not upload or convert an XLSX file. Ledger creates the native tabs directly.")
+    print("Copy the spreadsheet ID from the Google Sheet URL after sharing it.")
 
     credentials_path = ask_path(
         "\nPath to your service-account JSON",
@@ -68,7 +67,7 @@ def main() -> int:
         print("Skipped Google validation.")
         return 0
 
-    print("\nChecking Google access and repairing Ledger tabs...")
+    print("\nChecking Google access and creating native Ledger tabs...")
     result = subprocess.run(
         [sys.executable, "server.py", "--store", "google", "--init-google-sheet", "--init-only"],
         cwd=ROOT,
