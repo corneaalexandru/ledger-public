@@ -3459,16 +3459,19 @@ function overviewHeadlineInsightCards(cards = []) {
     selected.push(card);
   };
   const findById = (id) => available.find((card) => overviewInsightCardKey(card) === id);
+  addCard(findById("financial-health-score"));
   addCard(findById("strategic-monthly-surplus"));
   addCard(findById("strategic-savings-rate"));
   addCard(findById("strategic-cash-runway"));
   addCard(findById("liquid-capital") || available.find((card) => overviewInsightCardSearchText(card).includes("liquid capital")));
-  addCard(
-    available
-      .filter((card) => !selected.some((item) => overviewInsightCardKey(item) === overviewInsightCardKey(card)))
-      .filter((card) => overviewHeadlineRiskScore(card) > 0)
-      .sort((a, b) => overviewHeadlineRiskScore(b) - overviewHeadlineRiskScore(a))[0],
-  );
+  if (selected.length < 5) {
+    addCard(
+      available
+        .filter((card) => !selected.some((item) => overviewInsightCardKey(item) === overviewInsightCardKey(card)))
+        .filter((card) => overviewHeadlineRiskScore(card) > 0)
+        .sort((a, b) => overviewHeadlineRiskScore(b) - overviewHeadlineRiskScore(a))[0],
+    );
+  }
   available.forEach((card) => {
     if (selected.length < 5) addCard(card);
   });
@@ -10510,6 +10513,7 @@ function overviewStrategicCards(accounts = {}, transactions = {}, trades = {}, p
         tone: "strategic",
       },
     ),
+    financialHealthScoreCard(accounts, transactions, trades, portfolio),
     dashboardCard(
       "strategic-monthly-surplus",
       "Monthly Surplus",
@@ -10550,6 +10554,178 @@ function overviewStrategicCards(accounts = {}, transactions = {}, trades = {}, p
       },
     ),
   ];
+}
+
+function financialHealthScoreCard(accounts = {}, transactions = {}, trades = {}, portfolio = {}) {
+  const assessment = financialHealthAssessment(accounts, transactions, trades, portfolio);
+  return dashboardCard(
+    "financial-health-score",
+    "Financial Health",
+    `${assessment.score}/100`,
+    `${assessment.grade} · ${assessment.weakest.label} ${assessment.weakest.score}`,
+    "Weighted planning score from liquidity, cashflow, savings, target discipline, debt, concentration, capital momentum, and data quality.",
+    "gauge",
+    {
+      compact: true,
+      sparkline: overviewReferenceSparkline(assessment.score),
+      tone: assessment.tone,
+    },
+  );
+}
+
+function financialHealthAssessment(accounts = {}, transactions = {}, trades = {}, portfolio = {}) {
+  const components = financialHealthComponents(accounts, transactions, trades, portfolio);
+  const totalWeight = components.reduce((sum, component) => sum + component.weight, 0) || 1;
+  const rawScore = components.reduce((sum, component) => sum + (component.score * component.weight), 0) / totalWeight;
+  const score = Math.round(clampValue(rawScore, 0, 100));
+  const weakest = components.reduce((lowest, component) => component.score < lowest.score ? component : lowest, components[0] || { label: "baseline", score: score });
+  return {
+    components,
+    grade: financialHealthGrade(score),
+    score,
+    tone: financialHealthTone(score),
+    weakest: {
+      label: weakest.label,
+      score: Math.round(weakest.score),
+    },
+  };
+}
+
+function financialHealthComponents(accounts = {}, transactions = {}, trades = {}, portfolio = {}) {
+  const series = transactions.monthly_series || [];
+  const recentRows = recentCompletedMonthlyRows(series, 12);
+  const thresholds = state.intelligenceThresholds || defaultIntelligenceThresholds();
+  const netWorth = numericValue(accounts.net_worth_eur);
+  const liquidCapital = numericValue(accounts.liquid_capital_eur);
+  const averageIncome = averageMonthlyIncome(series, 12);
+  const averageSpend = averageMonthlyExpense(series, 12);
+  const monthlySurplus = averageIncome - averageSpend;
+  const cashRunway = averageSpend > 0 ? liquidCapital / averageSpend : liquidCapital > 0 ? 24 : 0;
+  const positiveCashflowPct = recentRows.length
+    ? percentOf(recentRows.filter((row) => numericValue(row.net_eur, numericValue(row.income_eur) - numericValue(row.expense_eur)) >= 0).length, recentRows.length)
+    : 0;
+  const ytdNet = numericValue(transactions.ytd_net_eur);
+  const ytdIncome = numericValue(transactions.ytd_income_eur);
+  const ytdSavingsRate = percentOf(ytdNet, ytdIncome);
+  const structuralOverspending = Math.max(0, numericValue(transactions.capital_targets?.structural_overspending_eur));
+  const annualizedIncome = averageIncome * 12;
+  const currentCapacityBase = Math.max(Math.abs(netWorth), Math.abs(ytdIncome), Math.abs(annualizedIncome), 1);
+  const structuralOverspendingPct = percentOf(structuralOverspending, currentCapacityBase);
+  const targets = transactions.monthly_targets || [];
+  const targetRowsWithActuals = targets.filter((row) => monthlyTargetActualsAreDue(row));
+  const breachRate = targetRowsWithActuals.length
+    ? percentOf(targetRowsWithActuals.filter((row) => numericValue(row.structural_overspending_eur) > 0).length, targetRowsWithActuals.length)
+    : 0;
+  const expenses = recentCompletedMonthlyValues(series, "expense_eur", 12).filter((value) => value > 0);
+  const expenseVolatility = average(expenses) ? percentOf(standardDeviation(expenses), average(expenses)) : 0;
+  const credit = creditUtilizationData(accounts.credit_cards || []);
+  const creditScore = credit.limit
+    ? healthScoreLowerIsBetter(credit.pct, 20, thresholds.creditUtilizationWarningPct, 95)
+    : 82;
+  const liabilityRatio = percentOf(numericValue(accounts.liabilities_eur), numericValue(accounts.assets_eur));
+  const topAccount = largestAccountExposureData(accounts);
+  const largestExpense = largestExpenseCategory(transactions);
+  const investmentShare = percentOf(breakdownAmount(accounts.by_bucket, ["investment", "investments"]), netWorth);
+  const leakageContext = netWorthLeakageContext(accounts, transactions);
+  const capitalLeakagePct = percentOf(numericValue(leakageContext.ledgerGap), currentCapacityBase);
+  const investmentCapital = breakdownAmount(accounts.by_bucket, ["investment", "investments"]);
+  const realizedGains = numericValue(trades.realized_pl_eur, currencyTotal(trades.realized_pl_by_currency));
+  const unrealizedGains = numericValue(trades.unrealized_pl_eur, currencyTotal(trades.unrealized_pl_by_currency));
+  const investmentReturn = percentOf(realizedGains + unrealizedGains, investmentCapital);
+  const stalePositions = numericValue(trades.stale_price_positions);
+  const activePositions = numericValue(trades.active_positions);
+  const stalePositionPct = activePositions ? percentOf(stalePositions, activePositions) : 0;
+  const totalRows = numericValue(transactions.total);
+  const issueCount = numericValue(transactions.review_open)
+    + numericValue(transactions.uncategorized)
+    + numericValue(transactions.missing_core_fields);
+  const dataCompletenessScore = totalRows ? clampValue(100 - percentOf(issueCount, totalRows), 0, 100) : 75;
+  const reviewImpactPct = percentOf(Math.abs(numericValue(transactions.review_open_amount_eur)), Math.max(Math.abs(netWorth), 1));
+  const liquidityScore = weightedHealthScore([
+    { score: healthScoreHigherIsBetter(cashRunway, 1, 6, 12), weight: 0.75 },
+    { score: healthScoreHigherIsBetter(percentOf(liquidCapital, averageSpend * 6), 25, 100, 200), weight: 0.25 },
+  ]);
+  const cashflowScore = weightedHealthScore([
+    { score: healthScoreHigherIsBetter(percentOf(monthlySurplus, averageIncome), -20, 15, 40), weight: 0.65 },
+    { score: positiveCashflowPct, weight: 0.35 },
+  ]);
+  const targetDisciplineScore = weightedHealthScore([
+    { score: healthScoreLowerIsBetter(structuralOverspendingPct, 0, 5, 20), weight: 0.45 },
+    { score: healthScoreLowerIsBetter(breachRate, 0, 20, 65), weight: 0.35 },
+    { score: healthScoreLowerIsBetter(expenseVolatility, 10, 35, 85), weight: 0.20 },
+  ]);
+  const debtScore = weightedHealthScore([
+    { score: creditScore, weight: 0.65 },
+    { score: healthScoreLowerIsBetter(liabilityRatio, 0, 15, 60), weight: 0.35 },
+  ]);
+  const concentrationScore = weightedHealthScore([
+    { score: healthScoreLowerIsBetter(topAccount.pct, 35, thresholds.concentrationWarningPct, 85), weight: 0.55 },
+    { score: healthScoreLowerIsBetter(largestExpense.share, 25, 55, 85), weight: 0.30 },
+    { score: healthScoreLowerIsBetter(investmentShare, 75, 90, 100), weight: 0.15 },
+  ]);
+  const capitalMomentumScore = weightedHealthScore([
+    { score: healthScoreLowerIsBetter(capitalLeakagePct, 0, 8, 25), weight: 0.45 },
+    { score: healthScoreHigherIsBetter(investmentReturn, -10, 0, 15), weight: 0.35 },
+    { score: healthScoreLowerIsBetter(stalePositionPct, 0, 10, 40), weight: 0.20 },
+  ]);
+  const dataQualityScore = weightedHealthScore([
+    { score: dataCompletenessScore, weight: 0.70 },
+    { score: healthScoreLowerIsBetter(reviewImpactPct, 0, 1, 10), weight: 0.30 },
+  ]);
+
+  return [
+    { label: "liquidity", score: liquidityScore, weight: 18 },
+    { label: "cashflow", score: cashflowScore, weight: 16 },
+    { label: "savings", score: healthScoreHigherIsBetter(ytdSavingsRate, -10, 25, 60), weight: 12 },
+    { label: "targets", score: targetDisciplineScore, weight: 18 },
+    { label: "debt", score: debtScore, weight: 12 },
+    { label: "concentration", score: concentrationScore, weight: 12 },
+    { label: "capital trend", score: capitalMomentumScore, weight: 8 },
+    { label: "data quality", score: dataQualityScore, weight: 4 },
+  ];
+}
+
+function weightedHealthScore(items = []) {
+  const valid = items.filter((item) => Number.isFinite(Number(item.score)) && Number(item.weight) > 0);
+  const totalWeight = valid.reduce((sum, item) => sum + Number(item.weight), 0);
+  if (!totalWeight) return 0;
+  return clampValue(valid.reduce((sum, item) => sum + (Number(item.score) * Number(item.weight)), 0) / totalWeight, 0, 100);
+}
+
+function healthScoreHigherIsBetter(value, poor, good, excellent) {
+  const numeric = numericValue(value);
+  if (numeric <= poor) return 0;
+  if (numeric >= excellent) return 100;
+  if (numeric <= good) return healthInterpolate(numeric, poor, good, 0, 75);
+  return healthInterpolate(numeric, good, excellent, 75, 100);
+}
+
+function healthScoreLowerIsBetter(value, good, warning, poor) {
+  const numeric = numericValue(value);
+  if (numeric <= good) return 100;
+  if (numeric >= poor) return 0;
+  if (numeric <= warning) return healthInterpolate(numeric, good, warning, 100, 60);
+  return healthInterpolate(numeric, warning, poor, 60, 0);
+}
+
+function healthInterpolate(value, fromValue, toValue, fromScore, toScore) {
+  if (fromValue === toValue) return toScore;
+  const pct = clampValue((value - fromValue) / (toValue - fromValue), 0, 1);
+  return fromScore + ((toScore - fromScore) * pct);
+}
+
+function financialHealthGrade(score) {
+  if (score >= 85) return "Excellent";
+  if (score >= 75) return "Strong";
+  if (score >= 60) return "Stable";
+  if (score >= 45) return "Fragile";
+  return "At risk";
+}
+
+function financialHealthTone(score) {
+  if (score >= 75) return "positive";
+  if (score < 60) return "negative";
+  return "";
 }
 
 function overviewSystemInsights(accounts = {}, transactions = {}, trades = {}, portfolio = {}) {

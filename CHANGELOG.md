@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-12
 
+- Added a weighted Financial Health score to Overview using liquidity, cashflow, savings, target discipline, debt, concentration, capital momentum, and data quality.
 - Bounded target progress bars so red over-target segments scale inside the available period column instead of spilling into adjacent values.
 - Removed the duplicate structural overspending review signal from Overview while keeping the existing Risk metric.
 - Moved structural overspending from the Overview headline row into Risk bullets and promoted Liquid Capital in its place.
