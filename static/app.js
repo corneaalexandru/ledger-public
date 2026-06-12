@@ -1549,6 +1549,7 @@ function bindEvents() {
       state.selectedTransactionId = "";
       state.selectedTransactionEditing = false;
       state.transactionActionError = "";
+      resetStatementPanel();
       renderPreservingScroll();
     }
     if (action.dataset.action === "close-account") {
@@ -1589,9 +1590,24 @@ function bindEvents() {
     }
     if (action.dataset.action === "close-statement") {
       resetStatementPanel();
+      state.selectedTransactionId = "";
+      state.selectedTransactionEditing = false;
+      state.transactionActionError = "";
+      renderPreservingScroll();
+    }
+    if (action.dataset.action === "back-transaction-detail") {
+      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.transactionId || "";
+      resetStatementPanel();
+      state.selectedTransactionId = transactionId;
+      state.selectedTransactionEditing = false;
+      state.transactionActionError = "";
       renderPreservingScroll();
     }
     if (action.dataset.action === "edit-transaction") {
+      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.transactionId || "";
+      if (!transactionId) return;
+      state.selectedTransactionId = transactionId;
+      resetStatementPanel();
       state.selectedTransactionEditing = true;
       state.transactionActionError = "";
       renderPreservingScroll();
@@ -3867,8 +3883,7 @@ function renderTransactions() {
       "full",
       transactionTableActions(),
     )}
-    ${transactionDetailsPanel(rows)}
-    ${transactionStatementPanel()}
+    ${state.statement.transactionId ? transactionStatementPanel() : transactionDetailsPanel(rows)}
     `}
   `;
 }
@@ -14434,7 +14449,17 @@ function transactionStatementPanel() {
     statementPanelBody(data),
     "close-statement",
     "Imported statement",
+    transactionStatementActions(data),
   );
+}
+
+function transactionStatementActions(data = {}) {
+  const transactionId = state.statement.transactionId || data.transaction_id || state.selectedTransactionId || "";
+  if (!transactionId) return "";
+  return `
+    ${iconActionButton("back-transaction-detail", "chevronLeft", "Back to transaction details", { transactionId })}
+    ${iconActionButton("edit-transaction", "edit", "Edit transaction", { transactionId })}
+  `;
 }
 
 function statementPanelBody(data) {
@@ -14538,7 +14563,9 @@ function transactionDetailActions(row, isEditing) {
     `;
   }
   return `
-    ${isEditing ? "" : `
+    ${isEditing ? `
+      ${iconActionButton("back-transaction-detail", "chevronLeft", "Back to transaction details", { transactionId: row.transaction_id })}
+    ` : `
       ${iconActionButton("duplicate-transaction", "copy", "Duplicate transaction", { transactionId: row.transaction_id })}
       ${row.has_statement ? `
         ${iconActionButton("show-statement", "fileText", "View statement attachments", { transactionId: row.transaction_id })}
@@ -17008,7 +17035,7 @@ async function showTransactionStatement(transactionId) {
   const id = transactionId || "";
   if (!id) return;
   state.periodPanelOpen = false;
-  state.selectedTransactionId = "";
+  state.selectedTransactionId = id;
   state.selectedTransactionEditing = false;
   state.transactionActionError = "";
   state.statement = {
