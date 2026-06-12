@@ -9760,14 +9760,12 @@ function settingsProfileForm() {
       ${[
         settingsMetricCard({ label: "Name", valueHtml: settingsProfileInput("name", profile.name || "", "text", "given-name"), meta: "Profile", note: "Given name shown in local profile settings.", icon: "user", className: "settings-input-card" }),
         settingsMetricCard({ label: "Surname", valueHtml: settingsProfileInput("surname", profile.surname || "", "text", "family-name"), meta: "Profile", note: "Family name shown in local profile settings.", icon: "user", className: "settings-input-card" }),
-        settingsMetricCard({ label: "Username", valueHtml: settingsProfileInput("username", profile.username || "", "text", "username"), meta: "Local identity", note: "Username for the in-app profile record.", icon: "user", className: "settings-input-card" }),
         settingsMetricCard({ label: "Email", valueHtml: settingsProfileInput("email", profile.email || "", "email", "email"), meta: "Contact", note: "Email stored only in the local profile file.", icon: "mail", className: "settings-input-card" }),
-        settingsMetricCard({ label: "Password", valueHtml: settingsProfileInput("password", "", "password", "new-password", profile.has_password ? "Password set" : "New password"), meta: profile.has_password ? "Password set" : "Not set", note: "Leave blank to keep the existing password hash.", icon: "shield", className: "settings-input-card" }),
         settingsMetricCard({
           label: "Profile Status",
-          value: profile.has_password ? "Protected" : "Not protected",
+          value: "Local profile",
           meta: `Updated: ${updated}`,
-          note: "Save profile changes to the local profile store.",
+          note: "Saved locally for display and contact details only.",
           icon: "check",
           actionsHtml: `
             <button class="small-button" type="submit" ${state.loading.profile ? "disabled" : ""}>
@@ -16123,7 +16121,6 @@ async function saveAccount(form) {
 
 async function saveProfile(form) {
   const values = Object.fromEntries(new FormData(form).entries());
-  if (!String(values.password || "").trim()) delete values.password;
   state.profileActionError = "";
   state.profileActionMessage = "";
   state.loading.profile = true;

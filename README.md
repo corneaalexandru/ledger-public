@@ -56,7 +56,7 @@ User data stays in the user's Google Sheet. Pulling app updates does not overwri
 
 ## Local Profile
 
-Settings > Profile stores profile details and an optional password hash in `.ledger_profile.json`. The file is ignored by Git and stays on the user's computer.
+Settings > Profile stores display and contact details in `.ledger_profile.json`. It does not create a login, password, or browser authentication prompt. The file is ignored by Git and stays on the user's computer.
 
 ## Documentation
 
