@@ -5009,6 +5009,8 @@ input.is-invalid {
 .target-progress-strip {
   --planned-pct: 100%;
   --achieved-pct: 0%;
+  --over-left-pct: 100%;
+  --over-pct: 0%;
   position: relative;
   display: block;
   width: min(100%, 440px);
@@ -5018,7 +5020,8 @@ input.is-invalid {
 }
 
 .target-progress-planned,
-.target-progress-achieved {
+.target-progress-achieved,
+.target-progress-over {
   position: absolute;
   left: 0;
   top: 50%;
@@ -5038,7 +5041,25 @@ input.is-invalid {
   background: #0a0a0a;
 }
 
-.target-progress-strip.is-empty .target-progress-achieved {
+.target-progress-over {
+  left: var(--over-left-pct);
+  width: var(--over-pct);
+  height: 8px;
+  background: #c43b32;
+}
+
+.target-progress-strip.is-over .target-progress-achieved {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.target-progress-strip.is-over .target-progress-over {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.target-progress-strip.is-empty .target-progress-achieved,
+.target-progress-strip.is-empty .target-progress-over {
   width: 0;
 }
 

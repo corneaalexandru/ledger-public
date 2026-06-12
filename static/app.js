@@ -11780,18 +11780,23 @@ function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense
 function monthlyTargetCategoryProgressBar(category = {}, mode = "expense") {
   const target = Math.max(0, numericValue(category.target_eur));
   const actual = Math.max(0, numericValue(category.actual_eur));
+  const cappedActual = target > 0 ? Math.min(actual, target) : 0;
+  const overAmount = Math.max(actual - target, 0);
   const basis = Math.max(target, actual, 1);
   const plannedPct = clampValue(percentOf(target, basis), 0, 100);
-  const achievedPct = clampValue(percentOf(actual, basis), 0, 100);
+  const achievedPct = clampValue(percentOf(cappedActual, basis), 0, 100);
+  const overPct = clampValue(percentOf(overAmount, basis), 0, 100);
+  const overLeftPct = plannedPct;
   const status = !actual
     ? "empty"
-    : actual > target && target
+    : actual > target
       ? "over"
       : "active";
   return `
-    <span class="target-progress-strip is-${mode === "income" ? "income" : "expense"} is-${status}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%;" aria-hidden="true">
+    <span class="target-progress-strip is-${mode === "income" ? "income" : "expense"} is-${status}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%; --over-left-pct: ${overLeftPct}%; --over-pct: ${overPct}%;" aria-hidden="true">
       <span class="target-progress-planned"></span>
       <span class="target-progress-achieved"></span>
+      <span class="target-progress-over"></span>
     </span>
   `;
 }
