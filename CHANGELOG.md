@@ -5,7 +5,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 ## 2026-06-12
 
 - Flattened Settings into one page and standardized Settings/About into one-card-per-item insight grids.
-- Added visual candle progress strips to monthly target category rows, comparing planned target against actual progress.
+- Added grey planned and black achieved progress bars to monthly target category rows.
 - Moved About into its own sidebar page below Settings and removed the raw markdown opener from the changelog view.
 - Reworked Settings sections into compact cards and added Settings > Profile for name, surname, username, password, and email.
 - Removed the browser username/password setup flow from the launcher in favor of the in-app profile store.

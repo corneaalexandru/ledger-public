@@ -11723,7 +11723,7 @@ function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense
               <span class="table-sub">${safe(formatWholeCurrency(category.actual_eur || 0, "EUR"))} ${safe(mode === "expense" ? "actual spend" : "actual income")}</span>
             </span>
           </span>
-          ${monthlyTargetCategoryCandleStrip(category, mode)}
+          ${monthlyTargetCategoryProgressBar(category, mode)}
         </span>
       </td>
       <td class="align-right">${targetAmountCell(category.target_eur, "EUR", mode === "income" ? "income target" : "expense target")}</td>
@@ -11740,30 +11740,21 @@ function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense
   `;
 }
 
-function monthlyTargetCategoryCandleStrip(category = {}, mode = "expense") {
-  const candleCount = 24;
+function monthlyTargetCategoryProgressBar(category = {}, mode = "expense") {
   const target = Math.max(0, numericValue(category.target_eur));
   const actual = Math.max(0, numericValue(category.actual_eur));
   const basis = Math.max(target, actual, 1);
-  const targetPct = clampValue(percentOf(target, basis), 0, 100);
-  const plannedCount = target ? clampValue(Math.round(candleCount * target / basis), 1, candleCount) : 0;
-  const actualCount = actual ? clampValue(Math.round(candleCount * actual / basis), 1, candleCount) : 0;
+  const plannedPct = clampValue(percentOf(target, basis), 0, 100);
+  const achievedPct = clampValue(percentOf(actual, basis), 0, 100);
   const status = !actual
     ? "empty"
     : actual > target && target
       ? "over"
       : "active";
-  const candles = Array.from({ length: candleCount }, (_, index) => {
-    const position = index + 1;
-    const planned = plannedCount && position <= plannedCount;
-    const achieved = actualCount && position <= actualCount;
-    const overrun = achieved && plannedCount && position > plannedCount;
-    return `<span class="target-candle ${planned ? "is-planned" : ""} ${achieved ? "is-achieved" : ""} ${overrun ? "is-overrun" : ""}"></span>`;
-  }).join("");
   return `
-    <span class="target-candle-strip is-${mode === "income" ? "income" : "expense"} is-${status}" style="--target-pct: ${targetPct}%;" aria-hidden="true">
-      <span class="target-candle-track">${candles}</span>
-      ${plannedCount ? `<span class="target-candle-marker"></span>` : ""}
+    <span class="target-progress-strip is-${mode === "income" ? "income" : "expense"} is-${status}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%;" aria-hidden="true">
+      <span class="target-progress-planned"></span>
+      <span class="target-progress-achieved"></span>
     </span>
   `;
 }
