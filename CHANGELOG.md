@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-13
 
+- Changed account and transaction country edit fields to plain two-letter country-code inputs without browser/datalist autofill suggestions.
 - Kept scroll position inside register tables when opening or closing detail drawers from any row.
 - Improved print/PDF output with landscape A4 layout, compact matching typography, fitted tables, and cleaner print headers.
 - Expanded Financial Health scoring with retained-capital shortfall, ledger leakage, and compounding deficit inputs.

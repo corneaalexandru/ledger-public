@@ -14900,6 +14900,14 @@ function accountFieldInput(key, label, row) {
   const comboOptions = accountComboOptions(key);
   const selectOptions = accountSelectOptions(key);
   const className = accountWideFields().has(key) ? " class=\"field-wide\"" : "";
+  if (key === "country_code") {
+    return `
+      <label${className}>
+        <span>${safe(label)}</span>
+        ${countryCodeInputHtml(key, value)}
+      </label>
+    `;
+  }
   if (comboOptions) {
     const listId = `account-${safe(row.account_id)}-${safe(key)}-options`;
     return `
@@ -14939,7 +14947,6 @@ function accountComboOptions(key) {
     provider_id: options.provider_ids || [],
     capital_bucket: options.capital_buckets || [],
     account_type: options.account_types || [],
-    country_code: options.countries || countryOptions(),
   };
   return optionsByField[key] || null;
 }
@@ -15101,6 +15108,14 @@ function transactionFieldInput(key, label, row) {
   const value = row[key];
   const comboOptions = transactionComboOptions(key, row);
   const className = transactionWideFields().has(key) ? " class=\"field-wide\"" : "";
+  if (key === "country_code") {
+    return `
+      <label${className}>
+        <span>${safe(label)}</span>
+        ${countryCodeInputHtml(key, value)}
+      </label>
+    `;
+  }
   if (comboOptions) {
     const listId = `transaction-${safe(row.transaction_id)}-${safe(key)}-options`;
     const inputValue = comboInputValue(value, key);
@@ -15161,7 +15176,6 @@ function transactionComboOptions(key, row = {}) {
   if (key === "transfer_scope") return options.transfer_scopes || [];
   if (key === "category_id") return categoryOptionsForSubcategory(row.subcategory_id);
   if (key === "subcategory_id") return subcategoryOptionsForCategory(row.category_id);
-  if (key === "country_code") return countryOptions();
   return null;
 }
 
@@ -15191,6 +15205,24 @@ function selectOptionsHtml(options, selectedValue, key) {
       return `<option value="${safe(value)}"${value === String(selectedValue ?? "") ? " selected" : ""}>${safe(optionLabel(option, key))}</option>`;
     }),
   ].join("");
+}
+
+function countryCodeInputHtml(key, value = "") {
+  const inputValue = countryCodeFromInput(value) || String(value ?? "").trim().toUpperCase();
+  return `
+    <input
+      name="${safe(key)}"
+      type="text"
+      value="${safe(inputValue)}"
+      autocomplete="new-password"
+      autocapitalize="characters"
+      spellcheck="false"
+      inputmode="text"
+      maxlength="2"
+      pattern="[A-Za-z]{2}"
+      placeholder="RO"
+    />
+  `;
 }
 
 function datalistOptionsHtml(options, key) {
