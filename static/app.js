@@ -15523,7 +15523,9 @@ function detailPanel(title, heading, body, closeAction, ariaLabel, actions = "")
           </button>
         </div>
       </header>
-      ${body}
+      <div class="details-body">
+        ${body}
+      </div>
     </aside>
   `;
 }
