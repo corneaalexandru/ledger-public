@@ -18,6 +18,9 @@
   --warning: #f0bd6a;
   --danger: #ee806f;
   --negative-subtle: #d7d7d7;
+  --target-progress-planned: #d8d8d8;
+  --target-progress-achieved: #555555;
+  --target-progress-over: #c43b32;
   --heat-0: #101010;
   --heat-1: #1d1d1d;
   --heat-2: #2b2b2b;
@@ -84,6 +87,9 @@ html[data-theme="light"] {
   --warning: #9c650e;
   --danger: #b53b2f;
   --negative-subtle: #38434f;
+  --target-progress-planned: #d8d8d8;
+  --target-progress-achieved: #202a33;
+  --target-progress-over: #c43b32;
   --heat-0: #eef1f4;
   --heat-1: #dde4ea;
   --heat-2: #c7d1da;
@@ -5335,20 +5341,20 @@ input.is-invalid {
 .target-progress-planned {
   width: var(--planned-pct);
   height: 8px;
-  background: #d8d8d8;
+  background: var(--target-progress-planned);
 }
 
 .target-progress-achieved {
   width: var(--achieved-pct);
   height: 8px;
-  background: #0a0a0a;
+  background: var(--target-progress-achieved);
 }
 
 .target-progress-over {
   left: var(--over-left-pct);
   width: var(--over-pct);
   height: 8px;
-  background: #c43b32;
+  background: var(--target-progress-over);
 }
 
 .target-progress-strip.is-compact .target-progress-planned,

@@ -9,6 +9,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Updated install documentation to spell out Google Sheets API enablement, service-account creation, Sheet sharing, and native Google Sheets setup.
 - Expanded the README screenshot gallery to cover setup, account details, Insights, chart views, Targets in all/year/month modes, Statements Import, Trades, Portfolio, Planning, Settings, and About.
 - Added release checks for the new web setup first-run path so clean installs do not create local CSV or spreadsheet artifacts.
+- Changed target progress bars to use visible dark-gray achieved fills in dark mode instead of near-black fills that disappear on the black background.
 
 ## 2026-06-14
 
