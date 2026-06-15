@@ -20,7 +20,5 @@ then
   "$PYTHON_BIN" -m pip install -r requirements-google.txt
 fi
 
-"$PYTHON_BIN" scripts/setup_google.py
-
 echo "Starting Ledger Public at http://${HOST}:${PORT}"
-exec "$PYTHON_BIN" server.py --store google --host "$HOST" --port "$PORT" --open
+exec "$PYTHON_BIN" server.py --setup --store google --host "$HOST" --port "$PORT" --open

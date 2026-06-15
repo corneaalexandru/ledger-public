@@ -1,3 +1,4 @@
 @echo off
 cd /d "%~dp0"
-py server.py --open
+py -m pip install -r requirements-google.txt
+py server.py --setup --open

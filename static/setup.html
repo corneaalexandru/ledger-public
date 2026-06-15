@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ledger Public Setup</title>
+    <link rel="stylesheet" href="styles.css?v=20260615-setup" />
+    <link rel="stylesheet" href="setup.css?v=20260615-setup" />
+  </head>
+  <body class="setup-body">
+    <main class="setup-shell">
+      <section class="setup-main" aria-labelledby="setupTitle">
+        <div class="setup-kicker">Ledger Public</div>
+        <header class="setup-header">
+          <div>
+            <h1 id="setupTitle">Connect Google Sheets</h1>
+            <p>
+              Create a user-owned Ledger database in a native Google Sheet, then seed it with complete mock data.
+            </p>
+          </div>
+          <a class="setup-link" href="GOOGLE_SHEETS_SETUP.md">Setup guide</a>
+        </header>
+
+        <form class="setup-form" id="setupForm">
+          <section class="setup-section" aria-labelledby="googleCloudTitle">
+            <div class="setup-section-head">
+              <span class="setup-step-number">1</span>
+              <div>
+                <h2 id="googleCloudTitle">Google Cloud Key</h2>
+                <p>Enable the Google Sheets API, create a service account, then upload its JSON key.</p>
+              </div>
+            </div>
+            <div class="setup-grid">
+              <label class="setup-field setup-field-wide">
+                <span>Service-account JSON</span>
+                <input id="credentialsFile" name="credentials_file" type="file" accept=".json,application/json" />
+              </label>
+              <label class="setup-field setup-field-wide">
+                <span>Existing key path</span>
+                <input id="credentialsPath" name="credentials_path" type="text" autocomplete="off" />
+              </label>
+            </div>
+            <div class="setup-callout" id="serviceEmailBox">
+              <span class="setup-callout-label">Share email</span>
+              <strong id="serviceEmail">Upload a key to reveal the service-account email.</strong>
+              <p>Share the blank Google Sheet with this email as Editor before completing setup.</p>
+            </div>
+          </section>
+
+          <section class="setup-section" aria-labelledby="sheetTitle">
+            <div class="setup-section-head">
+              <span class="setup-step-number">2</span>
+              <div>
+                <h2 id="sheetTitle">Google Sheet</h2>
+                <p>Paste the blank Sheet URL or the spreadsheet ID copied from the address bar.</p>
+              </div>
+            </div>
+            <div class="setup-grid">
+              <label class="setup-field setup-field-wide">
+                <span>Google Sheet URL or ID</span>
+                <input id="spreadsheet" name="spreadsheet" type="text" autocomplete="off" required />
+              </label>
+              <label class="setup-field">
+                <span>Project Currency</span>
+                <select id="projectCurrency" name="project_currency"></select>
+              </label>
+            </div>
+          </section>
+
+          <section class="setup-section" aria-labelledby="profileTitle">
+            <div class="setup-section-head">
+              <span class="setup-step-number">3</span>
+              <div>
+                <h2 id="profileTitle">Local Profile</h2>
+                <p>These details stay in the ignored local profile file and can be changed later in Settings.</p>
+              </div>
+            </div>
+            <div class="setup-grid">
+              <label class="setup-field">
+                <span>Name</span>
+                <input id="profileName" name="name" type="text" autocomplete="given-name" />
+              </label>
+              <label class="setup-field">
+                <span>Surname</span>
+                <input id="profileSurname" name="surname" type="text" autocomplete="family-name" />
+              </label>
+              <label class="setup-field setup-field-wide">
+                <span>Email</span>
+                <input id="profileEmail" name="email" type="email" autocomplete="email" />
+              </label>
+            </div>
+          </section>
+
+          <div class="setup-actions">
+            <button class="setup-button" id="submitButton" type="submit">
+              <span>Finish Setup</span>
+            </button>
+            <p class="setup-status" id="setupStatus" role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <aside class="setup-side" aria-labelledby="checklistTitle">
+        <h2 id="checklistTitle">Install Checklist</h2>
+        <ol class="setup-checklist" id="setupSteps"></ol>
+        <div class="setup-note">
+          <strong>Native Google Sheets only</strong>
+          <p>The public release does not require an XLSX workbook or a local database file.</p>
+        </div>
+      </aside>
+    </main>
+    <script type="module" src="setup.js?v=20260615-setup"></script>
+  </body>
+</html>

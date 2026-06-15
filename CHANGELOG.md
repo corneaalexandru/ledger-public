@@ -2,6 +2,13 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-15
+
+- Added a browser setup flow that captures the Google service-account key, Google Sheet URL, Project Currency, and local profile name/surname/email before seeding.
+- Expanded starter Google Sheets with richer mock income, expense, transfer, account, trade, portfolio, category, FX, classification-rule, and setup-reference rows.
+- Updated install documentation to spell out Google Sheets API enablement, service-account creation, Sheet sharing, native Google Sheets setup, and the retirement of XLSX starter files.
+- Added release checks for the new web setup first-run path so clean installs do not create legacy local CSV or XLSX runtime data.
+
 ## 2026-06-14
 
 - Added total rows to the monthly target income and expense category model tables so each breakdown shows target, actual, and share or over-ceiling totals.

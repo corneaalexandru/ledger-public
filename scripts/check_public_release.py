@@ -84,6 +84,17 @@ def verify_clean_first_run_requires_google_setup() -> None:
             raise SystemExit("Default first run should require Google setup, but it succeeded.")
         if "Google mode needs LEDGER_SPREADSHEET_ID" not in result.stdout:
             raise SystemExit("Default first run did not explain missing Google setup:\n" + result.stdout)
+        setup_result = subprocess.run(
+            [sys.executable, "server.py", "--setup", "--init-only"],
+            cwd=tmp,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        if setup_result.returncode != 0:
+            raise SystemExit("Web setup mode should start cleanly before Google setup:\n" + setup_result.stdout)
+        if "web setup is ready" not in setup_result.stdout.lower():
+            raise SystemExit("Web setup mode did not explain the browser setup path:\n" + setup_result.stdout)
         for forbidden in ("local_ledger_data", "local_ledger_workbook.xlsx"):
             if (tmp / forbidden).exists():
                 raise SystemExit(f"Default first run created legacy local data: {forbidden}")

@@ -17,9 +17,6 @@ credentials/*
 !credentials/.gitkeep
 .ledger_public_setup/
 
-# Starter database template is tracked. User-created workbooks remain ignored.
-!starter/ledger_starter_workbook.xlsx
-
 # Legacy/local runtime data. Ignored so older installs and test runs do not
 # commit personal ledger rows.
 local_ledger_data/

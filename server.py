@@ -7,6 +7,7 @@ import json
 import mimetypes
 import os
 import re
+import stat
 import sys
 import tempfile
 import threading
@@ -33,6 +34,10 @@ CHANGELOG_PATH = ROOT / "CHANGELOG.md"
 DATA_DIR = ROOT / "local_ledger_data"
 LEGACY_DATA_DIR = ROOT / "mock_google_sheet"
 SHEET_DIR = DATA_DIR
+ENV_PATH = ROOT / ".env"
+SETUP_DIR = ROOT / ".ledger_public_setup"
+SETUP_MARKER = SETUP_DIR / "google_configured"
+DEFAULT_CREDENTIALS = Path("credentials/ledger-public-service-account.json")
 TODAY = date(2026, 6, 10)
 
 FX_RATES_TO_EUR = {
@@ -186,6 +191,7 @@ STORE_MODE = "google"
 STORE_DETAILS: dict[str, str] = {}
 PROJECT_CURRENCY = "EUR"
 PROFILE = ProfileStore(ROOT)
+SETUP_MODE = False
 
 
 def money(value: float) -> float:
@@ -436,28 +442,65 @@ def default_transactions() -> list[dict]:
     for index, month in enumerate(months):
         year, month_number = [int(part) for part in month.split("-")]
         base_day = date(year, month_number, 1)
-        salary = 8300 + (index // 12) * 350
-        bonus = 2200 if month_number in {3, 6, 9, 12} else 0
+        salary = 8600 + (index // 12) * 350
+        consulting = 1800 if month_number in {3, 6, 9, 12} else 0
+        pension = 520 + (index // 12) * 35
+        interest = 58 + (index % 4) * 9
+        brokerage_revenue = 260 if month_number in {1, 4, 7, 10} else 0
+        refund = 140 if index % 7 == 0 else 0
+        incoming_transfer = 600 if month_number in {6, 12} else 0
         rent = -2450 - (index // 12) * 120
-        groceries = -880 - (index % 5) * 25
-        utilities = -360 - (index % 4) * 18
-        dining = -540 - (index % 6) * 45
-        travel = -900 - (700 if month_number in {4, 8, 12} else 0)
+        groceries = -780 - (index % 5) * 24
+        dining = -430 - (index % 6) * 38
+        utilities = -330 - (index % 4) * 18
+        transport = -310 - (index % 3) * 22
+        subscriptions = -92 - (index % 2) * 12
+        health = -150 - (260 if month_number in {2, 8} else 0)
+        insurance = -215
+        education = -180 if month_number in {1, 5, 9} else -45
+        travel = -760 - (620 if month_number in {4, 8, 12} else 0)
+        bank_charges = -38 - (index % 3) * 6
+        taxes = -420 if month_number in {3, 6, 9, 12} else -95
+        family = -240 - (index % 4) * 35
+        personal = -310 - (index % 5) * 28
+        home = -190 - (360 if month_number in {5, 11} else 0)
         investment = -1800 - (index // 12) * 250
+        reserve_transfer = -700 if month_number in {1, 7} else 0
         entries = [
-            (2, "Employer salary", "Salary", "salary", "salary", salary, "acct_000001", "Employer", "payroll"),
-            (4, "Quarterly consulting invoice", "Consulting", "consulting", "consulting", bonus, "acct_000001", "Consulting", "invoice"),
-            (6, "Monthly rent", "Housing", "rent", "expense", rent, "acct_000001", "", "landlord"),
+            (2, "Employer salary package", "Salary Package", "salary_package", "income", salary, "acct_000001", "Employer", "payroll"),
+            (3, "Employer pension contribution", "Pension", "employer_pension", "income", pension, "acct_000004", "PensionCo", "pension"),
+            (4, "Quarterly consulting invoice", "Consulting", "consulting", "income", consulting, "acct_000001", "Consulting", "invoice"),
+            (5, "Interest returns", "Interest Returns", "interest", "income", interest, "acct_000002", "Savings Reserve", "bank interest"),
+            (6, "Brokerage dividends", "Brokerage Revenue", "dividends", "income", brokerage_revenue, "acct_000003", "IBKR", "dividend"),
+            (7, "Statement refund", "Refunds", "refund", "income", refund, "acct_000005", "Card refund", "refund"),
+            (8, "Incoming internal transfer", "Transfer", "incoming_transfer", "transfer", incoming_transfer, "acct_000001", "", "internal transfer"),
+            (9, "Monthly accommodation", "Accommodation", "rent", "expense", rent, "acct_000001", "", "landlord"),
             (9, "Groceries and household", "Food", "groceries", "expense", groceries, "acct_000005", "", "market"),
-            (12, "Utilities", "Home", "utilities", "expense", utilities, "acct_000001", "", "utility"),
-            (18, "Dining and social", "Lifestyle", "dining", "expense", dining, "acct_000005", "", "restaurants"),
+            (10, "Dining and social", "Food", "dining", "expense", dining, "acct_000005", "", "restaurants"),
+            (12, "Utilities", "Utilities", "utilities", "expense", utilities, "acct_000001", "", "utility"),
+            (13, "Transport and mobility", "Transport", "mobility", "expense", transport, "acct_000005", "", "mobility"),
+            (14, "Software subscriptions", "Subscriptions", "software", "expense", subscriptions, "acct_000005", "", "software"),
+            (15, "Medical and pharmacy", "Health", "medical", "expense", health, "acct_000005", "", "clinic"),
+            (16, "Insurance premium", "Insurance", "insurance", "expense", insurance, "acct_000001", "", "insurer"),
+            (17, "Education and books", "Education", "learning", "expense", education, "acct_000005", "", "learning"),
+            (20, "Family support", "Family", "family_support", "expense", family, "acct_000001", "", "family"),
+            (21, "Personal shopping", "Personal", "shopping", "expense", personal, "acct_000005", "", "retail"),
             (22, "Travel and mobility", "Travel", "travel", "expense", travel, "acct_000005", "", "travel"),
-            (25, "Brokerage contribution", "Investing", "portfolio_contribution", "transfer", investment, "acct_000001", "", "IBKR"),
+            (23, "Home maintenance", "Home", "maintenance", "expense", home, "acct_000001", "", "maintenance"),
+            (24, "Taxes and government fees", "Taxes", "tax", "expense", taxes, "acct_000001", "", "tax authority"),
+            (25, "Bank and platform charges", "Bank Charges", "bank_fee", "expense", bank_charges, "acct_000001", "", "bank fee"),
+            (26, "Brokerage contribution", "Transfer", "portfolio_contribution", "transfer", investment, "acct_000001", "", "IBKR"),
+            (27, "Reserve transfer", "Transfer", "reserve_transfer", "transfer", reserve_transfer, "acct_000001", "", "Wise"),
         ]
         for day_offset, memo, category, subcategory, klass, amount, account_id, income_source, merchant in entries:
             if amount == 0:
                 continue
             tx_date = (base_day + timedelta(days=min(day_offset, 27))).isoformat()
+            transfer_scope = ""
+            portfolio_id = ""
+            if klass == "transfer":
+                transfer_scope = "portfolio" if subcategory == "portfolio_contribution" else "internal"
+                portfolio_id = "core" if transfer_scope == "portfolio" else ""
             rows.append(
                 {
                     "transaction_id": f"tx_{counter:06d}",
@@ -478,8 +521,8 @@ def default_transactions() -> list[dict]:
                     "account_id": account_id,
                     "income_source": income_source,
                     "merchant": merchant,
-                    "transfer_scope": "portfolio" if klass == "transfer" else "",
-                    "portfolio_id": "core" if klass == "transfer" else "",
+                    "transfer_scope": transfer_scope,
+                    "portfolio_id": portfolio_id,
                     "imported_transaction": "yes",
                     "ledger_status": "accountable",
                     "review_status": "reviewed",
@@ -712,20 +755,30 @@ def default_phase_rows() -> list[dict]:
 def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
     category_headers = ["category_id", "subcategory_id", "transaction_class", "direction", "example", "notes"]
     categories = [
-        ("Salary", "salary", "salary", "inflow", "Employer payroll", "Recurring earned income"),
-        ("Consulting", "consulting", "consulting", "inflow", "Client invoice", "Variable earned income"),
-        ("Housing", "rent", "expense", "outflow", "Monthly rent", "Housing and rent"),
+        ("Salary Package", "salary_package", "income", "inflow", "Employer payroll", "Base pay, allowances, and recurring earned income"),
+        ("Pension", "employer_pension", "income", "inflow", "Employer pension contribution", "Retirement contributions recorded as income"),
+        ("Consulting", "consulting", "income", "inflow", "Client invoice", "Variable earned income"),
+        ("Interest Returns", "interest", "income", "inflow", "Savings interest", "Bank, cash, and fixed-income interest"),
+        ("Brokerage Revenue", "dividends", "income", "inflow", "Dividend distribution", "Dividends, coupons, and realized brokerage cash income"),
+        ("Refunds", "refund", "income", "inflow", "Card refund", "Refunds and reversals"),
+        ("Transfer", "incoming_transfer", "transfer", "neutral", "Incoming own-account transfer", "Internal movement into an account"),
+        ("Transfer", "portfolio_contribution", "transfer", "outflow", "Brokerage transfer", "Capital moved into investment accounts"),
+        ("Transfer", "reserve_transfer", "transfer", "outflow", "Reserve transfer", "Capital moved into savings or reserve accounts"),
+        ("Accommodation", "rent", "expense", "outflow", "Monthly rent", "Housing, rent, and accommodation"),
         ("Food", "groceries", "expense", "outflow", "Supermarket", "Groceries and household food"),
         ("Food", "dining", "expense", "outflow", "Restaurant", "Dining and social spending"),
-        ("Home", "utilities", "expense", "outflow", "Electricity/water", "Recurring utilities"),
+        ("Utilities", "utilities", "expense", "outflow", "Electricity/water", "Recurring utilities"),
+        ("Transport", "mobility", "expense", "outflow", "Taxi, metro, fuel", "Local transport and mobility"),
+        ("Subscriptions", "software", "expense", "outflow", "Cloud software", "Software, apps, and memberships"),
         ("Travel", "travel", "expense", "outflow", "Flights/hotels", "Travel and mobility"),
         ("Health", "medical", "expense", "outflow", "Clinic/pharmacy", "Medical and wellbeing"),
         ("Insurance", "insurance", "expense", "outflow", "Policy premium", "Protection and insurance"),
         ("Education", "learning", "expense", "outflow", "Course/books", "Learning and professional growth"),
-        ("Investing", "portfolio_contribution", "transfer", "outflow", "Brokerage transfer", "Capital moved into investment accounts"),
-        ("Transfers", "internal_transfer", "transfer", "neutral", "Own-account transfer", "Internal movement between accounts"),
         ("Taxes", "tax", "expense", "outflow", "Income tax", "Taxes and government fees"),
-        ("Fees", "bank_fee", "expense", "outflow", "Bank/platform fee", "Financial service charges"),
+        ("Family", "family_support", "expense", "outflow", "Family support", "Family, dependents, and support payments"),
+        ("Personal", "shopping", "expense", "outflow", "Retail purchase", "Personal goods and shopping"),
+        ("Home", "maintenance", "expense", "outflow", "Repair or fixture", "Home maintenance and household items"),
+        ("Bank Charges", "bank_fee", "expense", "outflow", "Bank/platform fee", "Financial service charges"),
     ]
 
     account_headers = ["account_type", "capital_bucket", "ledger_status", "example", "notes"]
@@ -736,6 +789,8 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
         ("pension", "retirement", "accountable", "Pension account", "Long-term retirement capital"),
         ("credit_card", "liability", "accountable", "Credit card", "Short-term liability"),
         ("receivable", "receivable", "accountable", "Private receivable", "Money owed to user"),
+        ("loan", "liability", "accountable", "Personal loan", "Debt and installment balances"),
+        ("wallet", "liquid", "accountable", "Cash wallet", "Small cash or app wallet balance"),
     ]
 
     fx_headers = ["currency", "rate_to_eur", "rate_to_usd", "rate_date", "source", "notes"]
@@ -756,18 +811,23 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
     rules = [
         ("rule_0001", "merchant", "market", "Food", "groceries", "expense", "Starter categorization example"),
         ("rule_0002", "merchant", "restaurants", "Food", "dining", "expense", "Starter categorization example"),
-        ("rule_0003", "memo", "rent", "Housing", "rent", "expense", "Starter categorization example"),
-        ("rule_0004", "memo", "salary", "Salary", "salary", "salary", "Starter categorization example"),
-        ("rule_0005", "merchant", "IBKR", "Investing", "portfolio_contribution", "transfer", "Starter transfer example"),
+        ("rule_0003", "merchant", "landlord", "Accommodation", "rent", "expense", "Starter categorization example"),
+        ("rule_0004", "memo", "salary", "Salary Package", "salary_package", "income", "Starter categorization example"),
+        ("rule_0005", "merchant", "IBKR", "Transfer", "portfolio_contribution", "transfer", "Starter transfer example"),
+        ("rule_0006", "merchant", "bank interest", "Interest Returns", "interest", "income", "Starter income example"),
+        ("rule_0007", "merchant", "dividend", "Brokerage Revenue", "dividends", "income", "Starter investment-income example"),
+        ("rule_0008", "merchant", "software", "Subscriptions", "software", "expense", "Starter subscription example"),
+        ("rule_0009", "merchant", "tax authority", "Taxes", "tax", "expense", "Starter tax example"),
+        ("rule_0010", "merchant", "bank fee", "Bank Charges", "bank_fee", "expense", "Starter fee example"),
     ]
 
     instruction_headers = ["step", "instruction", "details"]
     instructions = [
         ("1", "Create a blank Google Sheet", "Use Google Drive > New > Google Sheets. No XLSX upload or conversion is required."),
-        ("2", "Create a service-account JSON key", "Save it as credentials/ledger-service-account.json inside Ledger Public."),
-        ("3", "Share the Google Sheet", "Share it with the client_email from the JSON key as Editor."),
-        ("4", "Run start_ledger_public.command", "The setup wizard writes .env once and creates the native Ledger tabs."),
-        ("5", "Start Ledger Public", "The app reads and writes the Google Sheet directly after setup."),
+        ("2", "Enable the Google Sheets API", "In Google Cloud, choose the project for Ledger Public and enable Google Sheets API."),
+        ("3", "Create a service-account JSON key", "Create a service account, create a JSON key, and upload it in the web setup page."),
+        ("4", "Share the Google Sheet", "Share it with the client_email from the JSON key as Editor."),
+        ("5", "Finish web setup", "The browser setup writes .env once, stores local profile details, and creates the native Ledger tabs."),
     ]
 
     return {
@@ -780,7 +840,7 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
 
 
 def default_google_sheet_rows() -> dict[str, list[dict]]:
-    return {
+    rows = {
         "accounts_register": default_accounts(),
         "transactions_register": default_transactions(),
         "trades_register": default_trades(),
@@ -788,6 +848,14 @@ def default_google_sheet_rows() -> dict[str, list[dict]]:
         "portfolio_monthly_investment_plan": default_mip_rows(),
         "portfolio_exit_phases": default_phase_rows(),
     }
+    rows.update({sheet_name: sheet_rows for sheet_name, (_, sheet_rows) in default_reference_sheets().items()})
+    return rows
+
+
+def google_sheet_schemas() -> dict[str, list[str]]:
+    schemas = dict(SHEETS)
+    schemas.update({sheet_name: headers for sheet_name, (headers, _) in default_reference_sheets().items()})
+    return schemas
 
 
 def ensure_local_data(reset: bool = False) -> None:
@@ -974,7 +1042,17 @@ def transaction_amount(row: dict) -> float:
 
 def transaction_summary(rows: list[dict]) -> dict:
     active = active_rows(rows)
-    monthly = defaultdict(lambda: {"income_eur": 0.0, "expense_eur": 0.0, "net_eur": 0.0, "transfers_eur": 0.0, "transactions": 0})
+    monthly = defaultdict(
+        lambda: {
+            "income_eur": 0.0,
+            "expense_eur": 0.0,
+            "net_eur": 0.0,
+            "transfers_eur": 0.0,
+            "transactions": 0,
+            "income_categories": defaultdict(float),
+            "expense_categories": defaultdict(float),
+        }
+    )
     income_by_source = defaultdict(float)
     spend_by_category = defaultdict(float)
     for row in active:
@@ -987,11 +1065,13 @@ def transaction_summary(rows: list[dict]) -> dict:
         bucket["net_eur"] += amount
         if amount >= 0:
             bucket["income_eur"] += amount
+            bucket["income_categories"][row.get("category_id") or "Income"] += amount
             income_by_source[row.get("income_source") or row.get("category_id") or "Income"] += amount
         elif row.get("transaction_class") == "transfer":
             bucket["transfers_eur"] += abs(amount)
         else:
             bucket["expense_eur"] += abs(amount)
+            bucket["expense_categories"][row.get("category_id") or "Expense"] += abs(amount)
             spend_by_category[row.get("category_id") or "Expense"] += abs(amount)
     monthly_series = [
         {
@@ -1001,6 +1081,14 @@ def transaction_summary(rows: list[dict]) -> dict:
             "net_eur": money(values["net_eur"]),
             "transfers_eur": money(values["transfers_eur"]),
             "transactions": values["transactions"],
+            "income_categories": [
+                {"category": key, "actual_eur": money(value)}
+                for key, value in sorted(values["income_categories"].items(), key=lambda item: -item[1])
+            ],
+            "expense_categories": [
+                {"category": key, "actual_eur": money(value)}
+                for key, value in sorted(values["expense_categories"].items(), key=lambda item: -item[1])
+            ],
         }
         for month, values in sorted(monthly.items())
     ]
@@ -1048,18 +1136,27 @@ def planning_targets(monthly_series: list[dict]) -> tuple[list[dict], list[dict]
     for row in monthly_series:
         income = num(row.get("income_eur"))
         expenses = num(row.get("expense_eur"))
+        actual_income = income
         if income <= 0:
             income = 8600
         ceiling = income * 0.48
         savings_target = income - ceiling
+        income_categories = category_target_rows(row.get("income_categories", []), income)
+        expense_categories = category_target_rows(row.get("expense_categories", []), ceiling)
         monthly_rows.append(
             {
                 "month": row["month"],
                 "income_target_eur": money(income),
+                "income_target_basis": "recorded" if actual_income > 0 else "modeled",
+                "actual_income_eur": money(actual_income),
                 "expense_ceiling_eur": money(ceiling),
                 "savings_target_eur": money(savings_target),
+                "expense_target_pct": money((ceiling / income * 100) if income else 0),
+                "savings_target_pct": money((savings_target / income * 100) if income else 0),
                 "actual_expense_eur": money(expenses),
                 "structural_overspending_eur": money(max(expenses - ceiling, 0)),
+                "income_categories": income_categories,
+                "categories": expense_categories,
             }
         )
     by_year = defaultdict(list)
@@ -1091,6 +1188,36 @@ def planning_targets(monthly_series: list[dict]) -> tuple[list[dict], list[dict]
             }
         )
     return yearly_rows, monthly_rows
+
+
+def category_target_rows(categories: list[dict], target_total: float) -> list[dict]:
+    actuals = [
+        (str(row.get("category") or "Uncategorized"), num(row.get("actual_eur")))
+        for row in categories
+        if str(row.get("category") or "").strip()
+    ]
+    if not actuals:
+        return []
+    basis_total = sum(actual for _, actual in actuals)
+    target_total = money(target_total)
+    allocated = 0.0
+    rows = []
+    for index, (category, actual) in enumerate(actuals):
+        if index == len(actuals) - 1:
+            target = money(target_total - allocated)
+        else:
+            share = actual / basis_total if basis_total else 1 / len(actuals)
+            target = money(target_total * share)
+            allocated = money(allocated + target)
+        rows.append(
+            {
+                "category": category,
+                "target_eur": target,
+                "actual_eur": money(actual),
+                "share_pct": money((target / target_total * 100) if target_total else 0),
+            }
+        )
+    return rows
 
 
 def trade_summary(rows: list[dict]) -> dict:
@@ -1428,6 +1555,12 @@ class LedgerPublicHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = {key: values[-1] for key, values in parse_qs(parsed.query).items()}
         try:
+            if parsed.path == "/api/setup/status":
+                return self.send_json(setup_status_payload())
+            if parsed.path in {"/setup", "/setup/"} or (SETUP_MODE and parsed.path == "/"):
+                return self.serve_setup_page()
+            if SETUP_MODE and parsed.path.startswith("/api/") and parsed.path != "/api/health":
+                return self.send_json({"ok": False, "error": "Finish Google Sheets setup first."}, status=503)
             if parsed.path == "/api/health":
                 return self.send_json(public_health())
             if parsed.path == "/api/overview":
@@ -1452,6 +1585,9 @@ class LedgerPublicHandler(BaseHTTPRequestHandler):
                 return self.send_json(read_changelog_payload())
             if parsed.path == "/CHANGELOG.md":
                 return self.send_bytes(read_changelog_text().encode("utf-8"), "text/markdown; charset=utf-8", "CHANGELOG.md")
+            if parsed.path in {"/README.md", "/INSTALL.md", "/GOOGLE_SHEETS_SETUP.md", "/TROUBLESHOOTING.md"}:
+                doc_name = parsed.path.strip("/")
+                return self.send_bytes((ROOT / doc_name).read_bytes(), "text/markdown; charset=utf-8", doc_name)
             if parsed.path == "/api/refresh":
                 return self.send_json({"ok": True, "refreshed": True})
             tx_id = self.path_id(parsed.path, "/api/transactions/", "/statement/file")
@@ -1467,6 +1603,10 @@ class LedgerPublicHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         try:
+            if parsed.path == "/api/setup/complete":
+                if not SETUP_MODE:
+                    return self.send_json({"ok": False, "error": "Google Sheets setup is already configured."}, status=409)
+                return self.send_json(complete_web_setup(self.values_payload()), status=201)
             if parsed.path == "/api/statements/import/upload":
                 self.discard_body()
                 return self.send_json(statement_preview(), status=201)
@@ -1662,6 +1802,12 @@ class LedgerPublicHandler(BaseHTTPRequestHandler):
             content = inject_app_config(content.decode("utf-8")).encode("utf-8")
         self.send_bytes(content, content_type)
 
+    def serve_setup_page(self) -> None:
+        target = STATIC_DIR / "setup.html"
+        if not target.exists():
+            return self.send_json({"ok": False, "error": "Setup page is missing."}, status=500)
+        self.send_bytes(target.read_bytes(), "text/html; charset=utf-8")
+
 
 def flatten_mip_values(values: dict) -> dict:
     next_values = dict(values)
@@ -1712,7 +1858,9 @@ def public_data_health() -> dict:
 
 def public_health() -> dict:
     payload = {"ok": True, "mode": STORE_MODE}
-    if STORE_MODE == "google":
+    if SETUP_MODE or STORE_MODE == "setup":
+        payload.update({"setup_complete": False, "setup_url": "/setup"})
+    elif STORE_MODE == "google":
         payload.update(
             {
                 "spreadsheet_id": STORE_DETAILS.get("spreadsheet_id", ""),
@@ -1820,6 +1968,217 @@ def refresh_local_prices() -> dict:
     return {"ok": True, "updated_positions": updated, "skipped": [], "brokerage_account_formulas": 1, "price_as_of": TODAY.isoformat()}
 
 
+def extract_spreadsheet_id(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "docs.google.com" not in text:
+        return text
+    path = urlparse(text).path
+    parts = [part for part in path.split("/") if part]
+    if "d" not in parts:
+        return ""
+    index = parts.index("d")
+    return parts[index + 1] if index + 1 < len(parts) else ""
+
+
+def relative_to_root(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def write_private_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    try:
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+
+
+def validate_service_account_payload(payload: dict) -> str:
+    if not isinstance(payload, dict):
+        raise ValueError("The credentials file must contain a JSON object.")
+    if payload.get("type") != "service_account":
+        raise ValueError("The credentials JSON must be a Google service-account key.")
+    client_email = str(payload.get("client_email") or "").strip()
+    project_id = str(payload.get("project_id") or "").strip()
+    token_uri = str(payload.get("token_uri") or "").strip()
+    key_material = str(payload.get("private_key") or "").strip()
+    if not client_email or "@" not in client_email:
+        raise ValueError("The credentials JSON is missing the service-account email.")
+    if not project_id:
+        raise ValueError("The credentials JSON is missing the Google Cloud project ID.")
+    if not token_uri or not key_material:
+        raise ValueError("The credentials JSON is missing required service-account key fields.")
+    return client_email
+
+
+def read_service_account_file(path: Path) -> tuple[dict, str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"Could not read the credentials file: {error}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"The credentials file is not valid JSON: {error}") from error
+    return payload, validate_service_account_payload(payload)
+
+
+def service_account_email_if_available(path: Path) -> str:
+    try:
+        _, email = read_service_account_file(path)
+        return email
+    except ValueError:
+        return ""
+
+
+def write_env_file(credentials_path: Path, spreadsheet_id: str, project_currency: str) -> None:
+    write_private_text(
+        ENV_PATH,
+        "\n".join(
+            [
+                "LEDGER_STORE=google",
+                f"LEDGER_SPREADSHEET_ID={spreadsheet_id}",
+                f"GOOGLE_APPLICATION_CREDENTIALS={relative_to_root(credentials_path)}",
+                f"LEDGER_PROJECT_CURRENCY={project_currency}",
+                "",
+            ]
+        ),
+    )
+
+
+def write_setup_marker(spreadsheet_id: str, project_currency: str, service_email: str) -> None:
+    SETUP_DIR.mkdir(parents=True, exist_ok=True)
+    write_private_text(
+        SETUP_MARKER,
+        "\n".join(
+            [
+                f"configured_at={datetime.utcnow().isoformat()}Z",
+                f"spreadsheet_id={spreadsheet_id}",
+                f"project_currency={project_currency}",
+                f"service_account_email={service_email}",
+                "",
+            ]
+        ),
+    )
+
+
+def setup_is_complete(env: dict[str, str] | None = None) -> bool:
+    env = env if env is not None else load_env_file(ENV_PATH)
+    credentials = env.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    spreadsheet_id = env.get("LEDGER_SPREADSHEET_ID", "")
+    return (
+        env.get("LEDGER_STORE", "").lower() == "google"
+        and bool(spreadsheet_id)
+        and bool(credentials)
+        and resolve_path(credentials).exists()
+    )
+
+
+def setup_status_payload(env: dict[str, str] | None = None) -> dict:
+    env = env if env is not None else load_env_file(ENV_PATH)
+    configured_credentials = env.get("GOOGLE_APPLICATION_CREDENTIALS", DEFAULT_CREDENTIALS.as_posix())
+    credentials_path = resolve_path(configured_credentials)
+    return {
+        "ok": True,
+        "complete": setup_is_complete(env),
+        "default_credentials_path": DEFAULT_CREDENTIALS.as_posix(),
+        "credentials_path": relative_to_root(credentials_path),
+        "credentials_exists": credentials_path.exists(),
+        "service_account_email": service_account_email_if_available(credentials_path) if credentials_path.exists() else "",
+        "spreadsheet_id": env.get("LEDGER_SPREADSHEET_ID", ""),
+        "project_currency": normalize_currency(env.get("LEDGER_PROJECT_CURRENCY", PROJECT_CURRENCY)),
+        "supported_project_currencies": list(SUPPORTED_CONVERSION_CURRENCIES),
+        "profile": PROFILE.read().get("profile", {}),
+        "steps": [
+            {
+                "label": "Google Cloud",
+                "detail": "Create or choose a project, enable the Google Sheets API, then create a service-account key.",
+            },
+            {
+                "label": "Google Sheet",
+                "detail": "Create a blank Google Sheet and share it with the service-account email as Editor.",
+            },
+            {
+                "label": "Ledger Public",
+                "detail": "Connect the Sheet, choose Project Currency, save profile details, and seed the starter tabs.",
+            },
+        ],
+    }
+
+
+def build_google_store(spreadsheet_id: str, credentials_path: Path) -> GoogleSheetsLedgerStore:
+    return GoogleSheetsLedgerStore(
+        GoogleSheetsConfig(spreadsheet_id=spreadsheet_id, credentials_path=credentials_path),
+        sheets=google_sheet_schemas(),
+        fx=DEFAULT_CONVERTER,
+        starter_rows=default_google_sheet_rows(),
+    )
+
+
+def activate_google_store(spreadsheet_id: str, credentials_path: Path, project_currency: str, store: GoogleSheetsLedgerStore | None = None) -> None:
+    global PROJECT_CURRENCY, SETUP_MODE, STORE, STORE_MODE, STORE_DETAILS
+    PROJECT_CURRENCY = project_currency if project_currency in SUPPORTED_CONVERSION_CURRENCIES else "EUR"
+    STORE = store or build_google_store(spreadsheet_id, credentials_path)
+    STORE_MODE = "google"
+    STORE_DETAILS = {
+        "spreadsheet_id": spreadsheet_id,
+        "credentials_file": str(credentials_path),
+    }
+    SETUP_MODE = False
+
+
+def complete_web_setup(values: dict) -> dict:
+    credential_text = str(values.get("credentials_json") or "").strip()
+    credentials_path_value = str(values.get("credentials_path") or "").strip()
+    if credential_text:
+        try:
+            credentials_payload = json.loads(credential_text)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"The uploaded service-account key is not valid JSON: {error}") from error
+        service_email = validate_service_account_payload(credentials_payload)
+        credentials_path = resolve_path(DEFAULT_CREDENTIALS.as_posix())
+        write_private_text(credentials_path, json.dumps(credentials_payload, indent=2) + "\n")
+    else:
+        credentials_path = resolve_path(credentials_path_value or DEFAULT_CREDENTIALS.as_posix())
+        _, service_email = read_service_account_file(credentials_path)
+
+    spreadsheet_id = extract_spreadsheet_id(values.get("spreadsheet") or values.get("spreadsheet_id") or "")
+    if not spreadsheet_id:
+        raise ValueError("Paste a Google Sheet URL or spreadsheet ID.")
+
+    project_currency = normalize_currency(values.get("project_currency") or "EUR")
+    if project_currency not in SUPPORTED_CONVERSION_CURRENCIES:
+        raise ValueError(f"Project Currency must be one of: {', '.join(SUPPORTED_CONVERSION_CURRENCIES)}.")
+
+    store = build_google_store(spreadsheet_id, credentials_path)
+    ensure_result = store.ensure_sheets(seed_empty=True)
+    write_env_file(credentials_path, spreadsheet_id, project_currency)
+    write_setup_marker(spreadsheet_id, project_currency, service_email)
+
+    profile_values = {
+        "name": values.get("name", ""),
+        "surname": values.get("surname", ""),
+        "email": values.get("email", ""),
+    }
+    if any(str(value or "").strip() for value in profile_values.values()):
+        profile = PROFILE.update(profile_values)
+    else:
+        profile = PROFILE.read()
+
+    activate_google_store(spreadsheet_id, credentials_path, project_currency, store)
+    return {
+        "ok": True,
+        "spreadsheet_id": spreadsheet_id,
+        "service_account_email": service_email,
+        "project_currency": project_currency,
+        "seeded_sheets": ensure_result.get("seeded_sheets", []),
+        "profile": profile.get("profile", {}),
+    }
+
+
 def load_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.exists():
@@ -1866,26 +2225,18 @@ def configure_store(args: argparse.Namespace, env: dict[str, str]) -> None:
     if not credentials_path.exists():
         raise SystemExit(f"Google credentials file was not found: {credentials_path}")
 
-    STORE = GoogleSheetsLedgerStore(
-        GoogleSheetsConfig(spreadsheet_id=spreadsheet_id, credentials_path=credentials_path),
-        sheets=SHEETS,
-        fx=DEFAULT_CONVERTER,
-        starter_rows=default_google_sheet_rows(),
-    )
-    STORE_MODE = "google"
-    STORE_DETAILS = {
-        "spreadsheet_id": spreadsheet_id,
-        "credentials_file": str(credentials_path),
-    }
+    activate_google_store(spreadsheet_id, credentials_path, PROJECT_CURRENCY)
 
 
-def run_server(port: int, host: str, open_browser: bool = False) -> None:
+def run_server(port: int, host: str, open_browser: bool = False, open_path: str = "/") -> None:
     server = ThreadingHTTPServer((host, port), LedgerPublicHandler)
     url = f"http://{host}:{port}"
     if open_browser:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        threading.Timer(0.8, lambda: webbrowser.open(f"{url}{open_path}")).start()
     print(f"Ledger Public running at {url}")
-    if STORE_MODE == "google":
+    if SETUP_MODE:
+        print("First-run setup: open /setup to connect Google Sheets.")
+    elif STORE_MODE == "google":
         print(f"Google Sheet: {STORE_DETAILS.get('spreadsheet_id', '')}")
     else:
         print(f"Local CSV data: {DATA_DIR}")
@@ -1902,12 +2253,24 @@ def main() -> None:
     parser.add_argument("--env-file", default=".env", help="Optional environment file for Ledger Public settings.")
     parser.add_argument("--spreadsheet-id", help="Google Sheet ID for --store google.")
     parser.add_argument("--credentials-file", help="Service-account JSON file for --store google.")
+    parser.add_argument("--setup", action="store_true", help="Start the browser setup wizard when Google Sheets is not configured.")
     parser.add_argument("--init-google-sheet", action="store_true", help="Create or repair required native Google Sheet tabs and seed empty tabs.")
     parser.add_argument("--init-only", action="store_true", help="Initialize the configured store, then exit.")
     parser.add_argument("--reset-data", action="store_true", help="Reset legacy local CSV tabs. Only valid with --store local.")
     args = parser.parse_args()
 
     env = load_env_file(resolve_path(args.env_file))
+    if args.setup and not setup_is_complete(env):
+        global SETUP_MODE, STORE_MODE, STORE_DETAILS
+        SETUP_MODE = True
+        STORE_MODE = "setup"
+        STORE_DETAILS = {}
+        if args.init_only:
+            print("Ledger Public web setup is ready. Start with: python3 server.py --setup --open")
+            return
+        run_server(args.port, args.host, open_browser=args.open, open_path="/setup")
+        return
+
     configure_store(args, env)
 
     if STORE_MODE == "local":

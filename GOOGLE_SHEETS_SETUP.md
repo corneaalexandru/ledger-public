@@ -12,27 +12,39 @@ Copy the spreadsheet ID from the URL:
 https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit
 ```
 
-## 2. Create A Service Account
+## 2. Enable The Google Sheets API
 
 In Google Cloud:
 
 1. Create or choose a project.
-2. Enable the Google Sheets API.
-3. Create a service account.
-4. Create a JSON key.
-5. Save the JSON file locally, for example:
+2. Open **APIs & Services > Library**.
+3. Search for **Google Sheets API**.
+4. Click **Enable**.
+
+Ledger Public uses the Sheets API to create tabs, write headers, seed starter rows, and read/write register data.
+
+## 3. Create A Service Account
+
+In the same Google Cloud project:
+
+1. Open **IAM & Admin > Service Accounts**.
+2. Create a service account for Ledger Public.
+3. Open the service account, choose **Keys**, then create a new JSON key.
+4. Save the JSON file locally. The browser setup will copy it into:
 
 ```text
-credentials/ledger-service-account.json
+credentials/ledger-public-service-account.json
 ```
 
-## 3. Share The Sheet
+## 4. Share The Sheet
 
 Open the JSON file and find `client_email`.
 
 Share the Google Sheet with that email as Editor.
 
-## 4. Run The Wizard
+The service account is not your normal Google account. Sharing the Sheet with your own email is not enough; it must be shared with the service-account `client_email`.
+
+## 5. Run The Browser Setup
 
 On macOS, double-click:
 
@@ -44,29 +56,50 @@ Or run manually:
 
 ```bash
 python3 -m pip install -r requirements-google.txt
-python3 scripts/setup_google.py
+python3 server.py --setup --open
 ```
 
-The wizard writes `.env` once:
+The setup page asks for:
+
+- Service-account JSON file.
+- Google Sheet URL or spreadsheet ID.
+- Project Currency.
+- Profile name, surname, and email.
+
+It writes `.env` once:
 
 ```env
 LEDGER_STORE=google
 LEDGER_SPREADSHEET_ID=your_google_sheet_id_here
-GOOGLE_APPLICATION_CREDENTIALS=credentials/ledger-service-account.json
+GOOGLE_APPLICATION_CREDENTIALS=credentials/ledger-public-service-account.json
 LEDGER_PROJECT_CURRENCY=EUR
 ```
 
-The wizard creates and seeds the required Ledger tabs directly in native Google Sheets format.
-It also asks for Project Currency during setup. Supported values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
-Profile details are managed later in Settings > Profile and stored locally in `.ledger_profile.json`.
+It also writes `.ledger_public_setup/google_configured` and `.ledger_profile.json`. These files are ignored by Git.
 
-## 5. Start Ledger
+The setup page creates and seeds the required Ledger tabs directly in native Google Sheets format. Starter content includes mock accounts, transactions, trades, portfolio plans, category references, account types, FX rates, classification rules, and setup instructions.
+
+Supported Project Currency values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
+
+## Why Native Google Sheets Instead Of XLSX
+
+Google Sheets is the live database for Ledger Public. Using the Sheets API avoids a fragile workbook upload/conversion step, preserves the user-owned Sheet as the source of truth, and lets setup create or repair tabs in place. A local `local_ledger_workbook.xlsx` file is a legacy ignored runtime artifact from older builds, not part of the current public install.
+
+## Terminal Fallback
+
+Use this only when browser setup is not practical:
+
+```bash
+python3 scripts/setup_google.py --force
+```
+
+## 6. Start Ledger
 
 ```bash
 python3 server.py --store google --open
 ```
 
-Re-run setup at any time with:
+After setup, the launcher starts Ledger directly. To re-run terminal setup:
 
 ```bash
 python3 scripts/setup_google.py --force

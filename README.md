@@ -8,32 +8,41 @@ No private data, real spreadsheet ID, `.env`, or credentials are included.
 
 1. Download or clone this repository.
 2. Create a blank Google Sheet in your Google Drive.
-3. Create a Google service-account JSON key.
+3. In Google Cloud, enable the Google Sheets API and create a service-account JSON key.
 4. Double-click `start_ledger_public.command`.
-5. Follow the one-time setup wizard.
+5. Follow the browser setup wizard at `http://127.0.0.1:8765/setup`.
 
 The launcher will:
 
 - Pull the latest app version when this folder is a git clone.
 - Install Google Sheets requirements when missing.
-- Ask for the service-account JSON and Google Sheet ID only when setup is not complete.
-- Ask for the default Project Currency used across summaries, charts, reports, and printouts.
-- Manage profile details inside Settings > Profile.
+- Open a web setup page when Google Sheets is not configured.
+- Ask for the service-account JSON, Google Sheet URL or ID, Project Currency, name, surname, and email.
+- Seed the native Google Sheet with mock accounts, transactions, trades, portfolio plans, categories, FX rates, rules, and setup references.
 - Start Ledger Public at `http://127.0.0.1:8765`.
 
 ## Starter Database
 
-Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, and portfolio plan rows without requiring XLSX upload or conversion.
+Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, portfolio plan rows, reference categories, FX rates, and classification rules without requiring XLSX upload or conversion.
 Project Currency can be set during setup and changed later in Settings. Source/native rows remain stored in their original currencies.
 
-Create a blank Google Sheet, share it with the service-account email as Editor, then paste its URL or ID into the setup wizard. Ledger will create the required tabs in Google Sheets format.
+Create a blank Google Sheet, share it with the service-account email as Editor, then paste its URL or ID into the setup page. Ledger creates the required tabs in Google Sheets format.
+
+## Screenshots
+
+![Ledger Public setup wizard](docs/screenshots/setup-wizard.png)
+
+![Ledger Public planning view](docs/screenshots/ledger-public-planning.png)
+
+## Why No XLSX
+
+Ledger Public writes directly to the user's native Google Sheet through the Google Sheets API. A local XLSX workbook is not the database, is not uploaded during setup, and is not required for normal use. Runtime files such as `local_ledger_workbook.xlsx` from older builds are ignored and are not part of the public release.
 
 ## Manual Start
 
 ```bash
 python3 -m pip install -r requirements-google.txt
-python3 scripts/setup_google.py
-python3 server.py --store google --open
+python3 server.py --setup --open
 ```
 
 Change port:
@@ -50,7 +59,7 @@ User data stays in the user's Google Sheet. Pulling app updates does not overwri
 
 ## Local Profile
 
-Settings > Profile stores display and contact details in `.ledger_profile.json`. It does not create a login, password, or browser authentication prompt. The file is ignored by Git and stays on the user's computer.
+The setup page asks for name, surname, and email. Settings > Profile can edit those details later. They are stored in `.ledger_profile.json`, do not create a login, and stay on the user's computer.
 
 ## Documentation
 

@@ -9,12 +9,16 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ledger_core.profile import ProfileStore
+
 ENV_PATH = ROOT / ".env"
 SETUP_DIR = ROOT / ".ledger_public_setup"
 SETUP_MARKER = SETUP_DIR / "google_configured"
-DEFAULT_CREDENTIALS = Path("credentials/ledger-service-account.json")
+DEFAULT_CREDENTIALS = Path("credentials/ledger-public-service-account.json")
 SUPPORTED_PROJECT_CURRENCIES = ("EUR", "USD", "AED", "RON", "GBP", "CHF", "CAD", "AUD", "INR", "JPY")
 
 
@@ -30,7 +34,8 @@ def main() -> int:
 
     print("\nLedger Public Google setup")
     print("==========================")
-    print("This wizard runs once. It writes .env and never commits credentials.")
+    print("This terminal wizard is a fallback. The launcher opens the browser setup by default.")
+    print("It writes .env and never commits credentials.")
     print("\nCreate a blank Google Sheet in Drive before continuing.")
     print("Do not upload or convert an XLSX file. Ledger creates the native tabs directly.")
     print("Copy the spreadsheet ID from the Google Sheet URL after sharing it.")
@@ -58,9 +63,11 @@ def main() -> int:
             print("Could not read a spreadsheet ID. Paste the full Google Sheet URL or the ID between /d/ and /edit.")
 
     project_currency = ask_project_currency()
+    profile_values = ask_profile()
 
     write_env(credentials_path, spreadsheet_id, project_currency)
-    write_marker(spreadsheet_id, project_currency)
+    write_marker(spreadsheet_id, project_currency, service_email)
+    write_profile(profile_values)
     print(f"\nWrote {ENV_PATH}")
 
     if args.no_validate:
@@ -102,6 +109,16 @@ def ask_project_currency() -> str:
         if raw in SUPPORTED_PROJECT_CURRENCIES:
             return raw
         print(f"Choose one of: {supported}")
+
+
+def ask_profile() -> dict[str, str]:
+    print("\nLocal profile")
+    print("Optional. These details stay in .ledger_profile.json and can be changed later in Settings.")
+    return {
+        "name": input("Name: ").strip(),
+        "surname": input("Surname: ").strip(),
+        "email": input("Email: ").strip(),
+    }
 
 
 def ask_path(prompt: str, default: Path) -> Path:
@@ -166,12 +183,22 @@ def write_env(credentials_path: Path, spreadsheet_id: str, project_currency: str
     )
 
 
-def write_marker(spreadsheet_id: str, project_currency: str) -> None:
+def write_marker(spreadsheet_id: str, project_currency: str, service_email: str) -> None:
     SETUP_DIR.mkdir(parents=True, exist_ok=True)
     SETUP_MARKER.write_text(
-        f"configured_at={datetime.utcnow().isoformat()}Z\nspreadsheet_id={spreadsheet_id}\nproject_currency={project_currency}\n",
+        (
+            f"configured_at={datetime.utcnow().isoformat()}Z\n"
+            f"spreadsheet_id={spreadsheet_id}\n"
+            f"project_currency={project_currency}\n"
+            f"service_account_email={service_email}\n"
+        ),
         encoding="utf-8",
     )
+
+
+def write_profile(values: dict[str, str]) -> None:
+    if any(values.values()):
+        ProfileStore(ROOT).update(values)
 
 
 if __name__ == "__main__":
