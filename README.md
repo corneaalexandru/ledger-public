@@ -23,7 +23,7 @@ The launcher will:
 
 ## Starter Database
 
-Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, portfolio plan rows, reference categories, FX rates, and classification rules without requiring XLSX upload or conversion.
+Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, portfolio plan rows, reference categories, FX rates, and classification rules.
 Project Currency can be set during setup and changed later in Settings. Source/native rows remain stored in their original currencies.
 
 Create a blank Google Sheet, share it with the service-account email as Editor, then paste its URL or ID into the setup page. Ledger creates the required tabs in Google Sheets format.
@@ -76,9 +76,9 @@ Create a blank Google Sheet, share it with the service-account email as Editor, 
 
 ![Ledger Public about](docs/screenshots/about.png)
 
-## Why No XLSX
+## Native Google Sheets
 
-Ledger Public writes directly to the user's native Google Sheet through the Google Sheets API. A local XLSX workbook is not the database, is not uploaded during setup, and is not required for normal use. Runtime files such as `local_ledger_workbook.xlsx` from older builds are ignored and are not part of the public release.
+Ledger Public writes directly to the user's native Google Sheet through the Google Sheets API. Setup creates the required tabs in that Sheet, then the app uses that Sheet as the only public ledger store.
 
 ## Manual Start
 

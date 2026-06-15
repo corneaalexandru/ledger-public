@@ -4,7 +4,7 @@ Ledger Public uses a user-owned Google Sheet as its database.
 
 ## 1. Create The Ledger Sheet
 
-Create a blank Google Sheet in Google Drive. Do not upload or convert an XLSX file.
+Create a blank native Google Sheet in Google Drive.
 
 Copy the spreadsheet ID from the URL:
 
@@ -81,9 +81,9 @@ The setup page creates and seeds the required Ledger tabs directly in native Goo
 
 Supported Project Currency values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
 
-## Why Native Google Sheets Instead Of XLSX
+## Why Native Google Sheets
 
-Google Sheets is the live database for Ledger Public. Using the Sheets API avoids a fragile workbook upload/conversion step, preserves the user-owned Sheet as the source of truth, and lets setup create or repair tabs in place. A local `local_ledger_workbook.xlsx` file is a legacy ignored runtime artifact from older builds, not part of the current public install.
+Google Sheets is the live database for Ledger Public. Using the Sheets API keeps the user-owned Sheet as the source of truth and lets setup create or repair tabs in place.
 
 ## Terminal Fallback
 

@@ -7,7 +7,7 @@ This repository is designed to be safe for public sharing.
 - Static UI files.
 - Local Python server.
 - Public-safe Google Sheets adapter code.
-- Starter workbook with mock data only.
+- Starter seed data with mock rows only.
 - `.env.example` with placeholder values only.
 - One-time setup wizard.
 

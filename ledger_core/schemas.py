@@ -160,7 +160,5 @@ GOOGLE_SHEET_RANGES = {
 
 PUBLIC_RUNTIME_PATHS = {
     "local_ledger_data/",
-    "local_ledger_workbook.xlsx",
     "mock_google_sheet/",
-    "mock_ledger_google_sheet.xlsx",
 }

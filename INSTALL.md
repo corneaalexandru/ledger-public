@@ -41,7 +41,7 @@ python3 server.py --setup --open
 7. Paste the Google Sheet URL or spreadsheet ID into setup.
 8. Enter Project Currency plus local profile name, surname, and email.
 
-Ledger creates and seeds the required tabs directly in Google Sheets format. Do not upload or convert an XLSX workbook. The starter tabs include mock register rows plus reference categories, account types, FX rates, classification rules, and setup instructions.
+Ledger creates and seeds the required tabs directly in Google Sheets format. The starter tabs include mock register rows plus reference categories, account types, FX rates, classification rules, and setup instructions.
 
 The wizard writes:
 

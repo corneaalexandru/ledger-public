@@ -37,7 +37,7 @@ def main() -> int:
     print("This terminal wizard is a fallback. The launcher opens the browser setup by default.")
     print("It writes .env and never commits credentials.")
     print("\nCreate a blank Google Sheet in Drive before continuing.")
-    print("Do not upload or convert an XLSX file. Ledger creates the native tabs directly.")
+    print("Start from a blank native Google Sheet. Ledger creates the tabs directly.")
     print("Copy the spreadsheet ID from the Google Sheet URL after sharing it.")
 
     credentials_path = ask_path(

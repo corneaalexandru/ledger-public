@@ -13,8 +13,8 @@ from ledger_core.store import next_id, normalize_ids
 
 GOOGLE_SCOPES = ("https://www.googleapis.com/auth/spreadsheets",)
 SHEET_IMPORT_ALIASES = {
-    # Legacy converted workbooks used this Excel-safe tab name. Native Google
-    # Sheet setup writes the canonical tab directly.
+    # Older public seeds used this shortened tab name. Native Google Sheet setup
+    # writes the canonical tab directly.
     "portfolio_monthly_investment_plan": "portfolio_monthly_investment_pl",
 }
 GOOGLE_DATE_FIELDS = {

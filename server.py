@@ -823,7 +823,7 @@ def default_reference_sheets() -> dict[str, tuple[list[str], list[dict]]]:
 
     instruction_headers = ["step", "instruction", "details"]
     instructions = [
-        ("1", "Create a blank Google Sheet", "Use Google Drive > New > Google Sheets. No XLSX upload or conversion is required."),
+        ("1", "Create a blank Google Sheet", "Use Google Drive > New > Google Sheets. Ledger creates the native tabs directly."),
         ("2", "Enable the Google Sheets API", "In Google Cloud, choose the project for Ledger Public and enable Google Sheets API."),
         ("3", "Create a service-account JSON key", "Create a service account, create a JSON key, and upload it in the web setup page."),
         ("4", "Share the Google Sheet", "Share it with the client_email from the JSON key as Editor."),

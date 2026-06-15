@@ -6,9 +6,9 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 - Added a browser setup flow that captures the Google service-account key, Google Sheet URL, Project Currency, and local profile name/surname/email before seeding.
 - Expanded starter Google Sheets with richer mock income, expense, transfer, account, trade, portfolio, category, FX, classification-rule, and setup-reference rows.
-- Updated install documentation to spell out Google Sheets API enablement, service-account creation, Sheet sharing, native Google Sheets setup, and the retirement of XLSX starter files.
+- Updated install documentation to spell out Google Sheets API enablement, service-account creation, Sheet sharing, and native Google Sheets setup.
 - Expanded the README screenshot gallery to cover setup, account details, Insights, chart views, Targets in all/year/month modes, Statements Import, Trades, Portfolio, Planning, Settings, and About.
-- Added release checks for the new web setup first-run path so clean installs do not create legacy local CSV or XLSX runtime data.
+- Added release checks for the new web setup first-run path so clean installs do not create local CSV or spreadsheet artifacts.
 
 ## 2026-06-14
 
@@ -29,9 +29,9 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Expanded Financial Health scoring with retained-capital shortfall, ledger leakage, and compounding deficit inputs.
 - Matched Portfolio quick filters to register behavior with removable chips for portfolio, provider, ticker, and funding fields.
 - Moved the shared account `country_code` schema next to account type so native Google Sheets expose Country in the expected place.
-- Removed the legacy local XLSX writer so Ledger Public no longer generates workbook files; native Google Sheets is the supported setup path.
+- Removed the legacy local file writer so Ledger Public uses native Google Sheets as the supported setup path.
 - Labeled the Settings content as the General settings subpage under the page header.
-- Replaced the public XLSX starter workflow with native Google Sheet setup that creates and seeds tabs directly.
+- Replaced the public starter-file workflow with native Google Sheet setup that creates and seeds tabs directly.
 - Seeded account country codes in the public starter rows so the Accounts Country column is populated immediately.
 - Flattened Overview insights into one continuous bordered bullet list and removed the group headers.
 - Added a Settings header/content divider so the page matches the About page boundary treatment.
@@ -69,14 +69,14 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-11
 
-- Normalized Google Sheets date serials back to ISO dates so uploaded starter workbooks remain compatible after Google conversion.
+- Normalized Google Sheets date serials back to ISO dates when reading native Google Sheets rows.
 - Recalculated transaction conversions from edited statement amounts even when the disabled sanitized amount field is not submitted.
 - Renamed the visible transaction base column to Project Amount.
 - Added INR as a supported Project Currency and shipped a static changelog fallback for stale server routes.
 - Added switchable Project Currency support, setup-time Project Currency selection, expanded starter FX rates, and a hardened Settings changelog loader.
 - Added Settings > About with copyright, license, contact, disclaimer, and changelog subpages linked to `CHANGELOG.md`.
 - Added Google Sheets mode using a user-owned spreadsheet and service-account JSON.
-- Added `starter/ledger_starter_workbook.xlsx` as the starter database template with mock data and reference tabs.
+- Added native Google Sheet starter seeding with mock data and reference tabs.
 - Added one-time setup wizard in `scripts/setup_google.py`.
 - Updated `start_ledger_public.command` to pull the latest app version, install Google requirements when missing, run setup once, and start in Google mode.
 - Added release guards for credentials, `.env`, runtime data, backups, and private markers.

@@ -20,10 +20,8 @@ credentials/*
 # Legacy/local runtime data. Ignored so older installs and test runs do not
 # commit personal ledger rows.
 local_ledger_data/
-local_ledger_workbook.xlsx
 local_ledger_backups/
 google_ledger_backups/
 
 # Legacy local data names from early public builds. Ignored and migrated on run.
 mock_google_sheet/
-mock_ledger_google_sheet.xlsx
