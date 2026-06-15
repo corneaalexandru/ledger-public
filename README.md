@@ -18,12 +18,12 @@ The launcher will:
 - Install Google Sheets requirements when missing.
 - Open a web setup page when Google Sheets is not configured.
 - Ask for the service-account JSON, Google Sheet URL or ID, Project Currency, name, surname, and email.
-- Seed the native Google Sheet with mock accounts, transactions, trades, portfolio plans, categories, FX rates, rules, and setup references.
+- Seed the native Google Sheet with mock accounts, transactions, trades, portfolio plans, categories, reference currency rows, rules, and setup references.
 - Start Ledger Public at `http://127.0.0.1:8765`.
 
 ## Starter Database
 
-Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, portfolio plan rows, reference categories, FX rates, and classification rules.
+Ledger creates the starter database directly inside your native Google Sheet during setup. It seeds mock accounts, transactions, trades, portfolio plan rows, reference categories, reference currency rows, and classification rules. Converted amount cells use native Google Sheets formulas for currency conversion.
 Project Currency can be set during setup and changed later in Settings. Source/native rows remain stored in their original currencies.
 
 Create a blank Google Sheet, share it with the service-account email as Editor, then paste its URL or ID into the setup page. Ledger creates the required tabs in Google Sheets format.

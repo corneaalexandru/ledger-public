@@ -10279,7 +10279,7 @@ function settingsProjectCards({ accounts = {}, netWorth = 0, projectCurrency = "
   return [
     settingsMetricCard({ label: "Project Currency", valueHtml: settingsProjectCurrencyControl(projectCurrencyCode()), meta: "Display baseline", note: "Used across summaries, charts, reports, and printouts. Native source rows stay in their original currencies.", icon: "currency", className: "settings-input-card" }),
     settingsMetricCard({ label: "Current Net Worth", value: formatWholeCurrency(netWorth, projectCurrency, { project: false }), meta: "selected project currency", note: "Current capital position from source truth accounts.", icon: "wallet" }),
-    settingsMetricCard({ label: "Currency Coverage", value: supportedProjectCurrencies().join(" / "), meta: "conversion table", note: "Currencies supported by the shared conversion table.", icon: "currency" }),
+    settingsMetricCard({ label: "Currency Coverage", value: supportedProjectCurrencies().join(" / "), meta: "supported currencies", note: "Currencies accepted for project-currency display and local fallback calculations.", icon: "currency" }),
   ];
 }
 

@@ -10,6 +10,10 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Expanded the README screenshot gallery to cover setup, account details, Insights, chart views, Targets in all/year/month modes, Statements Import, Trades, Portfolio, Planning, Settings, and About.
 - Added release checks for the new web setup first-run path so clean installs do not create local CSV or spreadsheet artifacts.
 - Changed target progress bars to use visible dark-gray achieved fills in dark mode instead of near-black fills that disappear on the black background.
+- Removed the separate setup-guide button and moved the Google Cloud, Sheet sharing, and Ledger setup instructions into the web checklist.
+- Standardized native Google Sheet setup so all Ledger tabs get the same grid size, row height, column width, frozen header row, and header styling.
+- Switched Google Sheet converted amount cells to native Google Sheets currency formulas instead of treating starter FX rows as the conversion source.
+- Added launcher port fallback so an occupied default port automatically rolls to the next free port.
 
 ## 2026-06-14
 
@@ -74,7 +78,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Recalculated transaction conversions from edited statement amounts even when the disabled sanitized amount field is not submitted.
 - Renamed the visible transaction base column to Project Amount.
 - Added INR as a supported Project Currency and shipped a static changelog fallback for stale server routes.
-- Added switchable Project Currency support, setup-time Project Currency selection, expanded starter FX rates, and a hardened Settings changelog loader.
+- Added switchable Project Currency support, setup-time Project Currency selection, expanded starter currency references, and a hardened Settings changelog loader.
 - Added Settings > About with copyright, license, contact, disclaimer, and changelog subpages linked to `CHANGELOG.md`.
 - Added Google Sheets mode using a user-owned spreadsheet and service-account JSON.
 - Added native Google Sheet starter seeding with mock data and reference tabs.

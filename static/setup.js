@@ -62,6 +62,11 @@ function renderStatus(status) {
           <div>
             <strong>${escapeHtml(step.label || "")}</strong>
             <p>${escapeHtml(step.detail || "")}</p>
+            ${Array.isArray(step.items) && step.items.length ? `
+              <ul>
+                ${step.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+              </ul>
+            ` : ""}
           </div>
         </li>
       `,

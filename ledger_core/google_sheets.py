@@ -12,6 +12,10 @@ from ledger_core.store import next_id, normalize_ids
 
 
 GOOGLE_SCOPES = ("https://www.googleapis.com/auth/spreadsheets",)
+STANDARD_SHEET_ROW_COUNT = 1000
+STANDARD_SHEET_MIN_COLUMN_COUNT = 26
+STANDARD_SHEET_ROW_HEIGHT = 28
+STANDARD_SHEET_COLUMN_WIDTH = 140
 SHEET_IMPORT_ALIASES = {
     # Older public seeds used this shortened tab name. Native Google Sheet setup
     # writes the canonical tab directly.
@@ -86,8 +90,9 @@ class GoogleSheetsLedgerStore:
     def write_rows(self, sheet_name: str, rows: list[dict]) -> None:
         headers = self.sheets[sheet_name]
         values = [headers]
-        for row in rows:
+        for row_index, row in enumerate(rows, start=2):
             normalized = self._normalizer.normalize_row(sheet_name, row)
+            normalized.update(google_formula_values(sheet_name, row_index, headers))
             values.append([normalized.get(header, "") for header in headers])
         tab = quote_sheet_name(sheet_name)
         body = {"values": values}
@@ -155,6 +160,11 @@ class GoogleSheetsLedgerStore:
                 spreadsheetId=self.config.spreadsheet_id,
                 body={"requests": requests},
             ).execute()
+            metadata = self.service.spreadsheets().get(spreadsheetId=self.config.spreadsheet_id).execute()
+            existing = {
+                sheet["properties"]["title"]: sheet["properties"]["sheetId"]
+                for sheet in metadata.get("sheets", [])
+            }
 
         created = {request["addSheet"]["properties"]["title"] for request in requests}
         available = set(existing) | created
@@ -173,12 +183,31 @@ class GoogleSheetsLedgerStore:
                     valueInputOption="USER_ENTERED",
                     body={"values": [headers]},
                 ).execute()
+        self.standardize_sheet_layouts(existing)
         return {
             "ok": True,
             "sheets": list(self.sheets),
             "imported_aliases": sorted(alias_rows),
             "seeded_sheets": seeded_sheets,
         }
+
+    def standardize_sheet_layouts(self, sheet_ids: dict[str, int] | None = None) -> None:
+        sheet_ids = sheet_ids or {
+            sheet["properties"]["title"]: sheet["properties"]["sheetId"]
+            for sheet in self.service.spreadsheets().get(spreadsheetId=self.config.spreadsheet_id).execute().get("sheets", [])
+        }
+        column_count = max(STANDARD_SHEET_MIN_COLUMN_COUNT, *(len(headers) for headers in self.sheets.values()))
+        requests = []
+        for sheet_name in self.sheets:
+            sheet_id = sheet_ids.get(sheet_name)
+            if sheet_id is None:
+                continue
+            requests.extend(standard_sheet_layout_requests(sheet_id, column_count))
+        if requests:
+            self.service.spreadsheets().batchUpdate(
+                spreadsheetId=self.config.spreadsheet_id,
+                body={"requests": requests},
+            ).execute()
 
     def _mutate_status(self, sheet_name: str, id_field: str, ids: list[str], ledger_status: str) -> dict:
         row_ids = normalize_ids(ids)
@@ -211,6 +240,184 @@ def build_sheets_service(credentials_path: Path):
         scopes=GOOGLE_SCOPES,
     )
     return build("sheets", "v4", credentials=credentials, cache_discovery=False)
+
+
+def google_formula_values(sheet_name: str, row_number: int, headers: list[str]) -> dict[str, str]:
+    if sheet_name == "accounts_register":
+        return account_formula_values(row_number, headers)
+    if sheet_name == "transactions_register":
+        return transaction_formula_values(row_number, headers)
+    if sheet_name == "portfolio_strategy_instruments":
+        return portfolio_formula_values(row_number, headers)
+    return {}
+
+
+def account_formula_values(row_number: int, headers: list[str]) -> dict[str, str]:
+    if not {"account_currency", "balance_native"}.issubset(headers):
+        return {}
+    formulas = {}
+    if "amount_usd_converted" in headers:
+        formulas["amount_usd_converted"] = spot_fx_formula(
+            row_number,
+            headers,
+            currency_header="account_currency",
+            amount_header="balance_native",
+            target_currency="USD",
+        )
+    if "amount_eur_converted" in headers:
+        formulas["amount_eur_converted"] = spot_fx_formula(
+            row_number,
+            headers,
+            currency_header="account_currency",
+            amount_header="balance_native",
+            target_currency="EUR",
+        )
+    return formulas
+
+
+def transaction_formula_values(row_number: int, headers: list[str]) -> dict[str, str]:
+    if not {"statement_currency", "sanitized_statement_amount"}.issubset(headers):
+        return {}
+    formulas = {}
+    if "amount_usd_converted" in headers:
+        formulas["amount_usd_converted"] = historical_fx_formula(row_number, headers, "USD")
+    if "amount_eur_converted" in headers:
+        formulas["amount_eur_converted"] = historical_fx_formula(row_number, headers, "EUR")
+    return formulas
+
+
+def portfolio_formula_values(row_number: int, headers: list[str]) -> dict[str, str]:
+    if not {"current_value_currency", "current_value_native", "current_value_eur"}.issubset(headers):
+        return {}
+    return {
+        "current_value_eur": spot_fx_formula(
+            row_number,
+            headers,
+            currency_header="current_value_currency",
+            amount_header="current_value_native",
+            target_currency="EUR",
+        )
+    }
+
+
+def spot_fx_formula(
+    row_number: int,
+    headers: list[str],
+    *,
+    currency_header: str,
+    amount_header: str,
+    target_currency: str,
+) -> str:
+    currency_ref = cell_ref(headers, currency_header, row_number)
+    amount_ref = cell_ref(headers, amount_header, row_number)
+    normalized_currency = f"UPPER({currency_ref})"
+    return (
+        f'=IF(OR({currency_ref}="",{amount_ref}=""),"",'
+        f'IF({normalized_currency}="{target_currency}",{amount_ref},'
+        f'IFERROR({amount_ref}*GOOGLEFINANCE("CURRENCY:"&{normalized_currency}&"{target_currency}"),"")))'
+    )
+
+
+def historical_fx_formula(row_number: int, headers: list[str], target_currency: str) -> str:
+    currency_ref = cell_ref(headers, "statement_currency", row_number)
+    amount_ref = cell_ref(headers, "sanitized_statement_amount", row_number)
+    posted_date_ref = cell_ref(headers, "posted_date", row_number) if "posted_date" in headers else ""
+    transaction_date_ref = cell_ref(headers, "transaction_date", row_number) if "transaction_date" in headers else ""
+    if transaction_date_ref and posted_date_ref:
+        date_source = f'IF({transaction_date_ref}<>"",{transaction_date_ref},{posted_date_ref})'
+    else:
+        date_source = transaction_date_ref or posted_date_ref or "TODAY()"
+    fx_date = f"MIN({date_source},TODAY())"
+    normalized_currency = f"UPPER({currency_ref})"
+    googlefinance_call = (
+        f'GOOGLEFINANCE("CURRENCY:"&{normalized_currency}&"{target_currency}",'
+        f'"price",{fx_date}-7,{fx_date})'
+    )
+    converted_amount = f"LET(fx,{googlefinance_call},{amount_ref}*INDEX(fx,ROWS(fx),2))"
+    return (
+        f'=IF(OR({currency_ref}="",{amount_ref}="",{date_source}=""),"",'
+        f'IF({normalized_currency}="{target_currency}",{amount_ref},'
+        f'IFERROR({converted_amount},"")))'
+    )
+
+
+def cell_ref(headers: list[str], header: str, row_number: int) -> str:
+    return f"${column_name(headers.index(header) + 1)}{row_number}"
+
+
+def standard_sheet_layout_requests(sheet_id: int, column_count: int) -> list[dict]:
+    return [
+        {
+            "updateSheetProperties": {
+                "properties": {
+                    "sheetId": sheet_id,
+                    "gridProperties": {
+                        "rowCount": STANDARD_SHEET_ROW_COUNT,
+                        "columnCount": column_count,
+                        "frozenRowCount": 1,
+                    },
+                },
+                "fields": "gridProperties(rowCount,columnCount,frozenRowCount)",
+            }
+        },
+        {
+            "updateDimensionProperties": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "dimension": "ROWS",
+                    "startIndex": 0,
+                    "endIndex": STANDARD_SHEET_ROW_COUNT,
+                },
+                "properties": {"pixelSize": STANDARD_SHEET_ROW_HEIGHT},
+                "fields": "pixelSize",
+            }
+        },
+        {
+            "updateDimensionProperties": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "dimension": "COLUMNS",
+                    "startIndex": 0,
+                    "endIndex": column_count,
+                },
+                "properties": {"pixelSize": STANDARD_SHEET_COLUMN_WIDTH},
+                "fields": "pixelSize",
+            }
+        },
+        {
+            "repeatCell": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 0,
+                    "endRowIndex": 1,
+                    "startColumnIndex": 0,
+                    "endColumnIndex": column_count,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": {"red": 0.88, "green": 0.94, "blue": 0.90},
+                        "horizontalAlignment": "LEFT",
+                        "verticalAlignment": "MIDDLE",
+                        "textFormat": {"bold": True},
+                    }
+                },
+                "fields": "userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)",
+            }
+        },
+        {
+            "setBasicFilter": {
+                "filter": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 0,
+                        "endRowIndex": STANDARD_SHEET_ROW_COUNT,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": column_count,
+                    }
+                }
+            }
+        },
+    ]
 
 
 def column_name(index: int) -> str:

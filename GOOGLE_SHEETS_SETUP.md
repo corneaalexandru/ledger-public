@@ -77,7 +77,9 @@ LEDGER_PROJECT_CURRENCY=EUR
 
 It also writes `.ledger_public_setup/google_configured` and `.ledger_profile.json`. These files are ignored by Git.
 
-The setup page creates and seeds the required Ledger tabs directly in native Google Sheets format. Starter content includes mock accounts, transactions, trades, portfolio plans, category references, account types, FX rates, classification rules, and setup instructions.
+The setup page creates and seeds the required Ledger tabs directly in native Google Sheets format. Starter content includes mock accounts, transactions, trades, portfolio plans, category references, account types, reference currency rows, classification rules, and setup instructions.
+
+Converted amount cells are written as Google Sheets formulas, so currency conversion is handled by the native Sheet runtime. Reference currency rows are starter context only; they are not the conversion engine.
 
 Supported Project Currency values are EUR, USD, AED, RON, GBP, CHF, CAD, AUD, INR, and JPY.
 

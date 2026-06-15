@@ -2096,14 +2096,31 @@ def setup_status_payload(env: dict[str, str] | None = None) -> dict:
             {
                 "label": "Google Cloud",
                 "detail": "Create or choose a project, enable the Google Sheets API, then create a service-account key.",
+                "items": [
+                    "Open Google Cloud Console, then create or choose the project that will own the API access.",
+                    "Go to APIs & Services > Library, search for Google Sheets API, and click Enable.",
+                    "Go to IAM & Admin > Service Accounts, create a Ledger service account, then create a JSON key.",
+                    "Upload the JSON key here or paste its saved path; setup stores it as credentials/ledger-public-service-account.json.",
+                ],
             },
             {
                 "label": "Google Sheet",
-                "detail": "Create a blank Google Sheet and share it with the service-account email as Editor.",
+                "detail": "Create a blank native Google Sheet and share it with the service-account email as Editor.",
+                "items": [
+                    "In Google Drive choose New > Google Sheets, then copy the Sheet URL or the spreadsheet ID from the address bar.",
+                    "Open the JSON key and find client_email, or upload the key here and use the Share Email shown by Ledger.",
+                    "Share the Google Sheet with that service-account email as Editor; sharing only with your personal email is not enough.",
+                ],
             },
             {
                 "label": "Ledger Public",
                 "detail": "Connect the Sheet, choose Project Currency, save profile details, and seed the starter tabs.",
+                "items": [
+                    "Paste the Google Sheet URL or ID, choose Project Currency, and save profile name, surname, and email.",
+                    "Setup writes .env, .ledger_public_setup/google_configured, and .ledger_profile.json locally; those files are ignored by Git.",
+                    "Ledger creates or repairs the required tabs directly in native Google Sheets format with uniform rows, columns, headers, and filters.",
+                    "Converted amount cells use Google Sheets formulas so currency conversion comes from the Sheet runtime, not from an XLSX workbook.",
+                ],
             },
         ],
     }

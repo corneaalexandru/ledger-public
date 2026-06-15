@@ -41,7 +41,7 @@ python3 server.py --setup --open
 7. Paste the Google Sheet URL or spreadsheet ID into setup.
 8. Enter Project Currency plus local profile name, surname, and email.
 
-Ledger creates and seeds the required tabs directly in Google Sheets format. The starter tabs include mock register rows plus reference categories, account types, FX rates, classification rules, and setup instructions.
+Ledger creates and seeds the required tabs directly in Google Sheets format. The starter tabs include mock register rows plus reference categories, account types, reference currency rows, classification rules, and setup instructions. Converted amount cells use native Google Sheets formulas for currency conversion.
 
 The wizard writes:
 

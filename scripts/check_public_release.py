@@ -27,6 +27,7 @@ ALLOWED_TRACKED_FILES = {
 def main() -> int:
     run([sys.executable, "-m", "py_compile", "server.py"])
     run([sys.executable, "-m", "py_compile", "scripts/setup_google.py"])
+    run([sys.executable, "-m", "py_compile", "scripts/free_port.py"])
     reject_tracked_runtime_data()
     verify_clean_first_run_requires_google_setup()
     print("Ledger Public release check passed.")
