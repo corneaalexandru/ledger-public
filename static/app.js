@@ -13812,7 +13812,7 @@ function transactionPayloadHasScope(data = {}, scope = "register") {
 }
 
 function transactionMonthlyTargetsAvailableForPeriod(insights = {}) {
-  const targets = insights.capital_targets?.monthly_targets || [];
+  const targets = insights.monthly_targets || insights.capital_targets?.monthly_targets || [];
   if (!targets.length) return false;
   if (state.period.mode === "all") return true;
   if (state.period.mode === "year") {
