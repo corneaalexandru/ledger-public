@@ -14380,7 +14380,7 @@ function tradeTable(rows, data) {
   const end = data ? Math.min(data.offset + data.limit, data.total) : 0;
   const canGoBack = data && data.offset > 0;
   const canGoForward = data && data.offset + data.limit < data.total;
-  const columnCount = 13;
+  const columnCount = 14;
   const allVisibleSelected = rows.length > 0 && rows.every((row) => state.selectedTrades.has(row.trade_id));
 
   return `
@@ -14389,6 +14389,7 @@ function tradeTable(rows, data) {
         <thead>
           <tr>
             <th class="check-cell trade-check-cell"><input data-select-trade-page type="checkbox" ${allVisibleSelected ? "checked" : ""} aria-label="Select visible trades" /></th>
+            <th class="statement-cell">Source</th>
             <th class="trade-instrument-col">${tradeSortHeader("Symbol", "symbol")}</th>
             <th class="trade-asset-col">Asset</th>
             <th class="trade-provider-col">${tradeSortHeader("Provider", "provider")}</th>
@@ -14415,6 +14416,7 @@ function tradeTable(rows, data) {
                   aria-label="Select ${safe(row.trade_id)}"
                 />
               </td>
+              <td class="statement-cell">${statementCell(row)}</td>
               <td class="trade-instrument-col">${tradeInstrumentCell(row)}</td>
 	              <td class="trade-asset-col">
 	                <span class="table-main">${quickFilterControl(row.asset_name || "-", row.asset_name || "-", { field: "asset_name" })}</span>
@@ -14724,13 +14726,17 @@ function transactionDescriptionCell(row = {}) {
 
 function statementCell(row) {
   if (!row.has_statement) return `<span class="statement-placeholder" aria-hidden="true"></span>`;
+  const tradeId = String(row.trade_id || "").trim();
+  const transactionId = String(row.transaction_id || "").trim();
+  const recordId = tradeId || transactionId;
+  const idAttr = tradeId ? `data-trade-id="${safe(tradeId)}"` : `data-transaction-id="${safe(transactionId)}"`;
   return `
     <button
       class="statement-button"
       data-action="show-statement"
-      data-transaction-id="${safe(row.transaction_id)}"
+      ${idAttr}
       type="button"
-      ${tooltipAttrs(`Show imported statement for ${row.transaction_id}`)}
+      ${tooltipAttrs(`Show imported statement for ${recordId}`)}
     >
       <span data-icon="fileText"></span>
     </button>

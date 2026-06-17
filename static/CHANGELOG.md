@@ -7,6 +7,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Mirrored the shared Statements Import UI wording so queued rows show records, target identifiers, and target sheets instead of transaction-only labels.
 - Rounded fractional trade quantities to six decimal places in shared trade-table displays.
 - Mirrored the shared statement drawer so imported trade confirmations can open from trade detail records when available.
+- Added the shared Source statement-file column to Trades so linked trade confirmations are visible directly in the table.
 
 ## 2026-06-15
 
