@@ -183,6 +183,8 @@ const state = {
   intelligenceThresholds: readIntelligenceThresholds(),
   statement: {
     transactionId: "",
+    recordId: "",
+    recordKind: "transaction",
     data: null,
     loading: false,
     error: "",
@@ -1565,6 +1567,7 @@ function bindEvents() {
       state.selectedTradeId = "";
       state.selectedTradeEditing = false;
       state.tradeActionError = "";
+      resetStatementPanel();
       renderPreservingScroll();
     }
     if (action.dataset.action === "close-portfolio-instrument") {
@@ -1588,26 +1591,43 @@ function bindEvents() {
     if (action.dataset.action === "show-statement") {
       event.preventDefault();
       event.stopPropagation();
-      showTransactionStatement(action.dataset.transactionId || "");
+      const tradeId = action.dataset.tradeId || "";
+      const transactionId = action.dataset.transactionId || "";
+      showRecordStatement(tradeId || transactionId, tradeId ? "trade" : "transaction");
       return;
     }
     if (action.dataset.action === "close-statement") {
+      const recordKind = state.statement.recordKind || "transaction";
       resetStatementPanel();
-      state.selectedTransactionId = "";
-      state.selectedTransactionEditing = false;
-      state.transactionActionError = "";
+      if (recordKind === "trade") {
+        state.selectedTradeId = "";
+        state.selectedTradeEditing = false;
+        state.tradeActionError = "";
+      } else {
+        state.selectedTransactionId = "";
+        state.selectedTransactionEditing = false;
+        state.transactionActionError = "";
+      }
       renderPreservingScroll();
     }
     if (action.dataset.action === "back-transaction-detail") {
-      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.transactionId || "";
+      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.recordId || state.statement.transactionId || "";
       resetStatementPanel();
       state.selectedTransactionId = transactionId;
       state.selectedTransactionEditing = false;
       state.transactionActionError = "";
       renderPreservingScroll();
     }
+    if (action.dataset.action === "back-trade-detail") {
+      const tradeId = action.dataset.tradeId || state.selectedTradeId || state.statement.recordId || "";
+      resetStatementPanel();
+      state.selectedTradeId = tradeId;
+      state.selectedTradeEditing = false;
+      state.tradeActionError = "";
+      renderPreservingScroll();
+    }
     if (action.dataset.action === "edit-transaction") {
-      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.transactionId || "";
+      const transactionId = action.dataset.transactionId || state.selectedTransactionId || state.statement.recordId || state.statement.transactionId || "";
       if (!transactionId) return;
       state.selectedTransactionId = transactionId;
       resetStatementPanel();
@@ -1641,6 +1661,9 @@ function bindEvents() {
       renderPreservingScroll();
     }
     if (action.dataset.action === "edit-trade") {
+      const tradeId = action.dataset.tradeId || state.selectedTradeId || state.statement.recordId || "";
+      if (tradeId) state.selectedTradeId = tradeId;
+      resetStatementPanel();
       state.selectedTradeEditing = true;
       state.tradeActionError = "";
       renderPreservingScroll();
@@ -2415,6 +2438,7 @@ function hasOpenDetailPanel() {
     || state.selectedMonthlyTargetMonth
     || state.selectedYearlyTargetYear
     || state.expandedChartId
+    || state.statement.recordId
     || state.statement.transactionId,
   );
 }
@@ -2451,6 +2475,8 @@ function closeOpenDetailPanel() {
 function resetStatementPanel() {
   state.statement = {
     transactionId: "",
+    recordId: "",
+    recordKind: "transaction",
     data: null,
     loading: false,
     error: "",
@@ -4108,7 +4134,7 @@ function renderTrades() {
       "full",
       tradeTableActions(),
     )}
-    ${tradeDetailsPanel(rows)}
+    ${state.statement.recordKind === "trade" && state.statement.recordId ? transactionStatementPanel() : tradeDetailsPanel(rows)}
     `}
   `;
 }
@@ -14874,10 +14900,11 @@ function transactionDetailsPanel(rows = []) {
 }
 
 function transactionStatementPanel() {
-  if (!state.statement.transactionId) return "";
+  const recordId = state.statement.recordId || state.statement.transactionId;
+  if (!recordId) return "";
   const data = state.statement.data || {};
   const title = state.statement.loading ? "Loading statement" : state.statement.error ? "Statement unavailable" : "Imported Statement";
-  const heading = data.memo || data.file_name || state.statement.transactionId;
+  const heading = data.memo || data.file_name || recordId;
   return detailPanel(
     title,
     heading,
@@ -14889,7 +14916,16 @@ function transactionStatementPanel() {
 }
 
 function transactionStatementActions(data = {}) {
-  const transactionId = state.statement.transactionId || data.transaction_id || state.selectedTransactionId || "";
+  const recordKind = state.statement.recordKind || data.record_kind || "transaction";
+  if (recordKind === "trade") {
+    const tradeId = state.statement.recordId || data.trade_id || state.selectedTradeId || "";
+    if (!tradeId) return "";
+    return `
+      ${iconActionButton("back-trade-detail", "chevronLeft", "Back to trade details", { tradeId })}
+      ${iconActionButton("edit-trade", "edit", "Edit trade", { tradeId })}
+    `;
+  }
+  const transactionId = state.statement.transactionId || state.statement.recordId || data.transaction_id || state.selectedTransactionId || "";
   if (!transactionId) return "";
   return `
     ${iconActionButton("back-transaction-detail", "chevronLeft", "Back to transaction details", { transactionId })}
@@ -14905,9 +14941,11 @@ function statementPanelBody(data) {
     return `<p class="drawer-error">${safe(state.statement.error)}</p>`;
   }
   const preview = data.preview || {};
+  const recordKind = data.record_kind || state.statement.recordKind || "transaction";
+  const recordId = data.trade_id || data.transaction_id || data.record_id || state.statement.recordId || state.statement.transactionId;
   return `
     <dl>
-      ${detailItem("Transaction ID", data.transaction_id)}
+      ${detailItem(recordKind === "trade" ? "Trade ID" : "Transaction ID", recordId)}
       ${detailItem("Source", labelize(data.source))}
       ${detailItem("Type", labelize(data.source_type))}
       ${detailItem("Statement Date", data.statement_date)}
@@ -15040,6 +15078,9 @@ function tradeDetailActions(row, isEditing) {
   return `
     ${isEditing ? "" : `
       ${iconActionButton("duplicate-trade", "copy", "Duplicate trade", { tradeId: row.trade_id })}
+      ${row.has_statement ? `
+        ${iconActionButton("show-statement", "fileText", "View statement attachments", { tradeId: row.trade_id })}
+      ` : ""}
       ${iconActionButton("edit-trade", "edit", "Edit trade")}
     `}
     ${iconActionButton("delete-trade", "trash", "Delete trade", { tradeId: row.trade_id, className: "is-danger" })}
@@ -17509,14 +17550,28 @@ async function restoreSelectedTransactions() {
 }
 
 async function showTransactionStatement(transactionId) {
-  const id = transactionId || "";
+  return showRecordStatement(transactionId, "transaction");
+}
+
+async function showRecordStatement(recordId, recordKind = "transaction") {
+  const id = recordId || "";
   if (!id) return;
+  const kind = recordKind === "trade" ? "trade" : "transaction";
+  const collection = kind === "trade" ? "trades" : "transactions";
   state.periodPanelOpen = false;
-  state.selectedTransactionId = id;
-  state.selectedTransactionEditing = false;
-  state.transactionActionError = "";
+  if (kind === "trade") {
+    state.selectedTradeId = id;
+    state.selectedTradeEditing = false;
+    state.tradeActionError = "";
+  } else {
+    state.selectedTransactionId = id;
+    state.selectedTransactionEditing = false;
+    state.transactionActionError = "";
+  }
   state.statement = {
-    transactionId: id,
+    transactionId: kind === "transaction" ? id : "",
+    recordId: id,
+    recordKind: kind,
     data: null,
     loading: true,
     error: "",
@@ -17524,16 +17579,20 @@ async function showTransactionStatement(transactionId) {
   render();
 
   try {
-    const data = await fetchJson(`/api/transactions/${encodeURIComponent(id)}/statement`);
+    const data = await fetchJson(`/api/${collection}/${encodeURIComponent(id)}/statement`);
     state.statement = {
-      transactionId: id,
+      transactionId: kind === "transaction" ? id : "",
+      recordId: id,
+      recordKind: kind,
       data,
       loading: false,
       error: "",
     };
   } catch (error) {
     state.statement = {
-      transactionId: id,
+      transactionId: kind === "transaction" ? id : "",
+      recordId: id,
+      recordKind: kind,
       data: null,
       loading: false,
       error: friendlyActionError(error, "Unable to load imported statement."),
@@ -17560,6 +17619,8 @@ async function attachStatementFiles(fileList) {
     if (state.statement.transactionId === id) {
       state.statement = {
         transactionId: id,
+        recordId: id,
+        recordKind: "transaction",
         data,
         loading: false,
         error: "",
