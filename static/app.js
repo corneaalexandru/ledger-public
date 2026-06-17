@@ -10726,8 +10726,6 @@ function insightBars(items = [], emptyLabel = "No values available.") {
   return `
     <div class="minimal-bars insight-bars">
       ${visible.map((item) => {
-        const share = Math.abs(numericValue(item.share));
-        const width = Math.max(2, Math.min(100, share));
         const tag = item.action ? "button" : "article";
         const attrs = item.action
           ? `type="button" data-action="${safe(item.action)}" ${item.dataAttrs || ""}`
@@ -10747,7 +10745,7 @@ function insightBars(items = [], emptyLabel = "No values available.") {
                 ${Number.isFinite(Number(item.share)) && item.shareLabel !== "" ? `<small>${safe(item.shareLabel || formatPercent(item.share))}</small>` : ""}
               </span>
             </div>
-            <i style="width:${width}%"></i>
+            <i></i>
           </${tag}>
         `;
       }).join("")}

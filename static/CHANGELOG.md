@@ -2,6 +2,10 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-18
+
+- Changed insight-list indicator bars to a uniform fixed width so the first/highest row no longer visually dominates the breakdown.
+
 ## 2026-06-17
 
 - Replaced the expanded README screenshot gallery with eight light-mode key views for setup, overview, accounts, transactions, targets, trades, portfolio, and planning.
