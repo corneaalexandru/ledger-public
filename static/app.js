@@ -10046,7 +10046,7 @@ function statementMatchLabel(row = {}) {
 
 function statementImportMainLabel(row = {}) {
   if (row.record_kind === "trade" || row.target_sheet_name === "trades_register") {
-    const quantity = row.quantity ? `${row.quantity} ` : "";
+    const quantity = row.quantity ? `${formatQuantity(row.quantity)} ` : "";
     const price = row.entry_price ? ` @ ${formatCurrency(numericValue(row.entry_price), row.trade_currency || row.statement_currency || "EUR")}` : "";
     return `${quantity}${row.symbol || row.asset_name || row.memo || "Trade"}${price}`.trim();
   }
@@ -14448,7 +14448,7 @@ function tradeCostBasisCell(row = {}) {
   const entryPrice = numericValue(row.entry_price);
   const costBasis = quantity * entryPrice;
   const detail = quantity && entryPrice
-    ? `${formatNumber(quantity)} units @ ${formatTradePrice(entryPrice, row.trade_currency)}`
+    ? `${formatQuantity(quantity)} units @ ${formatTradePrice(entryPrice, row.trade_currency)}`
     : "entry price";
   return `
     <span class="table-main">${costBasis ? formatTradeMoney(costBasis, row.trade_currency) : "-"}</span>

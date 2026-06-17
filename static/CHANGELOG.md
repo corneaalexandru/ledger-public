@@ -5,6 +5,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 ## 2026-06-17
 
 - Mirrored the shared Statements Import UI wording so queued rows show records, target identifiers, and target sheets instead of transaction-only labels.
+- Rounded fractional trade quantities to six decimal places in shared trade-table displays.
 
 ## 2026-06-15
 
