@@ -30,51 +30,23 @@ Create a blank Google Sheet, share it with the service-account email as Editor, 
 
 ## Screenshots
 
-![Ledger Public setup wizard](docs/screenshots/setup-wizard.png)
+A short light-mode tour of the public starter experience:
 
-![Ledger Public overview insights](docs/screenshots/overview-insights.png)
+![Ledger Public setup wizard](docs/screenshots/setup.png)
 
-![Ledger Public overview charts](docs/screenshots/overview-charts.png)
+![Ledger Public overview](docs/screenshots/overview.png)
 
-![Ledger Public accounts register](docs/screenshots/accounts-register.png)
+![Ledger Public accounts](docs/screenshots/accounts.png)
 
-![Ledger Public accounts insights](docs/screenshots/accounts-insights.png)
+![Ledger Public transactions](docs/screenshots/transactions.png)
 
-![Ledger Public account details](docs/screenshots/accounts-detail.png)
+![Ledger Public monthly targets](docs/screenshots/targets.png)
 
-![Ledger Public transactions register](docs/screenshots/transactions-register.png)
+![Ledger Public trades](docs/screenshots/trades.png)
 
-![Ledger Public transactions insights](docs/screenshots/transactions-insights.png)
+![Ledger Public portfolio](docs/screenshots/portfolio.png)
 
-![Ledger Public transaction targets all periods](docs/screenshots/transactions-targets-all.png)
-
-![Ledger Public transaction targets June 2026](docs/screenshots/transactions-targets-month.png)
-
-![Ledger Public transaction targets year 2026](docs/screenshots/transactions-targets-year.png)
-
-![Ledger Public statements import](docs/screenshots/statements-import.png)
-
-![Ledger Public trades register](docs/screenshots/trades-register.png)
-
-![Ledger Public portfolio overview](docs/screenshots/portfolio-overview.png)
-
-![Ledger Public portfolio performance charts](docs/screenshots/portfolio-performance.png)
-
-![Ledger Public portfolio funding](docs/screenshots/portfolio-funding.png)
-
-![Ledger Public planning targets all periods](docs/screenshots/planning-targets-all.png)
-
-![Ledger Public planning targets June 2026](docs/screenshots/planning-targets-month.png)
-
-![Ledger Public planning targets year 2026](docs/screenshots/planning-targets-year.png)
-
-![Ledger Public planning exit strategy](docs/screenshots/planning-exit-strategy.png)
-
-![Ledger Public planning monthly plan](docs/screenshots/planning-monthly-plan.png)
-
-![Ledger Public settings](docs/screenshots/settings.png)
-
-![Ledger Public about](docs/screenshots/about.png)
+![Ledger Public planning](docs/screenshots/planning.png)
 
 ## Native Google Sheets
 

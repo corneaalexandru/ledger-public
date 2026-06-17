@@ -4,6 +4,8 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-17
 
+- Replaced the expanded README screenshot gallery with eight light-mode key views for setup, overview, accounts, transactions, targets, trades, portfolio, and planning.
+- Fixed public local-store filtering so frontend control parameters such as trade risk thresholds no longer remove valid starter rows from API responses.
 - Mirrored the shared Statements Import UI wording so queued rows show records, target identifiers, and target sheets instead of transaction-only labels.
 - Rounded fractional trade quantities to six decimal places in shared trade-table displays.
 - Mirrored the shared statement drawer so imported trade confirmations can open from trade detail records when available.

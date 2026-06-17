@@ -886,6 +886,8 @@ def filter_rows(rows: list[dict], params: dict[str, str], fields: list[str]) -> 
     for key, value in params.items():
         if key in {"q", "limit", "offset", "sort", "direction", "scope", "date_from", "date_to", "period", "month", "window"}:
             continue
+        if key not in fields:
+            continue
         if not value:
             continue
         result = [row for row in result if str(row.get(key, "")).lower() == str(value).lower()]
