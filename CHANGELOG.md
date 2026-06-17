@@ -5,6 +5,8 @@ Ledger Public follows the private Ledger development stream. Public releases con
 ## 2026-06-18
 
 - Changed insight-list indicator bars to a uniform fixed width so the first/highest row no longer visually dominates the breakdown.
+- Removed the document side rail and grouped Overview, Settings, About, and Changelog lists into clearer categorized sections with consistent text color.
+- Added consistent spacing between compact list icons and labels across the grouped document-style rows.
 
 ## 2026-06-17
 

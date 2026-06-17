@@ -863,8 +863,7 @@ kbd {
 .document-line-list {
   --document-line-inset: clamp(24px, 3vw, 44px);
   box-sizing: border-box;
-  border-left: 1px solid var(--line);
-  padding-left: var(--document-line-inset);
+  padding-left: 0;
 }
 
 .settings-metric-card strong {
@@ -964,6 +963,12 @@ kbd {
   content: " — ";
 }
 
+.settings-document-intro {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .settings-about-tabs {
   margin-bottom: 22px;
 }
@@ -1021,6 +1026,47 @@ kbd {
 
 .settings-markdown li + li {
   margin-top: 6px;
+}
+
+.settings-list-sections {
+  display: grid;
+  gap: 26px;
+  width: 100%;
+  max-width: none;
+  color: var(--muted);
+}
+
+.settings-list-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settings-list-section + .settings-list-section {
+  padding-top: 2px;
+}
+
+.settings-list-heading {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.settings-list-body {
+  min-width: 0;
+}
+
+.settings-changelog-section .settings-document-list {
+  color: var(--text);
+}
+
+.settings-changelog-section .settings-document-value {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .settings-row-link {
@@ -1998,7 +2044,7 @@ html[data-theme="light"] .skeleton-table span::after {
 .settings-line-grid .metric-card-head {
   display: inline-flex;
   align-items: baseline;
-  gap: 0;
+  gap: 6px;
   min-height: 0;
 }
 
@@ -7041,8 +7087,8 @@ table.portfolio-table td:nth-child(7) {
     display: block !important;
     width: auto !important;
     max-width: none !important;
-    border-left: 1px solid #d8dde3 !important;
-    padding-left: 8mm !important;
+    border-left: 0 !important;
+    padding-left: 0 !important;
     color: #65717d !important;
   }
 
@@ -7072,8 +7118,11 @@ table.portfolio-table td:nth-child(7) {
 
   .settings-line-grid .metric-card-head,
   .overview-insight-grid.settings-line-grid .metric-card-head {
-    display: inline;
+    display: inline-flex !important;
+    align-items: baseline;
+    gap: 1.5mm;
     min-height: 0;
+    vertical-align: baseline;
   }
 
   .settings-line-grid .metric-card-label,

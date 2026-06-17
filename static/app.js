@@ -3676,12 +3676,8 @@ function overviewInsightsDashboard(insightCards = [], accounts = {}, transaction
 }
 
 function overviewContinuousInsightSection(cards = []) {
-  if (!cards.length) return "";
-  return `
-    <section class="overview-insight-grid settings-line-grid document-line-list overview-line-grid overview-continuous-list" aria-label="Overview metrics">
-      ${cards.map((card) => overviewSupportingInsightLine(card)).join("")}
-    </section>
-  `;
+  const sections = overviewGroupedInsightSections(cards);
+  return settingsLineSections(sections, "overview-line-grid overview-continuous-list", "Overview metrics");
 }
 
 function overviewHeadlineInsightCards(cards = []) {
@@ -3743,6 +3739,35 @@ function overviewOrderedSupportingInsightCards(cards = []) {
     byId[overviewSupportingInsightGroupId(card)]?.cards.push(card);
   });
   return groups.flatMap((group) => group.cards);
+}
+
+function overviewGroupedInsightSections(cards = []) {
+  const groups = [
+    { id: "snapshot", title: "Core Position", cards: [] },
+    { id: "risk", title: "Risk & Exposure", cards: [] },
+    { id: "capital", title: "Capital Structure", cards: [] },
+    { id: "planning", title: "Planning Signals", cards: [] },
+    { id: "data-quality", title: "Data Quality", cards: [] },
+    { id: "trading", title: "Trading & Returns", cards: [] },
+    { id: "operations", title: "Operations", cards: [] },
+  ];
+  const byId = Object.fromEntries(groups.map((group) => [group.id, group]));
+  cards.forEach((card) => {
+    const groupId = overviewTopLevelInsightGroupId(card);
+    (byId[groupId] || byId.operations).cards.push(card);
+  });
+  return groups
+    .filter((group) => group.cards.length)
+    .map((group) => ({
+      title: group.title,
+      html: group.cards.map((card) => overviewSupportingInsightLine(card)).join(""),
+    }));
+}
+
+function overviewTopLevelInsightGroupId(card = {}) {
+  const text = overviewInsightCardSearchText(card);
+  if (/(financial health|monthly surplus|savings rate|cash runway|liquid capital)/.test(text)) return "snapshot";
+  return overviewSupportingInsightGroupId(card);
 }
 
 function overviewSupportingInsightLine(card = {}) {
@@ -10127,15 +10152,15 @@ function renderSettings() {
 }
 
 function settingsDashboard(context = {}) {
-  return settingsInsightGrid([
-    settingsProfileForm(),
-    ...settingsProjectCards(context),
-    ...settingsSourceTruthCards(context),
-    ...settingsSyncCards(),
-    ...settingsConnectionsCards(context),
-    ...settingsThresholdCards(),
-    ...settingsPreferencesCards(),
-  ], "settings-all-grid settings-line-grid document-line-list");
+  return settingsLineSections([
+    { title: "Profile", html: settingsProfileForm() },
+    { title: "Project", html: settingsProjectCards(context).join("") },
+    { title: "Source Truth", html: settingsSourceTruthCards(context).join("") },
+    { title: "Sync & Refresh", html: settingsSyncCards().join("") },
+    { title: "Connections", html: settingsConnectionsCards(context).join("") },
+    { title: "Intelligence Thresholds", html: settingsThresholdCards().join("") },
+    { title: "Preferences", html: settingsPreferencesCards().join("") },
+  ], "settings-all-grid", "Settings");
 }
 
 function settingsPageDivider() {
@@ -10183,22 +10208,35 @@ function settingsAboutTabs() {
 
 function settingsCopyrightPanel() {
   const currentYear = new Date().getFullYear();
-  return settingsInsightGrid([
-    settingsDocumentListCard([
+  return settingsLineSections([
+    {
+      title: "Product & Contact",
+      html: settingsDocumentListHtml([
       ["Product", "Ledger", "Personal finance workspace for source-truth review, portfolio planning, and reporting."],
       ["Copyright", `Copyright (c) ${currentYear} Alexandru Cornea. All rights reserved.`, "Ownership and notices apply to the application, documentation, and distributed assets unless separately stated."],
-    {
-      label: "Contact",
-      valueHtml: '<a class="settings-row-link" href="mailto:contact@alexandru-cornea.com">contact@alexandru-cornea.com</a>',
-      note: "Use this address for support, licensing, security disclosures, and permission requests.",
+      {
+        label: "Contact",
+        valueHtml: '<a class="settings-row-link" href="mailto:contact@alexandru-cornea.com">contact@alexandru-cornea.com</a>',
+        note: "Use this address for support, licensing, security disclosures, and permission requests.",
+      },
+      ]),
     },
+    {
+      title: "License & Distribution",
+      html: settingsDocumentListHtml([
       ["License", "Repository license controls use", "If a LICENSE file or written agreement is provided, that license governs. Otherwise, no rights are granted beyond personal evaluation or internal use expressly permitted by the owner."],
       ["Public Package", "User-owned data model", "Ledger Public is distributed without private data or credentials. Users are responsible for their own Google Sheet, service-account file, backups, and access controls."],
+      ]),
+    },
+    {
+      title: "Disclaimer & Third Parties",
+      html: settingsDocumentListHtml([
       ["Disclaimer", "No financial advice", "Information generated by Ledger is for recordkeeping and planning support only. It is not investment, tax, legal, accounting, or financial advice."],
       ["Warranty", "Provided as is", "The software is provided without warranties of merchantability, fitness for a particular purpose, accuracy, availability, or non-infringement, to the maximum extent permitted by law."],
       ["Third-party Services", "Separate terms apply", "Google Sheets, market-data providers, libraries, brokers, banks, and other connected services remain governed by their own terms and privacy policies."],
-    ]),
-  ], "settings-document-grid");
+      ]),
+    },
+  ], "settings-document-grid", "Copyright and license");
 }
 
 function settingsChangelogPanel() {
@@ -10214,9 +10252,7 @@ function settingsChangelogPanel() {
   }
   const changelog = state.aboutChangelog || {};
   const body = changelog.body || "# Changelog\n\nNo changelog entries are available.";
-  return settingsInsightGrid([
-    settingsDocumentCard(markdownDocument(changelogBodyWithoutTitle(body))),
-  ]);
+  return settingsLineSections(changelogSectionsFromMarkdown(changelogBodyWithoutTitle(body)), "settings-document-grid settings-changelog-grid", "Changelog");
 }
 
 function changelogBodyWithoutTitle(markdown = "") {
@@ -10291,6 +10327,29 @@ function settingsInsightGrid(cards, className = "") {
   return `<section class="overview-insight-grid settings-insight-grid ${safe(className)}">${cards.join("")}</section>`;
 }
 
+function settingsLineSections(sections = [], className = "", ariaLabel = "") {
+  const visible = sections.filter((section) => section && String(section.html || "").trim());
+  if (!visible.length) return "";
+  const label = ariaLabel ? ` aria-label="${safe(ariaLabel)}"` : "";
+  return `
+    <section class="settings-list-sections ${safe(className)}"${label}>
+      ${visible.map((section) => settingsLineSection(section.title, section.html, section.className || "")).join("")}
+    </section>
+  `;
+}
+
+function settingsLineSection(title = "", bodyHtml = "", className = "") {
+  if (!String(bodyHtml || "").trim()) return "";
+  return `
+    <section class="settings-list-section ${safe(className)}">
+      ${title ? `<h2 class="settings-list-heading">${safe(title)}</h2>` : ""}
+      <div class="settings-list-body settings-line-grid">
+        ${bodyHtml}
+      </div>
+    </section>
+  `;
+}
+
 function settingsMetricCard({ label, value = "", meta = "", note = "", icon = "", valueHtml = "", metaHtml = "", noteHtml = "", actionsHtml = "", tone = "", className = "" } = {}) {
   const iconKey = icon || panelIcon(label) || metricIcon(label);
   const hasValue = value !== null && value !== undefined && String(value) !== "";
@@ -10318,20 +10377,75 @@ function settingsDocumentCard(bodyHtml = "") {
 }
 
 function settingsDocumentListCard(rows = []) {
+  return settingsDocumentCard(settingsDocumentListHtml(rows));
+}
+
+function settingsDocumentListHtml(rows = []) {
   const normalizedRows = rows.map((row) => Array.isArray(row)
     ? { label: row[0], value: row[1], note: row[2] }
     : row);
-  return settingsDocumentCard(`
+  return `
     <ul class="settings-document-list">
       ${normalizedRows.map((row) => `
         <li>
-          <span class="settings-document-label">${safe(row.label || "")}</span>
+          ${row.label ? `<span class="settings-document-label">${safe(row.label)}</span>` : ""}
           <span class="settings-document-value">${row.valueHtml || safe(displayDetailValue(row.value))}</span>
           ${row.note ? `<span class="settings-document-note">${safe(row.note)}</span>` : ""}
         </li>
       `).join("")}
     </ul>
-  `);
+  `;
+}
+
+function changelogSectionsFromMarkdown(markdown = "") {
+  const sections = [];
+  let intro = [];
+  let current = null;
+  String(markdown || "").split(/\r?\n/).forEach((line) => {
+    const text = line.trim();
+    if (!text) return;
+    const heading = text.match(/^##\s+(.+)$/);
+    if (heading) {
+      current = { title: heading[1], rows: [] };
+      sections.push(current);
+      return;
+    }
+    const bullet = text.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      if (!current) {
+        current = { title: "Updates", rows: [] };
+        sections.push(current);
+      }
+      current.rows.push({ value: bullet[1] });
+      return;
+    }
+    if (current) {
+      current.rows.push({ value: text });
+    } else {
+      intro.push(text);
+    }
+  });
+  const grouped = sections
+    .filter((section) => section.rows.length)
+    .map((section) => ({
+      title: section.title,
+      className: "settings-changelog-section",
+      html: settingsDocumentListHtml(section.rows.map((row) => ({
+        label: "",
+        value: row.value,
+      }))),
+    }));
+  if (intro.length) {
+    grouped.unshift({
+      title: "Release Notes",
+      className: "settings-changelog-intro",
+      html: `<p class="settings-document-intro">${safe(intro.join(" "))}</p>`,
+    });
+  }
+  return grouped.length ? grouped : [{
+    title: "Release Notes",
+    html: settingsDocumentListHtml([["Status", "No changelog entries are available.", ""]]),
+  }];
 }
 
 function settingsRowsToMetricCards(rows, icon = "settings") {
