@@ -13784,7 +13784,7 @@ function transactionTabs(classes = [], insights = {}) {
     >Targets</button>
   `;
   return `
-    <nav class="transaction-tabs" aria-label="Transaction classes">
+    <nav class="transaction-tabs transaction-class-tabs" aria-label="Transaction classes">
       ${transactionTabButton("", labels)}
       <button
         class="${state.transactionView === "insights" ? "is-active" : ""}"

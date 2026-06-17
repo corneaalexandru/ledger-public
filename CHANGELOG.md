@@ -10,6 +10,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Added the shared Source statement-file column to Trades so linked trade confirmations are visible directly in the table.
 - Rounded visible trade quantities to two decimal places in shared tables, detail drawers, and statement-import labels while keeping source precision for stored values.
 - Aligned the Transactions Targets tab with the detailed monthly target payload used by shared monthly target actuals.
+- Kept the full Transactions tab strip visible in overall/all-period views so later filters such as Top Up, Review, and Deleted no longer fall off the edge.
 
 ## 2026-06-15
 

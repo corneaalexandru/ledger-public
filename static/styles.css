@@ -5128,6 +5128,16 @@ input.is-invalid {
   border-color: var(--strong);
 }
 
+.transaction-class-tabs {
+  flex-wrap: wrap;
+  gap: 0 24px;
+  overflow-x: visible;
+}
+
+.transaction-class-tabs button {
+  min-height: 40px;
+}
+
 .trade-tabs {
   gap: 24px;
 }
