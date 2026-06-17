@@ -2,6 +2,10 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-17
+
+- Mirrored the shared Statements Import UI wording so queued rows show records, target identifiers, and target sheets instead of transaction-only labels.
+
 ## 2026-06-15
 
 - Added a browser setup flow that captures the Google service-account key, Google Sheet URL, Project Currency, and local profile name/surname/email before seeding.

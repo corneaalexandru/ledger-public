@@ -9772,7 +9772,7 @@ function renderStatementImport() {
       </button>
     </nav>
     <section class="settings-summary">
-      ${inlineStat("Parsed", formatNumber(data.parsed_transactions || 0), "transactions")}
+      ${inlineStat("Parsed", formatNumber(data.parsed_records ?? data.parsed_transactions ?? 0), "records")}
       ${inlineStat("Importable", formatNumber(data.importable || 0), "ready")}
       ${inlineStat("Duplicates", formatNumber(data.duplicates || 0), "skipped")}
       ${inlineStat("Unsupported", formatNumber(data.unsupported_files || 0), "files")}
@@ -9793,11 +9793,24 @@ function statementImportRowMatches(row = {}, query = "") {
     row.source_file,
     row.file_name,
     row.suffix,
+    row.record_kind,
+    row.target_sheet_name,
+    row.target_identifier_value,
+    row.proposed_record_id,
+    row.duplicate_record_id,
     row.proposed_transaction_id,
     row.duplicate_transaction_id,
     row.transaction_id,
+    row.trade_id,
     row.memo,
     row.transaction_class,
+    row.provider_id,
+    row.portfolio_id,
+    row.symbol,
+    row.asset_name,
+    row.trade_currency,
+    row.quantity,
+    row.entry_price,
     row.category_id,
     row.subcategory_id,
     row.account_id,
@@ -9912,7 +9925,7 @@ function syncStatementImportSelection(options = {}) {
 }
 
 function statementImportTable(rows = [], isFiltered = false) {
-  if (!rows.length) return emptyState(isFiltered ? "No statement transactions match the current search." : "No statement transactions are queued.");
+  if (!rows.length) return emptyState(isFiltered ? "No statement records match the current search." : "No statement records are queued.");
   const selectableRows = rows.filter(statementImportRowSelectable);
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => state.selectedStatementImportRecords.has(statementImportRecordId(row)));
   return `
@@ -9920,14 +9933,14 @@ function statementImportTable(rows = [], isFiltered = false) {
       <table class="minimal-table statement-import-table">
         <thead>
           <tr>
-            <th class="check-cell"><input data-select-statement-import-page type="checkbox" ${allVisibleSelected ? "checked" : ""} ${selectableRows.length ? "" : "disabled"} aria-label="Select visible statement transactions" /></th>
+            <th class="check-cell"><input data-select-statement-import-page type="checkbox" ${allVisibleSelected ? "checked" : ""} ${selectableRows.length ? "" : "disabled"} aria-label="Select visible statement records" /></th>
             <th>Decision</th>
-            <th>Transaction Date</th>
-            <th>Memo</th>
+            <th>Record Date</th>
+            <th>Memo / Instrument</th>
             <th class="align-right">Amount</th>
-            <th>Class</th>
+            <th>Type</th>
             <th>Match</th>
-            <th>Transaction</th>
+            <th>Target</th>
           </tr>
         </thead>
         <tbody>
@@ -9943,22 +9956,25 @@ function statementImportTable(rows = [], isFiltered = false) {
                   value="${safe(recordId)}"
                   ${state.selectedStatementImportRecords.has(recordId) ? "checked" : ""}
                   ${canSelect ? "" : "disabled"}
-                  aria-label="Select statement transaction"
+                  aria-label="Select statement record"
                 />
               </td>
               <td><span class="status-chip ${safe(row.import_decision)}">${safe(statementDecisionLabel(row.import_decision))}</span></td>
-              <td>${safe(formatDisplayDate(row.transaction_date || row.posted_date || row.occurred_at))}</td>
+              <td>${safe(formatDisplayDate(row.entry_date || row.transaction_date || row.posted_date || row.occurred_at))}</td>
               <td>
-                <span class="table-main">${safe(row.memo || "-")}</span>
+                <span class="table-main">${safe(statementImportMainLabel(row))}</span>
                 <span class="table-sub">${safe(statementFileLabel(row.source_file) || row.source_type || "")}</span>
               </td>
-              <td class="align-right">${formatCurrency(numericValue(row.sanitized_statement_amount || row.statement_amount), row.statement_currency || "EUR")}</td>
-              <td>${safe(taxonomyLabel(row.transaction_class || "-"))}</td>
+              <td class="align-right">${statementImportAmountLabel(row)}</td>
+              <td>${safe(statementImportTypeLabel(row))}</td>
               <td>
                 <span class="table-main">${safe(statementMatchLabel(row))}</span>
                 <span class="table-sub">${safe(row.match_basis || row.decision_reason || "")}</span>
               </td>
-              <td>${safe(row.proposed_transaction_id || row.duplicate_transaction_id || "-")}</td>
+              <td>
+                <span class="table-main">${safe(statementImportTargetLabel(row))}</span>
+                <span class="table-sub">${safe(row.target_sheet_name || "")}</span>
+              </td>
             </tr>
           `;
           }).join("")}
@@ -10026,6 +10042,39 @@ function statementMatchLabel(row = {}) {
   const confidence = numericValue(row.match_confidence, Number.NaN);
   if (!Number.isFinite(confidence)) return row.decision_reason || "-";
   return `${formatPercent(confidence * 100)} confidence`;
+}
+
+function statementImportMainLabel(row = {}) {
+  if (row.record_kind === "trade" || row.target_sheet_name === "trades_register") {
+    const quantity = row.quantity ? `${row.quantity} ` : "";
+    const price = row.entry_price ? ` @ ${formatCurrency(numericValue(row.entry_price), row.trade_currency || row.statement_currency || "EUR")}` : "";
+    return `${quantity}${row.symbol || row.asset_name || row.memo || "Trade"}${price}`.trim();
+  }
+  return row.memo || "-";
+}
+
+function statementImportAmountLabel(row = {}) {
+  if (row.record_kind === "trade" || row.target_sheet_name === "trades_register") {
+    const total = numericValue(row.sanitized_statement_amount || row.statement_amount);
+    return formatCurrency(total, row.trade_currency || row.statement_currency || "EUR");
+  }
+  return formatCurrency(numericValue(row.sanitized_statement_amount || row.statement_amount), row.statement_currency || "EUR");
+}
+
+function statementImportTypeLabel(row = {}) {
+  if (row.record_kind === "trade" || row.target_sheet_name === "trades_register") {
+    return [row.provider_id, row.portfolio_id, row.record_kind || "trade"].filter(Boolean).join(" · ");
+  }
+  return taxonomyLabel(row.transaction_class || "-");
+}
+
+function statementImportTargetLabel(row = {}) {
+  return row.target_identifier_value
+    || row.proposed_record_id
+    || row.duplicate_record_id
+    || row.proposed_transaction_id
+    || row.duplicate_transaction_id
+    || "-";
 }
 
 function renderSettings() {
@@ -16313,7 +16362,7 @@ async function loadStatementImport(options = {}) {
 }
 
 function statementImportSummaryMessage(data, prefix) {
-  const parsed = numericValue(data?.parsed_transactions);
+  const parsed = numericValue(data?.parsed_records ?? data?.parsed_transactions);
   const importable = numericValue(data?.importable);
   const duplicates = numericValue(data?.duplicates);
   const unsupported = numericValue(data?.unsupported_files);
@@ -16634,7 +16683,7 @@ async function applyStatementImport() {
     render();
     return;
   }
-  const confirmed = window.confirm(`Import ${formatNumber(recordIds.length)} selected statement transaction${recordIds.length === 1 ? "" : "s"} into transactions_register?`);
+  const confirmed = window.confirm(`Import ${formatNumber(recordIds.length)} selected statement record${recordIds.length === 1 ? "" : "s"} into Ledger?`);
   if (!confirmed) return;
   state.loading.statementImport = true;
   state.error.statementImport = "";
@@ -16650,7 +16699,7 @@ async function applyStatementImport() {
     const applied = numericValue(data.applied);
     const archivedDuplicates = numericValue(data.archived_duplicates);
     const messageParts = [];
-    if (applied) messageParts.push(`Imported ${formatNumber(applied)} transaction${applied === 1 ? "" : "s"}`);
+    if (applied) messageParts.push(`Imported ${formatNumber(applied)} record${applied === 1 ? "" : "s"}`);
     if (archivedDuplicates) {
       messageParts.push(`cleared ${formatNumber(archivedDuplicates)} duplicate file${archivedDuplicates === 1 ? "" : "s"}`);
     }
@@ -16659,6 +16708,9 @@ async function applyStatementImport() {
       : statementImportSummaryMessage(data, "Nothing imported");
     markOverviewStale();
     state.transactions = null;
+    state.trades = null;
+    state.portfolioReturns = null;
+    state.overview = null;
   } catch (error) {
     state.statementImportActionError = friendlyActionError(error, "Unable to import statements.");
   } finally {
