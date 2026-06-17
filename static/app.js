@@ -18692,7 +18692,7 @@ function formatTradePrice(value, currency = "EUR") {
 function formatQuantity(value) {
   const amount = numericValue(value);
   if (!amount) return "-";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(amount);
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount);
 }
 
 function countryCell(value) {
