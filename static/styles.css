@@ -1789,46 +1789,6 @@ kbd {
   font-weight: 560;
 }
 
-.loading-skeleton {
-  display: grid;
-  gap: 22px;
-  width: min(960px, 100%);
-}
-
-.skeleton-hero,
-.skeleton-metrics span,
-.skeleton-table span {
-  position: relative;
-  overflow: hidden;
-  border-radius: 6px;
-  background: var(--surface-2);
-}
-
-.skeleton-hero {
-  width: 34%;
-  min-width: 260px;
-  height: 58px;
-}
-
-.skeleton-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.skeleton-metrics span {
-  height: 74px;
-}
-
-.skeleton-table {
-  display: grid;
-  gap: 10px;
-}
-
-.skeleton-table span {
-  height: 42px;
-}
-
 .loader {
   width: 28px;
   height: 28px;

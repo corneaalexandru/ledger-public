@@ -16350,22 +16350,6 @@ function categoryCell(row) {
 function loadingState(label) {
   return `
     <section class="state-panel loading-panel" aria-busy="true" aria-label="${safe(label)}">
-      <div class="loading-skeleton" aria-hidden="true">
-        <div class="skeleton-hero"></div>
-        <div class="skeleton-metrics">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-        <div class="skeleton-table">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
       <strong>${safe(label)}</strong>
     </section>
   `;
