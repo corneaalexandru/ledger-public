@@ -1221,17 +1221,7 @@ kbd {
 }
 
 .statement-import-table-wrap {
-  width: 100%;
   min-width: 0;
-  max-height: none;
-  overflow-x: auto;
-  overflow-y: visible;
-  padding-right: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  scrollbar-gutter: auto;
-  scroll-padding-right: 0;
 }
 
 .statement-import-table {
@@ -1239,27 +1229,9 @@ kbd {
   table-layout: fixed;
 }
 
-.statement-import-table th {
-  position: static;
-  top: auto;
-  z-index: auto;
-}
-
-.statement-import-table thead {
-  display: table-header-group;
-}
-
-.statement-import-table tbody {
-  display: table-row-group;
-}
-
-.statement-import-table tr {
-  display: table-row;
-}
-
 .statement-import-table th.check-cell,
 .statement-import-table td.check-cell {
-  width: 42px;
+  width: 32px;
 }
 
 .statement-import-table th:nth-child(2),
@@ -1297,13 +1269,9 @@ kbd {
   width: 140px;
 }
 
-.statement-import-table td {
-  height: 62px;
-}
-
 .statement-unsupported-table th:first-child,
 .statement-unsupported-table td:first-child {
-  width: 42px;
+  width: 32px;
 }
 
 .statement-unsupported-table th:nth-child(2),
@@ -4402,18 +4370,6 @@ html[data-theme="light"] .skeleton-table span::after {
 .minimal-table-wrap.statement-import-table-wrap {
   width: 100%;
   min-width: 0;
-  max-height: none;
-  overflow-x: auto;
-  overflow-y: visible;
-  padding-right: 0;
-  scrollbar-gutter: auto;
-  scroll-padding-right: 0;
-}
-
-.minimal-table.statement-import-table th {
-  position: static;
-  top: auto;
-  z-index: auto;
 }
 
 input.is-invalid {
@@ -5871,14 +5827,16 @@ input.is-invalid {
 .transactions-table tbody tr,
 .portfolio-table tbody tr,
 .planning-target-table tbody tr,
-.monthly-target-table tbody tr {
+.monthly-target-table tbody tr,
+.statement-import-table tbody tr {
   height: 90px;
 }
 
 .transactions-table td,
 .portfolio-table td,
 .planning-target-table td,
-.monthly-target-table td {
+.monthly-target-table td,
+.statement-import-table td {
   padding-top: 14px;
   padding-bottom: 14px;
 }

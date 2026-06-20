@@ -1388,12 +1388,12 @@ function bindEvents() {
 
     const statementImportPageSelect = event.target.closest("[data-select-statement-import-page]");
     if (statementImportPageSelect && state.statementImport) {
-      visibleStatementImportRows().filter(statementImportRowSelectable).forEach((row) => {
-        const id = statementImportRecordId(row);
+      document.querySelectorAll("[data-statement-import-select]").forEach((control) => {
+        if (!control.value || control.disabled) return;
         if (statementImportPageSelect.checked) {
-          state.selectedStatementImportRecords.add(id);
+          state.selectedStatementImportRecords.add(control.value);
         } else {
-          state.selectedStatementImportRecords.delete(id);
+          state.selectedStatementImportRecords.delete(control.value);
         }
       });
       renderPreservingScroll();
@@ -1402,13 +1402,12 @@ function bindEvents() {
 
     const statementFilePageSelect = event.target.closest("[data-select-statement-file-page]");
     if (statementFilePageSelect && state.statementImport) {
-      visibleStatementUnsupportedRows().forEach((row) => {
-        const fileName = statementFileName(row);
-        if (!fileName) return;
+      document.querySelectorAll("[data-statement-file-select]").forEach((control) => {
+        if (!control.value || control.disabled) return;
         if (statementFilePageSelect.checked) {
-          state.selectedStatementImportFiles.add(fileName);
+          state.selectedStatementImportFiles.add(control.value);
         } else {
-          state.selectedStatementImportFiles.delete(fileName);
+          state.selectedStatementImportFiles.delete(control.value);
         }
       });
       renderPreservingScroll();
@@ -10372,10 +10371,12 @@ function syncStatementImportSelection(options = {}) {
 
 function statementImportTable(rows = [], isFiltered = false) {
   if (!rows.length) return emptyState(isFiltered ? "No statement records match the current search." : "No statement records are queued.");
-  const selectableRows = rows.filter(statementImportRowSelectable);
+  const page = localTablePageData("statementImportQueue", rows);
+  const visibleRows = page.rows;
+  const selectableRows = visibleRows.filter(statementImportRowSelectable);
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => state.selectedStatementImportRecords.has(statementImportRecordId(row)));
   return `
-    <section class="minimal-table-wrap statement-import-table-wrap">
+    <section class="minimal-table-wrap transactions-table-wrap statement-import-table-wrap">
       <table class="minimal-table statement-import-table">
         <thead>
           <tr>
@@ -10390,7 +10391,7 @@ function statementImportTable(rows = [], isFiltered = false) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
+          ${visibleRows.map((row) => {
             const recordId = statementImportRecordId(row);
             const canSelect = statementImportRowSelectable(row);
             return `
@@ -10427,14 +10428,17 @@ function statementImportTable(rows = [], isFiltered = false) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("statementImportQueue", page)}
   `;
 }
 
 function statementUnsupportedTable(rows = []) {
-  const selectableRows = rows.filter((row) => Boolean(statementFileName(row)));
+  const page = localTablePageData("statementUnsupportedFiles", rows);
+  const visibleRows = page.rows;
+  const selectableRows = visibleRows.filter((row) => Boolean(statementFileName(row)));
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => state.selectedStatementImportFiles.has(statementFileName(row)));
   return `
-    <section class="minimal-table-wrap statement-import-table-wrap">
+    <section class="minimal-table-wrap transactions-table-wrap statement-import-table-wrap">
       <table class="minimal-table statement-import-table statement-unsupported-table">
         <thead>
           <tr>
@@ -10445,7 +10449,7 @@ function statementUnsupportedTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
+          ${visibleRows.map((row) => {
             const fileName = statementFileName(row);
             return `
             <tr>
@@ -10471,6 +10475,7 @@ function statementUnsupportedTable(rows = []) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("statementUnsupportedFiles", page)}
   `;
 }
 
