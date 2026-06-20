@@ -2768,6 +2768,34 @@ html[data-theme="light"] .skeleton-table span::after {
   font-size: 14px;
 }
 
+.chart-compact-submeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.chart-compact-submeta span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.chart-compact-submeta span + span {
+  padding-left: 12px;
+  border-left: 1px solid var(--line-faint);
+}
+
+.chart-compact-submeta b {
+  color: var(--strong);
+  font-weight: 760;
+}
+
 .chart-compact-standard {
   width: 100%;
   min-height: 320px;

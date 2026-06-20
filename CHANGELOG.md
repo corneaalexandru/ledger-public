@@ -6,6 +6,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 - Added a third Navy theme mode beside Dark and Light, with a dedicated deep-blue background/surface palette and sidebar cycle support.
 - Made Navy the first-load default theme and moved theme preference storage to a fresh key so older auto-saved Dark preferences do not override the new default.
+- Clarified the Monte Carlo compact card by showing planned investment, capital at work, and projected growth separately from the ending projection value.
 - Fixed Intelligence Threshold defaults so missing or collapsed-minimum local settings restore and persist the intended thresholds instead of showing `1`/`0` values.
 
 ## 2026-06-19

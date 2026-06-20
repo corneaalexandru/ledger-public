@@ -4476,6 +4476,7 @@ function compactChartCard(options = {}) {
   const deltas = metricDeltaHtml(options.metrics || []);
   const periodControl = compactChartPeriodControl(options.periodControl || {});
   const chart = compactStandardChart(options, sparklineValues, sparklineId, label);
+  const subMeta = compactChartSubMeta(options.subMeta || []);
   return `
     <article class="metric-card chart-compact-card">
       <div class="chart-compact-tools">
@@ -4488,10 +4489,26 @@ function compactChartCard(options = {}) {
       </div>
       <strong class="${hasValue ? "" : "is-empty"}">${hasValue ? safe(options.value) : "&nbsp;"}</strong>
       ${options.meta ? `<small>${safe(options.meta)}</small>` : ""}
+      ${subMeta}
       ${chart}
       ${deltas}
       ${options.note ? `<em>${safe(options.note)}</em>` : ""}
     </article>
+  `;
+}
+
+function compactChartSubMeta(items = []) {
+  const entries = (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      label: String(item?.label || "").trim(),
+      value: String(item?.value || "").trim(),
+    }))
+    .filter((item) => item.label && item.value);
+  if (!entries.length) return "";
+  return `
+    <div class="chart-compact-submeta">
+      ${entries.map((item) => `<span><b>${safe(item.value)}</b>${safe(item.label)}</span>`).join("")}
+    </div>
   `;
 }
 
@@ -8255,6 +8272,7 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
   const expectedReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p50) - totalCapitalAtWork, totalCapitalAtWork)) : "";
   const conservativeReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p10) - totalCapitalAtWork, totalCapitalAtWork)) : "";
   const upsideReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p90) - totalCapitalAtWork, totalCapitalAtWork)) : "";
+  const projectedGrowth = numericValue(last.p50) - totalCapitalAtWork;
   const contributionLabel = selectedWindow === "plan" ? "remaining" : "planned in view";
   const referenceMetaLabel = selectedScope === "plan" ? "actual invested" : "current value";
   const showLikelyRange = state.monteCarloContextLines.has("projection-band");
@@ -8272,10 +8290,12 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
       icon: "trendUp",
       label: "Monte Carlo Projection",
       value: formatWholeCurrency(last.p50 || 0, "EUR"),
-      meta: [
-        `${formatWholeCurrency(plannedCapital, "EUR")} ${contributionLabel}`,
-        actualInvestmentReference ? `${formatWholeCurrency(actualInvestmentReference, "EUR")} ${referenceMetaLabel}` : "",
-      ].filter(Boolean).join(" · "),
+      meta: model.scope_label || "Plan",
+      subMeta: [
+        plannedCapital ? { value: formatWholeCurrency(plannedCapital, "EUR"), label: selectedWindow === "plan" ? "planned investment" : "planned in view" } : null,
+        totalCapitalAtWork ? { value: formatWholeCurrency(totalCapitalAtWork, "EUR"), label: "capital at work" } : null,
+        { value: signedWholeAmount(projectedGrowth, "EUR"), label: "projected growth" },
+      ].filter(Boolean),
       chartPoints: points.map((point) => ({
         ...point,
         label: point.month,
