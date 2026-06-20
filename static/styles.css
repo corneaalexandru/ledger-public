@@ -66,7 +66,7 @@
   --metric-section-gap: 20px;
   --table-section-gap: 16px;
   --table-header-gap: 10px;
-  --table-row-height: 72px;
+  --table-row-height: 60px;
   --overview-deep-gap: 48px;
   --control-height: 40px;
   --control-radius: 6px;
@@ -4349,6 +4349,10 @@ kbd {
 
 .minimal-table tbody tr + tr td {
   border-top: 1px solid var(--line);
+}
+
+.minimal-table tbody tr {
+  height: var(--table-row-height);
 }
 
 .minimal-table .table-main,
