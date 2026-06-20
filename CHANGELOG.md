@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-20
 
+- Added Portfolio Instruments footer pagination and brought Planning/Portfolio support tables onto the standard register row height.
 - Standardized the Portfolio Instruments table row height with the main register tables.
 - Defaulted register pagination to 100 rows and standardized transaction row height to the Deleted tab rhythm.
 - Changed Planning target variance to show under-ceiling spending as positive and over-ceiling spending as negative across monthly and yearly tables.

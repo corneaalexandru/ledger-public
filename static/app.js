@@ -142,6 +142,8 @@ const state = {
     error: "",
   },
   selectedPortfolioInstruments: new Set(),
+  portfolioInstrumentOffset: 0,
+  portfolioInstrumentPageSize: 100,
   selectedPortfolioInstrumentId: "",
   selectedPortfolioInstrumentEditing: false,
   portfolioInstrumentOverrides: {},
@@ -1393,7 +1395,7 @@ function bindEvents() {
 
     const portfolioPageSelect = event.target.closest("[data-select-portfolio-page]");
     if (portfolioPageSelect && state.overview) {
-      const rows = filteredPortfolioInstrumentRows(currentPortfolioInstrumentRows());
+      const rows = visiblePortfolioInstrumentRows();
       rows.forEach((row) => {
         const id = portfolioInstrumentId(row);
         if (portfolioPageSelect.checked) {
@@ -2069,6 +2071,7 @@ function bindEvents() {
       const nextPortfolioView = action.dataset.portfolioView || "overview";
       state.portfolioView = nextPortfolioView === "treemap" ? "overview" : nextPortfolioView;
       state.expandedChartId = "";
+      state.portfolioInstrumentOffset = 0;
       state.selectedPortfolioInstruments.clear();
       state.selectedPortfolioInstrumentId = "";
       state.selectedPortfolioInstrumentEditing = false;
@@ -2252,6 +2255,12 @@ function bindEvents() {
     if (action.dataset.action === "next-trade-page") {
       state.tradeOffset += tablePageStep(tradeLimit());
       loadTrades();
+    }
+    if (action.dataset.action === "previous-portfolio-instruments-page") {
+      setPortfolioInstrumentPage("previous");
+    }
+    if (action.dataset.action === "next-portfolio-instruments-page") {
+      setPortfolioInstrumentPage("next");
     }
     if (action.dataset.action === "refresh-data") {
       resetReportForecastOverrides();
@@ -3128,7 +3137,8 @@ function reloadQuickFilterView(view) {
 }
 
 function updateTablePageSize(control) {
-  const view = quickFilterRegisterView(control?.dataset?.tablePageSize || state.view);
+  const requestedView = control?.dataset?.tablePageSize || state.view;
+  const view = requestedView === "portfolioInstruments" ? requestedView : quickFilterRegisterView(requestedView);
   const size = normalizePageSize(control?.value);
   if (!view || !size) return;
   if (view === "transactions") {
@@ -3140,6 +3150,11 @@ function updateTablePageSize(control) {
   } else if (view === "trades") {
     state.tradePageSize = size;
     state.tradeOffset = 0;
+  } else if (view === "portfolioInstruments") {
+    state.portfolioInstrumentPageSize = size;
+    state.portfolioInstrumentOffset = 0;
+    renderPreservingScroll();
+    return;
   }
   reloadQuickFilterView(view);
 }
@@ -6141,6 +6156,54 @@ function filteredPortfolioInstrumentRows(rows = []) {
   return state.query.trim() ? filterRows(filteredRows, portfolioInstrumentFilterFields()) : filteredRows;
 }
 
+function portfolioInstrumentPageData(rows = []) {
+  const total = rows.length;
+  const limit = portfolioInstrumentLimit();
+  const step = tablePageStep(limit);
+  if (limit === "all" || !step) {
+    state.portfolioInstrumentOffset = 0;
+    return {
+      rows,
+      offset: 0,
+      limit: total,
+      total,
+      start: total ? 1 : 0,
+      end: total,
+      canGoBack: false,
+      canGoForward: false,
+    };
+  }
+  const maxOffset = Math.max(0, Math.floor(Math.max(total - 1, 0) / step) * step);
+  const offset = Math.min(Math.max(0, state.portfolioInstrumentOffset || 0), maxOffset);
+  if (offset !== state.portfolioInstrumentOffset) state.portfolioInstrumentOffset = offset;
+  const end = Math.min(offset + step, total);
+  return {
+    rows: rows.slice(offset, end),
+    offset,
+    limit: step,
+    total,
+    start: total ? offset + 1 : 0,
+    end,
+    canGoBack: offset > 0,
+    canGoForward: end < total,
+  };
+}
+
+function visiblePortfolioInstrumentRows(rows = filteredPortfolioInstrumentRows(currentPortfolioInstrumentRows())) {
+  return portfolioInstrumentPageData(rows).rows;
+}
+
+function setPortfolioInstrumentPage(direction = "next") {
+  const step = tablePageStep(portfolioInstrumentLimit());
+  if (!step) return;
+  const total = filteredPortfolioInstrumentRows(currentPortfolioInstrumentRows()).length;
+  const currentOffset = Math.max(0, state.portfolioInstrumentOffset || 0);
+  const requestedOffset = direction === "previous" ? currentOffset - step : currentOffset + step;
+  const maxOffset = Math.max(0, Math.floor(Math.max(total - 1, 0) / step) * step);
+  state.portfolioInstrumentOffset = Math.min(Math.max(0, requestedOffset), maxOffset);
+  renderPreservingScroll();
+}
+
 function portfolioFilterActive() {
   return Boolean(state.query.trim()) || Object.values(state.portfolioFilters || {}).some((value) => String(value || "").trim());
 }
@@ -7105,13 +7168,15 @@ function portfolioNativeValueLabel(row = {}) {
 
 function portfolioInstrumentTable(rows = []) {
   if (!rows.length) return emptyState("No portfolio instruments match the current search.");
-  const allVisibleSelected = rows.length > 0 && rows.every((row) => state.selectedPortfolioInstruments.has(portfolioInstrumentId(row)));
+  const page = portfolioInstrumentPageData(rows);
+  const visibleRows = page.rows;
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => state.selectedPortfolioInstruments.has(portfolioInstrumentId(row)));
   return `
     <section class="minimal-table-wrap transactions-table-wrap portfolio-table-wrap">
       <table class="minimal-table portfolio-table">
         <thead>
           <tr>
-            <th>
+            <th class="check-cell">
               <input
                 aria-label="Select visible portfolio instruments"
                 data-select-portfolio-page
@@ -7128,12 +7193,12 @@ function portfolioInstrumentTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
+          ${visibleRows.map((row) => {
             const id = portfolioInstrumentId(row);
             const nativeValueLabel = portfolioNativeValueLabel(row);
             return `
             <tr class="clickable-row ${state.selectedPortfolioInstrumentId === id ? "is-selected" : ""}" data-action="open-portfolio-instrument" data-portfolio-instrument-id="${safe(id)}" tabindex="0">
-              <td>
+              <td class="check-cell">
                 <input
                   aria-label="Select ${safe(row.ticker || row.asset_name || "portfolio instrument")}"
                   data-portfolio-instrument-select
@@ -7169,6 +7234,14 @@ function portfolioInstrumentTable(rows = []) {
         </tbody>
       </table>
     </section>
+    <footer class="table-footer portfolio-table-footer">
+      <span>${page.total ? `${formatNumber(page.start)}-${formatNumber(page.end)} of ${formatNumber(page.total)}` : "0 results"}</span>
+      <div>
+        ${pageSizeControl("portfolioInstruments")}
+        <button class="small-button" data-action="previous-portfolio-instruments-page" type="button" ${page.canGoBack ? "" : "disabled"}>Previous</button>
+        <button class="small-button" data-action="next-portfolio-instruments-page" type="button" ${page.canGoForward ? "" : "disabled"}>Next</button>
+      </div>
+    </footer>
   `;
 }
 
@@ -14876,7 +14949,9 @@ function pageSizeControl(view) {
     ? transactionLimit()
     : view === "accounts"
       ? accountLimit()
-      : tradeLimit();
+      : view === "portfolioInstruments"
+        ? portfolioInstrumentLimit()
+        : tradeLimit();
   return `
     <label class="page-size-control">
       <span>Rows</span>
@@ -18881,6 +18956,10 @@ function accountLimit() {
 
 function tradeLimit() {
   return normalizePageSize(state.tradePageSize);
+}
+
+function portfolioInstrumentLimit() {
+  return normalizePageSize(state.portfolioInstrumentPageSize);
 }
 
 function tablePageStep(value) {

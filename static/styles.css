@@ -5843,12 +5843,14 @@ input.is-invalid {
 }
 
 .transactions-table tbody tr,
-.portfolio-table tbody tr {
+.portfolio-table tbody tr,
+.planning-target-table tbody tr {
   height: 90px;
 }
 
 .transactions-table td,
-.portfolio-table td {
+.portfolio-table td,
+.planning-target-table td {
   padding-top: 14px;
   padding-bottom: 14px;
 }
