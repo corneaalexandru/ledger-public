@@ -144,6 +144,8 @@ const state = {
   selectedPortfolioInstruments: new Set(),
   portfolioInstrumentOffset: 0,
   portfolioInstrumentPageSize: 100,
+  localTableOffsets: {},
+  localTablePageSizes: {},
   selectedPortfolioInstrumentId: "",
   selectedPortfolioInstrumentEditing: false,
   portfolioInstrumentOverrides: {},
@@ -1235,6 +1237,12 @@ function bindEvents() {
       return;
     }
 
+    const localPageSizeControl = event.target.closest("[data-local-table-page-size]");
+    if (localPageSizeControl) {
+      updateLocalTablePageSize(localPageSizeControl);
+      return;
+    }
+
     const pageSizeControl = event.target.closest("[data-table-page-size]");
     if (pageSizeControl) {
       updateTablePageSize(pageSizeControl);
@@ -2261,6 +2269,10 @@ function bindEvents() {
     }
     if (action.dataset.action === "next-portfolio-instruments-page") {
       setPortfolioInstrumentPage("next");
+    }
+    if (action.dataset.action === "local-table-page") {
+      setLocalTablePage(action.dataset.localTablePageKey, action.dataset.pageDirection);
+      return;
     }
     if (action.dataset.action === "refresh-data") {
       resetReportForecastOverrides();
@@ -4679,6 +4691,8 @@ function yearlyTargetFromMonthlyTargetRows(year, rows = []) {
 
 function yearlyTargetsTable(rows = []) {
   if (!rows.length) return emptyState("No yearly targets available.");
+  const page = localTablePageData("planningCapitalTargets", rows);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap">
       <table class="minimal-table planning-target-table">
@@ -4694,7 +4708,7 @@ function yearlyTargetsTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${visibleRows.map((row) => `
             <tr class="clickable-row ${String(state.selectedYearlyTargetYear) === String(row.year) ? "is-selected" : ""}" data-action="open-yearly-target" data-yearly-target-year="${safe(row.year)}" tabindex="0">
               <td>
                 <span class="target-period-cell">
@@ -4731,6 +4745,7 @@ function yearlyTargetsTable(rows = []) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("planningCapitalTargets", page)}
   `;
 }
 
@@ -6104,6 +6119,8 @@ function portfolioMonthlyContributionBarChart(points = [], options = {}) {
 
 function portfolioPerformanceTable(rows = [], portfolio = {}) {
   if (!rows.length) return emptyState("No portfolio performance rows match the current search.");
+  const page = localTablePageData("portfolioFunding", rows);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap portfolio-performance-table-wrap">
       <table class="minimal-table planning-target-table portfolio-performance-table">
@@ -6118,7 +6135,7 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${visibleRows.map((row) => `
             <tr>
               <td>
 	                <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioPerformanceLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
@@ -6148,6 +6165,7 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("portfolioFunding", page)}
   `;
 }
 
@@ -7094,6 +7112,8 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
 
 function portfolioPortfolioPerformanceTable(rows = []) {
   if (!rows.length) return emptyState("No portfolio performance rows match the current search.");
+  const page = localTablePageData("portfolioPerformance", rows);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap portfolio-performance-table-wrap">
       <table class="minimal-table planning-target-table portfolio-performance-table">
@@ -7109,7 +7129,7 @@ function portfolioPortfolioPerformanceTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${visibleRows.map((row) => `
             <tr>
               <td>
                 <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioScopeLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
@@ -7147,6 +7167,7 @@ function portfolioPortfolioPerformanceTable(rows = []) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("portfolioPerformance", page)}
   `;
 }
 
@@ -7359,6 +7380,8 @@ function portfolioMipTable(rows = [], phases = []) {
     };
   });
   const totalPlanCapital = rowsWithCapital.reduce((sum, item) => sum + numericValue(item.planCapital), 0);
+  const page = localTablePageData("planningMonthlyPlan", rowsWithCapital);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap portfolio-mip-table-wrap">
       <table class="minimal-table planning-target-table portfolio-mip-table">
@@ -7372,7 +7395,7 @@ function portfolioMipTable(rows = [], phases = []) {
           </tr>
         </thead>
         <tbody>
-          ${rowsWithCapital.map((item) => {
+          ${visibleRows.map((item) => {
             const { row, id, planCapital, futurePlanCapital } = item;
             const windowMonths = monthsBetweenInclusive(row.start_date, row.portfolio_exit_date);
             const planShare = percentOf(planCapital, totalPlanCapital);
@@ -7403,6 +7426,7 @@ function portfolioMipTable(rows = [], phases = []) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("planningMonthlyPlan", page)}
   `;
 }
 
@@ -7541,6 +7565,8 @@ function dateValue(value) {
 
 function exitStrategyPhaseTable(rows = []) {
   if (!rows.length) return emptyState("No exit phases available.");
+  const page = localTablePageData("planningExitStrategy", rows);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap">
       <table class="minimal-table planning-target-table">
@@ -7554,7 +7580,7 @@ function exitStrategyPhaseTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${visibleRows.map((row) => `
             <tr class="clickable-row ${state.selectedExitPhaseId === row.phase_id ? "is-selected" : ""}" data-action="open-exit-phase" data-exit-phase-id="${safe(row.phase_id)}" tabindex="0">
 	              <td>
 	                <span class="table-main">${safe(row.phase_name)}</span>
@@ -7572,6 +7598,7 @@ function exitStrategyPhaseTable(rows = []) {
         </tbody>
       </table>
     </section>
+    ${localTableFooter("planningExitStrategy", page)}
   `;
 }
 
@@ -12636,6 +12663,8 @@ function projectMonthlyTargetFromYearlyTarget(row = {}, yearlyTarget = {}, overr
 function monthlyTargetsTable(rows = []) {
   if (!rows.length) return emptyState("No monthly targets available.");
   const sortedRows = sortedMonthlyTargetRows(rows);
+  const page = localTablePageData("transactionMonthlyTargets", sortedRows);
+  const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap monthly-target-table-wrap">
       <table class="minimal-table monthly-target-table">
@@ -12652,10 +12681,11 @@ function monthlyTargetsTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${sortedRows.map((row) => monthlyTargetTableRow(row, sortedRows.length === 1)).join("")}
+          ${visibleRows.map((row) => monthlyTargetTableRow(row, sortedRows.length === 1)).join("")}
         </tbody>
       </table>
     </section>
+    ${localTableFooter("transactionMonthlyTargets", page)}
   `;
 }
 
@@ -14962,6 +14992,91 @@ function pageSizeControl(view) {
       </select>
     </label>
   `;
+}
+
+function localTablePageData(key, rows = []) {
+  const tableKey = String(key || "").trim();
+  const total = rows.length;
+  const limit = localTableLimit(tableKey);
+  const step = tablePageStep(limit);
+  state.localTableOffsets = state.localTableOffsets || {};
+  if (limit === "all" || !step) {
+    state.localTableOffsets[tableKey] = 0;
+    return {
+      rows,
+      offset: 0,
+      limit: total,
+      total,
+      start: total ? 1 : 0,
+      end: total,
+      canGoBack: false,
+      canGoForward: false,
+    };
+  }
+  const maxOffset = Math.max(0, Math.floor(Math.max(total - 1, 0) / step) * step);
+  const offset = Math.min(Math.max(0, state.localTableOffsets[tableKey] || 0), maxOffset);
+  state.localTableOffsets[tableKey] = offset;
+  const end = Math.min(offset + step, total);
+  return {
+    rows: rows.slice(offset, end),
+    offset,
+    limit: step,
+    total,
+    start: total ? offset + 1 : 0,
+    end,
+    canGoBack: offset > 0,
+    canGoForward: end < total,
+  };
+}
+
+function localTableFooter(key, page = {}) {
+  const tableKey = String(key || "").trim();
+  const current = localTableLimit(tableKey);
+  return `
+    <footer class="table-footer local-table-footer">
+      <span>${page.total ? `${formatNumber(page.start)}-${formatNumber(page.end)} of ${formatNumber(page.total)}` : "0 results"}</span>
+      <div>
+        <label class="page-size-control">
+          <span>Rows</span>
+          <select data-local-table-page-size="${safe(tableKey)}" aria-label="${safe(labelize(tableKey))} rows per page">
+            ${PAGE_SIZE_OPTIONS.map((size) => `
+              <option value="${safe(size)}" ${current === size ? "selected" : ""}>${size === "all" ? "All" : size}</option>
+            `).join("")}
+          </select>
+        </label>
+        <button class="small-button" data-action="local-table-page" data-local-table-page-key="${safe(tableKey)}" data-page-direction="previous" type="button" ${page.canGoBack ? "" : "disabled"}>Previous</button>
+        <button class="small-button" data-action="local-table-page" data-local-table-page-key="${safe(tableKey)}" data-page-direction="next" type="button" ${page.canGoForward ? "" : "disabled"}>Next</button>
+      </div>
+    </footer>
+  `;
+}
+
+function updateLocalTablePageSize(control) {
+  const key = String(control?.dataset?.localTablePageSize || "").trim();
+  const size = normalizePageSize(control?.value);
+  if (!key || !size) return;
+  state.localTablePageSizes = {
+    ...(state.localTablePageSizes || {}),
+    [key]: size,
+  };
+  state.localTableOffsets = {
+    ...(state.localTableOffsets || {}),
+    [key]: 0,
+  };
+  renderPreservingScroll();
+}
+
+function setLocalTablePage(key, direction = "next") {
+  const tableKey = String(key || "").trim();
+  if (!tableKey) return;
+  const step = tablePageStep(localTableLimit(tableKey));
+  if (!step) return;
+  const currentOffset = Math.max(0, state.localTableOffsets?.[tableKey] || 0);
+  state.localTableOffsets = {
+    ...(state.localTableOffsets || {}),
+    [tableKey]: direction === "previous" ? Math.max(0, currentOffset - step) : currentOffset + step,
+  };
+  renderPreservingScroll();
 }
 
 function transactionPrimaryDate(row = {}) {
@@ -18283,6 +18398,10 @@ function updateMonthlyTargetSort(field) {
       direction: "desc",
     };
   }
+  state.localTableOffsets = {
+    ...(state.localTableOffsets || {}),
+    transactionMonthlyTargets: 0,
+  };
 }
 
 function openGlobalSearchSection(view) {
@@ -18960,6 +19079,10 @@ function tradeLimit() {
 
 function portfolioInstrumentLimit() {
   return normalizePageSize(state.portfolioInstrumentPageSize);
+}
+
+function localTableLimit(key) {
+  return normalizePageSize(state.localTablePageSizes?.[key] || 100);
 }
 
 function tablePageStep(value) {

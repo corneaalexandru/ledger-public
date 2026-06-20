@@ -4401,10 +4401,6 @@ input.is-invalid {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
-.portfolio-mip-table-wrap {
-  overflow-x: auto;
-}
-
 .portfolio-mip-table {
   min-width: 1040px;
 }
@@ -5772,6 +5768,15 @@ input.is-invalid {
   scroll-padding-right: 22px;
 }
 
+.planning-target-table-wrap,
+.monthly-target-table-wrap:not(.monthly-target-detail-wrap) {
+  max-height: 620px;
+  overflow: auto;
+  padding-right: 22px;
+  scrollbar-gutter: stable;
+  scroll-padding-right: 22px;
+}
+
 .transactions-table {
   min-width: 1120px;
   table-layout: fixed;
@@ -5779,7 +5784,8 @@ input.is-invalid {
 
 .transactions-table th,
 .portfolio-table th,
-.portfolio-mip-table th {
+.planning-target-table th,
+.monthly-target-table th {
   position: sticky;
   top: 0;
   z-index: 1;
