@@ -2236,8 +2236,8 @@ html[data-theme="light"] .skeleton-table span::after {
   width: auto;
   min-width: 0;
   max-width: 100%;
-  min-height: 26px;
-  padding: 2px 8px;
+  min-height: 34px;
+  padding: 6px 10px;
   border-radius: 5px;
   font-size: 13px;
   line-height: 1.2;
