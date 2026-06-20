@@ -4479,13 +4479,15 @@ function compactChartCard(options = {}) {
   const subMeta = compactChartSubMeta(options.subMeta || []);
   return `
     <article class="metric-card chart-compact-card">
-      <div class="chart-compact-tools">
-        ${periodControl}
-        ${chartExpandButton(options.chartId, options.expandLabel || `Expand ${label}`)}
-      </div>
-      <div class="metric-card-head">
-        <span class="metric-card-icon" aria-hidden="true">${icons[iconKey] || icons.target}</span>
-        <span class="metric-card-label">${safe(label)}</span>
+      <div class="chart-compact-header">
+        <div class="metric-card-head">
+          <span class="metric-card-icon" aria-hidden="true">${icons[iconKey] || icons.target}</span>
+          <span class="metric-card-label">${safe(label)}</span>
+        </div>
+        <div class="chart-compact-tools">
+          ${periodControl}
+          ${chartExpandButton(options.chartId, options.expandLabel || `Expand ${label}`)}
+        </div>
       </div>
       <strong class="${hasValue ? "" : "is-empty"}">${hasValue ? safe(options.value) : "&nbsp;"}</strong>
       ${options.meta ? `<small>${safe(options.meta)}</small>` : ""}
@@ -5589,12 +5591,14 @@ function portfolioReturnCompositionCard(summary = {}, chartId = "") {
   const totalPl = numericValue(summary.total_pl_eur);
   return `
     <article class="metric-card chart-compact-card return-composition-card">
-      <div class="chart-compact-tools">
-        ${chartExpandButton(chartId, "Expand P/L composition")}
-      </div>
-      <div class="metric-card-head">
-        <span class="metric-card-icon" aria-hidden="true">${icons.target}</span>
-        <span class="metric-card-label">P/L Composition</span>
+      <div class="chart-compact-header">
+        <div class="metric-card-head">
+          <span class="metric-card-icon" aria-hidden="true">${icons.target}</span>
+          <span class="metric-card-label">P/L Composition</span>
+        </div>
+        <div class="chart-compact-tools">
+          ${chartExpandButton(chartId, "Expand P/L composition")}
+        </div>
       </div>
       <strong>${signedWholeAmount(totalPl || 0, "EUR")}</strong>
       <small>${signedWholeAmount(realized, "EUR")} locked in · ${signedWholeAmount(unrealized, "EUR")} still open</small>
@@ -8292,8 +8296,8 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
       value: formatWholeCurrency(last.p50 || 0, "EUR"),
       meta: model.scope_label || "Plan",
       subMeta: [
-        plannedCapital ? { value: formatWholeCurrency(plannedCapital, "EUR"), label: selectedWindow === "plan" ? "planned investment" : "planned in view" } : null,
-        totalCapitalAtWork ? { value: formatWholeCurrency(totalCapitalAtWork, "EUR"), label: "capital at work" } : null,
+        plannedCapital ? { value: formatWholeCurrency(plannedCapital, "EUR"), label: selectedWindow === "plan" ? "planned contribution" : "planned in view" } : null,
+        totalCapitalAtWork ? { value: formatWholeCurrency(totalCapitalAtWork, "EUR"), label: "projected invested" } : null,
         { value: signedWholeAmount(projectedGrowth, "EUR"), label: "projected growth" },
       ].filter(Boolean),
       chartPoints: points.map((point) => ({

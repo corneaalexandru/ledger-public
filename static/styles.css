@@ -2695,19 +2695,31 @@ html[data-theme="light"] .skeleton-table span::after {
 
 .chart-compact-card {
   min-height: 520px;
-  padding: 42px 24px 24px;
+  padding: 34px 24px 24px;
   border-right: 1px solid var(--line);
 }
 
-.chart-compact-tools {
-  position: absolute;
-  top: 20px;
-  right: 18px;
+.chart-compact-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  gap: 16px;
+}
+
+.chart-compact-tools {
+  position: static;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  max-width: calc(100% - 72px);
+  max-width: 72%;
   gap: 6px;
+}
+
+.chart-compact-tools:empty {
+  display: none;
 }
 
 .chart-compact-card .chart-expand-button {
@@ -2754,8 +2766,10 @@ html[data-theme="light"] .skeleton-table span::after {
 }
 
 .chart-compact-card .metric-card-head {
-  max-width: calc(100% - 280px);
+  flex: 1 1 auto;
+  max-width: none;
   min-height: 34px;
+  min-width: 0;
   padding-right: 0;
 }
 
@@ -2834,7 +2848,7 @@ html[data-theme="light"] .skeleton-table span::after {
 }
 
 .return-composition-card .metric-card-head {
-  padding-right: 46px;
+  padding-right: 0;
 }
 
 .return-composition-strip {
@@ -6825,7 +6839,13 @@ table.portfolio-table td:nth-child(7) {
     position: static;
     justify-content: flex-start;
     max-width: 100%;
-    margin-bottom: 12px;
+    margin-bottom: 0;
+  }
+
+  .chart-compact-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .chart-compact-card .metric-card-head {
