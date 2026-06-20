@@ -3860,6 +3860,7 @@ function overviewSupportingInsightLine(card = {}) {
   return metricCard(card.label, card.value, card.meta, card.note, card.icon, {
     id: card.id,
     tone: card.tone,
+    progress: metricProgressFromCard(card),
   });
 }
 
@@ -3875,8 +3876,31 @@ function metricLineDashboard(sections = [], ariaLabel = "Metrics") {
 function metricLineItems(items = []) {
   return items
     .filter((item) => item && (item.label || item.value || item.meta || item.note))
-    .map((item) => metricCard(item.label, item.value, item.meta, item.note, item.icon, item.options || {}))
+    .map((item) => {
+      const options = { ...(item.options || {}) };
+      if (item.progress !== undefined && item.progress !== null) options.progress = item.progress;
+      if (item.progressLabel) options.progressLabel = item.progressLabel;
+      if (item.progressTone) options.progressTone = item.progressTone;
+      return metricCard(item.label, item.value, item.meta, item.note, item.icon, options);
+    })
     .join("");
+}
+
+function metricProgressFromCard(card = {}) {
+  return metricProgressFromText(card.progress, card.value, card.meta, card.note);
+}
+
+function metricProgressFromText(...values) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return Math.abs(value);
+    const text = String(value ?? "");
+    if (!text.trim()) continue;
+    const score = text.match(/([+-]?\d+(?:\.\d+)?)\s*\/\s*100\b/i);
+    if (score) return Math.abs(Number(score[1]));
+    const percent = text.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
+    if (percent) return Math.abs(Number(percent[1]));
+  }
+  return null;
 }
 
 function overviewSupportingInsightGroupId(card = {}) {
@@ -11812,6 +11836,24 @@ function metricDeltaHtml(items = []) {
   `;
 }
 
+function metricTextMeterHtml(progress, label = "", tone = "") {
+  if (state.privacyMode) return "";
+  const numeric = numericValue(progress, Number.NaN);
+  if (!Number.isFinite(numeric)) return "";
+  const bounded = clampValue(Math.abs(numeric), 0, 100);
+  if (bounded <= 0) return "";
+  const segments = 10;
+  const filled = Math.max(1, Math.round((bounded / 100) * segments));
+  const empty = Math.max(0, segments - filled);
+  const description = label || `${formatPercent(bounded)} progress`;
+  const toneClass = tone ? ` is-${tone}` : "";
+  return `
+    <span class="metric-text-meter${toneClass}" aria-label="${safe(description)}" title="${safe(description)}">
+      <span class="metric-text-meter-fill" aria-hidden="true">${"*".repeat(filled)}</span><span class="metric-text-meter-empty" aria-hidden="true">${".".repeat(empty)}</span>
+    </span>
+  `;
+}
+
 function microSparkline(values = [], seriesId = "") {
   if (state.privacyMode) return "";
   const numbers = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
@@ -12263,6 +12305,7 @@ function metricCard(label, value, meta = "", note = "", icon = "", options = {})
   ].filter(Boolean).join(" ");
   const sparkline = Array.isArray(options.sparkline) ? microSparkline(options.sparkline) : "";
   const deltas = metricDeltaHtml(options.delta || []);
+  const meter = metricTextMeterHtml(options.progress, options.progressLabel, options.progressTone);
   const hideControl = options.hideable && options.id
     ? `
       <button class="metric-card-hide" data-action="hide-dashboard-card" data-dashboard-card="${safe(options.id)}" type="button" aria-label="Hide" ${tooltipAttrs("Hide")}>
@@ -12278,6 +12321,7 @@ function metricCard(label, value, meta = "", note = "", icon = "", options = {})
         <span class="metric-card-label">${safe(label)}</span>
       </div>
       <strong class="${hasValue ? "" : "is-empty"}">${hasValue ? safe(value) : "&nbsp;"}</strong>
+      ${meter}
       ${meta ? `<small>${safe(meta)}</small>` : ""}
       ${sparkline}
       ${deltas}
@@ -12413,14 +12457,19 @@ function accountInsightsDashboard(data = {}) {
   const insights = data?.insights || {};
   const tables = data?.insight_tables || {};
   const netWorth = numericValue(insights.net_worth_eur);
+  const assets = numericValue(insights.assets_eur);
+  const liabilities = numericValue(insights.liabilities_eur);
+  const liquidCapital = numericValue(insights.liquid_capital_eur);
+  const liabilityShare = percentOf(liabilities, assets);
+  const liquidShare = percentOf(liquidCapital, netWorth);
   return metricLineDashboard([
     {
       title: "Core Position",
       html: metricLineItems([
         { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: `${formatNumber(insights.active_accounts || 0)} active accounts`, note: "Balance across active account registers.", icon: "wallet" },
-        { label: "Assets", value: formatWholeCurrency(insights.assets_eur || 0, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp" },
-        { label: "Liabilities", value: formatWholeCurrency(insights.liabilities_eur || 0, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard" },
-        { label: "Liquid Capital", value: formatWholeCurrency(insights.liquid_capital_eur || 0, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet" },
+        { label: "Assets", value: formatWholeCurrency(assets, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp" },
+        { label: "Liabilities", value: formatWholeCurrency(liabilities, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard", progress: liabilityShare, progressLabel: `${formatPercent(liabilityShare)} of active assets` },
+        { label: "Liquid Capital", value: formatWholeCurrency(liquidCapital, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet", progress: liquidShare, progressLabel: `${formatPercent(liquidShare)} of net worth` },
       ]),
     },
     { title: "Account Type Mix", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
@@ -12445,6 +12494,8 @@ function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, 
       meta: [formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
       note: `${formatPercent(share)} of net worth by ${noteLabel}.`,
       icon: insightIconFor(row[nameKey] || row.name || noteLabel, iconContext),
+      progress: share,
+      progressLabel: `${formatPercent(share)} of net worth`,
     };
   }));
 }
@@ -12453,26 +12504,36 @@ function topAccountsMetricLines(rows = []) {
   return metricLineItems((rows || [])
     .filter((row) => Number(row.amount_eur || 0) > 0)
     .slice(0, 6)
-    .map((row) => ({
-      label: accountDisplayName(row),
-      value: formatWholeCurrency(row.amount_eur, "EUR"),
-      meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
-      note: `${formatPercent(row.pct_of_net || 0)} of net worth.`,
-      icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
-    })));
+    .map((row) => {
+      const share = numericValue(row.pct_of_net);
+      return {
+        label: accountDisplayName(row),
+        value: formatWholeCurrency(row.amount_eur, "EUR"),
+        meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
+        note: `${formatPercent(share)} of net worth.`,
+        icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
+        progress: share,
+        progressLabel: `${formatPercent(share)} of net worth`,
+      };
+    }));
 }
 
 function accountAllocationMetricLines(rows = [], netWorth = 0, iconContext = "") {
   return metricLineItems((rows || [])
     .filter((row) => Number(row.eur || 0) > 0)
     .slice(0, 6)
-    .map((row) => ({
-      label: labelize(row.name),
-      value: formatWholeCurrency(row.eur, "EUR"),
-      meta: nativeCurrencySummaryOrBlank(row.native_amounts),
-      note: `${formatPercent(percentOf(row.eur, netWorth))} of net worth.`,
-      icon: insightIconFor(row.name, iconContext),
-    })));
+    .map((row) => {
+      const share = percentOf(row.eur, netWorth);
+      return {
+        label: labelize(row.name),
+        value: formatWholeCurrency(row.eur, "EUR"),
+        meta: nativeCurrencySummaryOrBlank(row.native_amounts),
+        note: `${formatPercent(share)} of net worth.`,
+        icon: insightIconFor(row.name, iconContext),
+        progress: share,
+        progressLabel: `${formatPercent(share)} of net worth`,
+      };
+    }));
 }
 
 function accountCreditMetricLines(rows = []) {
@@ -12488,6 +12549,8 @@ function accountCreditMetricLines(rows = []) {
         meta: labelize(row.provider_id),
         note: `${formatPercent(available)} available · ${formatWholeCurrency(row.available_credit_native || 0, row.currency || "")} headroom.`,
         icon: "creditCard",
+        progress: used,
+        progressLabel: `${formatPercent(used)} credit used`,
       };
     }));
 }
@@ -12568,14 +12631,18 @@ function transactionInsightsDashboard(data = {}) {
   const income = numericValue(insights.current_month_income_eur);
   const expenses = numericValue(insights.current_month_expense_eur);
   const net = numericValue(insights.current_month_net_eur);
+  const totalRows = numericValue(insights.total);
+  const expenseShare = percentOf(expenses, income);
+  const netShare = percentOf(net, income);
+  const reviewShare = percentOf(insights.review_open, totalRows);
   return metricLineDashboard([
     {
       title: "Core Flow",
       html: metricLineItems([
         { label: "Total Income", value: formatCurrency(income, "EUR"), meta: "selected period", note: `${formatNumber(insights.total || 0)} ledger rows included.`, icon: "trendUp" },
-        { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown" },
-        { label: "Net Flow", value: signedAmount(net, "EUR"), meta: percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }), note: "Income minus expenses in project currency.", icon: net >= 0 ? "trendUp" : "trendDown" },
-        { label: "Review", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target" },
+        { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown", progress: expenseShare, progressLabel: `${formatPercent(expenseShare)} of income` },
+        { label: "Net Flow", value: signedAmount(net, "EUR"), meta: percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }), note: "Income minus expenses in project currency.", icon: net >= 0 ? "trendUp" : "trendDown", progress: Math.abs(netShare), progressLabel: `${signedPercent(netShare)} of income` },
+        { label: "Review", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target", progress: reviewShare, progressLabel: `${formatPercent(reviewShare)} of rows in review` },
       ]),
     },
     {
@@ -12604,29 +12671,41 @@ function transactionHeatmapMetric(label = "Activity", payload = {}, type = "expe
     meta: `${formatNumber(activeItems.length)} active ${unit}`,
     note: peak ? `Peak ${peakLabel} · ${formatCurrency(peak.amount_eur || 0, "EUR")}.` : "No period activity recorded.",
     icon: type === "income" ? "trendUp" : "trendDown",
+    progress: percentOf(activeItems.length, items.length),
+    progressLabel: `${formatPercent(percentOf(activeItems.length, items.length))} active ${unit}`,
   };
 }
 
 function transactionCategorySpendMetricLines(rows = []) {
   const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
-  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
-    label: taxonomyLabel(row.category || "expense"),
-    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period category spend.`,
-    icon: insightIconFor(row.category, "category"),
-  })));
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const share = percentOf(row.amount_eur, total);
+    return {
+      label: taxonomyLabel(row.category || "expense"),
+      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+      meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: `${formatPercent(share)} of selected-period category spend.`,
+      icon: insightIconFor(row.category, "category"),
+      progress: share,
+      progressLabel: `${formatPercent(share)} of category spend`,
+    };
+  }));
 }
 
 function transactionIncomeSourceMetricLines(rows = []) {
   const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
-  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
-    label: row.name || "Income",
-    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period income.`,
-    icon: insightIconFor(row.name || "income", "income"),
-  })));
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const share = percentOf(row.amount_eur, total);
+    return {
+      label: row.name || "Income",
+      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+      meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: `${formatPercent(share)} of selected-period income.`,
+      icon: insightIconFor(row.name || "income", "income"),
+      progress: share,
+      progressLabel: `${formatPercent(share)} of income`,
+    };
+  }));
 }
 
 function transactionCurrencyFlowMetricLines(rows = []) {
@@ -12639,6 +12718,8 @@ function transactionCurrencyFlowMetricLines(rows = []) {
       meta: `${signedWholeAmount(row.net_native || 0, row.currency || "EUR")} native · ${formatPlural(row.count || 0, "row")}`,
       note: `${formatWholeCurrency(row.income_eur || 0, "EUR")} income · ${formatWholeCurrency(row.expense_eur || 0, "EUR")} expense · ${formatPercent(percentOf(Math.abs(net), total))} of currency movement.`,
       icon: "currency",
+      progress: percentOf(Math.abs(net), total),
+      progressLabel: `${formatPercent(percentOf(Math.abs(net), total))} of currency movement`,
     };
   }));
 }
@@ -14683,14 +14764,17 @@ function tradeInsightsDashboard(data = {}) {
   const marketValue = currencyRowsTotal(insights.market_value_by_currency);
   const realized = currencyRowsTotal(insights.realized_pl_by_currency);
   const unrealized = currencyRowsTotal(insights.unrealized_pl_by_currency);
+  const activePositions = numericValue(insights.active_positions);
+  const closedPositions = numericValue(insights.closed_positions);
+  const totalPositions = activePositions + closedPositions;
   return metricLineDashboard([
     {
       title: "Core Position",
       html: metricLineItems([
-        { label: "Active Positions", value: formatNumber(insights.active_positions || 0), meta: `${formatNumber(insights.closed_positions || 0)} closed`, note: "Open versus closed trade records.", icon: "pie" },
+        { label: "Active Positions", value: formatNumber(activePositions), meta: `${formatNumber(closedPositions)} closed`, note: "Open versus closed trade records.", icon: "pie", progress: percentOf(activePositions, totalPositions), progressLabel: `${formatPercent(percentOf(activePositions, totalPositions))} active positions` },
         { label: "Market Value", value: formatWholeCurrency(marketValue, "EUR"), meta: "active positions", note: "Current active market exposure converted to project currency.", icon: "wallet" },
-        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown" },
-        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown" },
+        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown", progress: Math.abs(numericValue(insights.realized_pl_pct)), progressLabel: `${signedPercent(insights.realized_pl_pct)} realized return` },
+        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown", progress: Math.abs(numericValue(insights.unrealized_pl_pct)), progressLabel: `${signedPercent(insights.unrealized_pl_pct)} unrealized return` },
       ]),
     },
     { title: "Month Performance", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
@@ -14717,6 +14801,8 @@ function tradePerformanceMetricLines(rows = [], key = "period") {
       meta: detail,
       note: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement.`,
       icon: pl >= 0 ? "trendUp" : "trendDown",
+      progress: percentOf(Math.abs(pl), total),
+      progressLabel: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement`,
     };
   }));
 }
@@ -14740,12 +14826,15 @@ function tradePositionWatchlistMetricLines(data = {}) {
   const largestExposure = byMarketValue[0];
   if (largestExposure) {
     const value = Math.abs(numericValue(largestExposure.current_market_value_native));
+    const share = percentOf(value, marketTotal);
     items.push({
       label: "Largest Exposure",
       value: formatWholeCurrency(value, largestExposure.trade_currency || "EUR"),
       meta: tradePositionLabel(largestExposure),
-      note: `${formatPercent(percentOf(value, marketTotal))} of active market value.`,
+      note: `${formatPercent(share)} of active market value.`,
       icon: "pie",
+      progress: share,
+      progressLabel: `${formatPercent(share)} of active market value`,
     });
   }
 
@@ -14759,6 +14848,8 @@ function tradePositionWatchlistMetricLines(data = {}) {
       meta: tradePositionLabel(worstReturn),
       note: `${signedWholeAmount(worstReturn.unrealized_pl_native || 0, worstReturn.trade_currency || "EUR")} unrealized.`,
       icon: numericValue(worstReturn.unrealized_pl_pct) < 0 ? "trendDown" : "trendUp",
+      progress: Math.abs(numericValue(worstReturn.unrealized_pl_pct)),
+      progressLabel: `${signedPercent(worstReturn.unrealized_pl_pct || 0)} unrealized return`,
     });
   }
   if (bestReturn && bestReturn !== worstReturn) {
@@ -14768,6 +14859,8 @@ function tradePositionWatchlistMetricLines(data = {}) {
       meta: tradePositionLabel(bestReturn),
       note: `${signedWholeAmount(bestReturn.unrealized_pl_native || 0, bestReturn.trade_currency || "EUR")} unrealized.`,
       icon: numericValue(bestReturn.unrealized_pl_pct) >= 0 ? "trendUp" : "trendDown",
+      progress: Math.abs(numericValue(bestReturn.unrealized_pl_pct)),
+      progressLabel: `${signedPercent(bestReturn.unrealized_pl_pct || 0)} unrealized return`,
     });
   }
 
@@ -14783,6 +14876,8 @@ function tradePositionWatchlistMetricLines(data = {}) {
         `limit ${formatNumber(staleDays)} days`,
       ].filter(Boolean).join(" · "),
       icon: "calendar",
+      progress: percentOf(stalePositions, activeRows.length),
+      progressLabel: `${formatPercent(percentOf(stalePositions, activeRows.length))} stale positions`,
     });
   }
 

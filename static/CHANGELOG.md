@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-20
 
+- Added compact text progress meters to Metrics rows where a score, share, ratio, utilization, exposure, or movement percentage is available.
 - Mirrored the shared Ledger UI, health-indicator, theme, and static cache updates into Ledger Public.
 - Added deleted-date traceability display for transactions, accounts, and trades, including visible fallbacks when older deleted rows have no recorded timestamp.
 - Fixed dark/Navy form field contrast in searchable combo boxes, category/subcategory inputs, and select option lists.

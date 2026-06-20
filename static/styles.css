@@ -2118,6 +2118,27 @@ kbd {
   display: none;
 }
 
+.settings-line-grid .metric-text-meter {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  margin: 0 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-line-grid .metric-text-meter-fill {
+  color: var(--strong);
+}
+
+.settings-line-grid .metric-text-meter-empty {
+  color: var(--faint);
+}
+
 .settings-line-grid .metric-card small,
 .settings-line-grid .metric-card > em {
   display: inline;
