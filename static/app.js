@@ -11245,6 +11245,9 @@ function insightBars(items = [], emptyLabel = "No values available.") {
         const attrs = item.action
           ? `type="button" data-action="${safe(item.action)}" ${item.dataAttrs || ""}`
           : "";
+        const rawShare = Number(item.share);
+        const share = Number.isFinite(rawShare) ? clampValue(rawShare, 0, 100) : 0;
+        const markerWidth = share > 0 ? Math.max(2, share) : 0;
         return `
           <${tag} ${attrs}>
             <div class="bar-row">
@@ -11260,8 +11263,9 @@ function insightBars(items = [], emptyLabel = "No values available.") {
                 ${Number.isFinite(Number(item.share)) && item.shareLabel !== "" ? `<small>${safe(item.shareLabel || formatPercent(item.share))}</small>` : ""}
               </span>
             </div>
-            <svg class="insight-marker" width="44" height="4" viewBox="0 0 44 4" aria-hidden="true" focusable="false">
-              <rect x="0" y="1" width="44" height="2"></rect>
+            <svg class="insight-marker" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              <rect class="insight-marker-track" x="0" y="1" width="100" height="2"></rect>
+              <rect class="insight-marker-value" x="0" y="1" width="${markerWidth.toFixed(2)}" height="2"></rect>
             </svg>
           </${tag}>
         `;
