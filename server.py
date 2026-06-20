@@ -1113,6 +1113,7 @@ def transaction_summary(rows: list[dict]) -> dict:
     current_month = monthly.get(f"{TODAY.year:04d}-{TODAY.month:02d}", {})
     yearly_targets, monthly_targets = planning_targets(monthly_series)
     structural = sum(num(row.get("structural_overspending_eur")) for row in monthly_targets)
+    expense_variance = sum(num(row.get("expense_variance_eur")) for row in yearly_targets)
     return {
         "lifetime_income_eur": money(income),
         "lifetime_expense_eur": money(expenses),
@@ -1133,6 +1134,7 @@ def transaction_summary(rows: list[dict]) -> dict:
             "actual_savings_eur": money(sum(num(row.get("actual_savings_eur")) for row in yearly_targets)),
             "actual_expenses_eur": money(sum(num(row.get("actual_expenses_eur")) for row in yearly_targets)),
             "structural_overspending_eur": money(structural),
+            "expense_variance_eur": money(expense_variance),
         },
         "yearly_targets": yearly_targets,
         "monthly_targets": monthly_targets,
@@ -1168,6 +1170,7 @@ def planning_targets(monthly_series: list[dict]) -> tuple[list[dict], list[dict]
                 "savings_target_pct": money((savings_target / income * 100) if income else 0),
                 "actual_expense_eur": money(expenses),
                 "structural_overspending_eur": money(max(expenses - ceiling, 0)),
+                "expense_variance_eur": money(ceiling - expenses),
                 "income_categories": income_categories,
                 "categories": expense_categories,
             }
@@ -1193,6 +1196,7 @@ def planning_targets(monthly_series: list[dict]) -> tuple[list[dict], list[dict]
                 "actual_expenses_eur": money(actual_expense),
                 "actual_savings_eur": money(actual_savings),
                 "structural_overspending_eur": money(max(actual_expense - ceiling, 0)),
+                "expense_variance_eur": money(ceiling - actual_expense),
                 "expense_target_pct": money((ceiling / income * 100) if income else 0),
                 "savings_target_pct": money((target / income * 100) if income else 0),
                 "actual_expense_pct": money((actual_expense / income * 100) if income else 0),

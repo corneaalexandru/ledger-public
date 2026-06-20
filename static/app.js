@@ -4593,7 +4593,7 @@ function planningTargetsDashboard(planning = {}) {
     <section class="transaction-metrics planning-target-metrics">
       ${transactionMetric("Capital Retention Target", formatWholeCurrency(summary.target_savings_eur || 0, "EUR"), `${formatPercent(summary.target_savings_pct || 0)} of income baseline`)}
       ${transactionMetric("Actual Capital Retention", signedWholeAmount(summary.actual_savings_eur || 0, "EUR"), `${signedPercent(summary.actual_savings_pct || 0)} of income baseline`)}
-      ${transactionMetric("Structural Overspending", formatWholeCurrency(summary.structural_overspending_eur || 0, "EUR"), "above modeled expense ceilings")}
+      ${transactionMetric("Expense Variance", signedWholeAmount(summary.expense_variance_eur || 0, "EUR"), expenseVarianceDetail(summary.expense_variance_eur || 0))}
       ${transactionMetric("Expense Ratio", formatPercent(summary.actual_expense_pct || 0), "actual spending / income baseline")}
     </section>
     <section class="planning-target-grid">
@@ -4642,6 +4642,7 @@ function yearlyTargetFromMonthlyTargetRows(year, rows = []) {
   const actualExpenses = rows.reduce((sum, row) => sum + numericValue(row.actual_expense_eur), 0);
   const structuralOverspending = rows.reduce((sum, row) => sum + numericValue(row.structural_overspending_eur), 0);
   const actualSavings = moneyRound(income - actualExpenses);
+  const expenseVariance = moneyRound(expenseCeiling - actualExpenses);
   return {
     year: Number(year),
     source: "monthly_targets",
@@ -4652,6 +4653,7 @@ function yearlyTargetFromMonthlyTargetRows(year, rows = []) {
     actual_expenses_eur: moneyRound(actualExpenses),
     actual_savings_eur: actualSavings,
     structural_overspending_eur: moneyRound(structuralOverspending),
+    expense_variance_eur: expenseVariance,
     expense_target_pct: income ? moneyRound(percentOf(expenseCeiling, income)) : 0,
     savings_target_pct: income ? moneyRound(percentOf(targetSavings, income)) : 0,
     actual_expense_pct: income ? moneyRound(percentOf(actualExpenses, income)) : 0,
@@ -4673,7 +4675,7 @@ function yearlyTargetsTable(rows = []) {
             <th class="align-right">Target Savings</th>
             <th class="align-right">Actual Expenses</th>
             <th class="align-right">Actual Savings</th>
-            <th class="align-right">Structural Overspending</th>
+            <th class="align-right">Expense Variance</th>
           </tr>
         </thead>
         <tbody>
@@ -4706,8 +4708,8 @@ function yearlyTargetsTable(rows = []) {
                 <span class="table-sub">${safe(signedPercent(row.actual_savings_pct || 0))}</span>
               </td>
               <td class="align-right">
-                <span class="table-main ${numericValue(row.structural_overspending_eur) ? "negative" : ""}">${safe(formatWholeCurrency(row.structural_overspending_eur || 0, "EUR"))}</span>
-                <span class="table-sub">${safe(row.status === "above_ceiling" ? "above ceiling" : "on target")}</span>
+                <span class="table-main ${signedClass(yearlyTargetExpenseVariance(row))}">${safe(signedWholeAmount(yearlyTargetExpenseVariance(row), "EUR"))}</span>
+                <span class="table-sub">${safe(expenseVarianceDetail(yearlyTargetExpenseVariance(row)))}</span>
               </td>
             </tr>
           `).join("")}
@@ -4747,12 +4749,30 @@ function normalizeYearlyTargetRow(row = {}, overrides = {}) {
   next.actual_expense_pct = income ? moneyRound(percentOf(actualExpenses, income)) : 0;
   next.actual_savings_pct = income ? moneyRound(percentOf(next.actual_savings_eur, income)) : 0;
   next.structural_overspending_eur = moneyRound(Math.max(actualExpenses - numericValue(next.expense_ceiling_eur), 0));
+  next.expense_variance_eur = moneyRound(numericValue(next.expense_ceiling_eur) - actualExpenses);
   next.status = numericValue(next.structural_overspending_eur) > 0 ? "above_ceiling" : "on_target";
   if (row.locked) {
     next.structural_overspending_eur = moneyRound(row.structural_overspending_eur || 0);
+    next.expense_variance_eur = Object.prototype.hasOwnProperty.call(row, "expense_variance_eur")
+      ? moneyRound(row.expense_variance_eur || 0)
+      : moneyRound(numericValue(next.expense_ceiling_eur) - actualExpenses);
     next.status = numericValue(next.structural_overspending_eur) > 0 ? "above_ceiling" : "on_target";
   }
   return next;
+}
+
+function yearlyTargetExpenseVariance(row = {}) {
+  if (Object.prototype.hasOwnProperty.call(row, "expense_variance_eur")) {
+    return moneyRound(row.expense_variance_eur || 0);
+  }
+  return moneyRound(numericValue(row.expense_ceiling_eur) - numericValue(row.actual_expenses_eur));
+}
+
+function expenseVarianceDetail(value) {
+  const variance = numericValue(value);
+  if (variance > 0) return "under ceiling";
+  if (variance < 0) return "above ceiling";
+  return "on target";
 }
 
 function yearlyTargetsSummary(rows = [], fallback = {}) {
@@ -4762,6 +4782,7 @@ function yearlyTargetsSummary(rows = [], fallback = {}) {
   const actualSavings = rows.reduce((sum, row) => sum + numericValue(row.actual_savings_eur), 0);
   const actualExpenses = rows.reduce((sum, row) => sum + numericValue(row.actual_expenses_eur), 0);
   const structuralOverspending = rows.reduce((sum, row) => sum + numericValue(row.structural_overspending_eur), 0);
+  const expenseVariance = rows.reduce((sum, row) => sum + yearlyTargetExpenseVariance(row), 0);
   return {
     ...fallback,
     income_baseline_eur: moneyRound(income),
@@ -4769,6 +4790,7 @@ function yearlyTargetsSummary(rows = [], fallback = {}) {
     actual_savings_eur: moneyRound(actualSavings),
     actual_expenses_eur: moneyRound(actualExpenses),
     structural_overspending_eur: moneyRound(structuralOverspending),
+    expense_variance_eur: moneyRound(expenseVariance),
     target_savings_pct: income ? moneyRound(percentOf(targetSavings, income)) : 0,
     actual_savings_pct: income ? moneyRound(percentOf(actualSavings, income)) : 0,
     actual_expense_pct: income ? moneyRound(percentOf(actualExpenses, income)) : 0,
@@ -4802,7 +4824,7 @@ function yearlyTargetDetails(row = {}) {
       ${detailItem("Savings Target", `${formatWholeCurrency(row.target_savings_eur || 0, "EUR")} · ${formatPercent(row.savings_target_pct || 0)}`)}
       ${detailItem("Actual Expenses", `${formatWholeCurrency(row.actual_expenses_eur || 0, "EUR")} · ${formatPercent(row.actual_expense_pct || 0)}`)}
       ${detailItem("Actual Savings", `${signedWholeAmount(row.actual_savings_eur || 0, "EUR")} · ${signedPercent(row.actual_savings_pct || 0)}`)}
-      ${detailItem("Structural Overspending", formatWholeCurrency(row.structural_overspending_eur || 0, "EUR"))}
+      ${detailItem("Expense Variance", `${signedWholeAmount(yearlyTargetExpenseVariance(row), "EUR")} · ${expenseVarianceDetail(yearlyTargetExpenseVariance(row))}`)}
     </dl>
   `;
 }
@@ -12306,7 +12328,10 @@ function transactionMonthlyTargetsDashboard(data = {}) {
   const comparablePlannedRetained = comparableRows.reduce((sum, row) => sum + numericValue(row.savings_target_eur), 0);
   const actualRetained = comparableRows.reduce((sum, row) => sum + monthlyTargetActualRetained(row), 0);
   const retentionGap = comparableRows.length ? moneyRound(actualRetained - comparablePlannedRetained) : null;
-  const overspending = selectedTargets.reduce((sum, row) => sum + numericValue(row.structural_overspending_eur), 0);
+  const varianceRows = selectedTargets.filter((row) => monthlyTargetExpenseVariance(row) !== null);
+  const expenseVariance = varianceRows.length
+    ? moneyRound(varianceRows.reduce((sum, row) => sum + monthlyTargetExpenseVariance(row), 0))
+    : null;
   const targetRatio = totalIncome ? percentOf(totalCeiling, totalIncome) : numericValue(selectedTargets[0]?.expense_target_pct);
   const plannedRetainedRatio = totalIncome ? percentOf(plannedRetained, totalIncome) : numericValue(selectedTargets[0]?.savings_target_pct);
   const actualRetainedRatio = totalActualIncome ? percentOf(actualRetained, totalActualIncome) : null;
@@ -12330,7 +12355,7 @@ function transactionMonthlyTargetsDashboard(data = {}) {
       ${transactionMetric("Planned Retained", formatWholeCurrency(plannedRetained, "EUR"), `${formatPercent(plannedRetainedRatio)} planned`)}
       ${transactionMetric("Actual Retained", signedWholeAmount(actualRetained, "EUR"), monthlyTargetActualRetainedMetricDetail(actualRetainedRatio))}
       ${transactionMetric("Retention Gap", retentionGap === null ? "-" : signedWholeAmount(retentionGap, "EUR"), monthlyTargetRetentionGapMetricDetail(comparableRows.length))}
-      ${transactionMetric("Spend Above Ceiling", formatWholeCurrency(overspending, "EUR"), "actual spend above ceiling")}
+      ${transactionMetric("Expense Variance", expenseVariance === null ? "-" : signedWholeAmount(expenseVariance, "EUR"), expenseVariance === null ? "not recorded yet" : expenseVarianceDetail(expenseVariance))}
     </section>
     <section class="monthly-target-grid${showAggregatePanels ? "" : " monthly-target-grid-single"}${isFilteredMonth ? " monthly-target-grid-detail" : ""}">
       ${aggregatePanels}
@@ -12379,6 +12404,14 @@ function monthlyTargetActualRetainedPct(row = {}) {
 function monthlyTargetRetentionGap(row = {}) {
   if (!monthlyTargetActualsAreDue(row)) return null;
   return moneyRound(monthlyTargetActualRetained(row) - numericValue(row.savings_target_eur));
+}
+
+function monthlyTargetExpenseVariance(row = {}) {
+  if (!monthlyTargetActualsAreDue(row)) return null;
+  if (Object.prototype.hasOwnProperty.call(row, "expense_variance_eur")) {
+    return moneyRound(row.expense_variance_eur || 0);
+  }
+  return moneyRound(numericValue(row.expense_ceiling_eur) - numericValue(row.actual_expense_eur));
 }
 
 function transactionYearlyTargetsDashboard(planning = {}) {
@@ -12542,7 +12575,7 @@ function monthlyTargetsTable(rows = []) {
             <th class="align-right">${monthlyTargetSortHeader("Actual Retained", "actual_retained_eur")}</th>
             <th class="align-right">${monthlyTargetSortHeader("Retention Gap", "retention_gap_eur")}</th>
             <th class="align-right">${monthlyTargetSortHeader("Actual Expenses", "actual_expense_eur")}</th>
-            <th class="align-right">${monthlyTargetSortHeader("Structural Overspending", "structural_overspending_eur")}</th>
+            <th class="align-right">${monthlyTargetSortHeader("Expense Variance", "expense_variance_eur")}</th>
           </tr>
         </thead>
         <tbody>
@@ -12582,10 +12615,12 @@ function monthlyTargetSortValue(row = {}, field = "month") {
     return monthlyTargetActualsAreDue(row) ? monthlyTargetActualRetained(row) : null;
   }
   if (field === "retention_gap_eur") return monthlyTargetRetentionGap(row);
+  if (field === "expense_variance_eur") return monthlyTargetExpenseVariance(row);
   return numericValue(row[field]);
 }
 
 function monthlyTargetTableRow(row = {}, includeDetails = false) {
+  const expenseVariance = monthlyTargetExpenseVariance(row);
   return `
     <tr class="clickable-row" data-action="filter-monthly-target" data-monthly-target-month="${safe(row.month || "")}" tabindex="0">
       <td>
@@ -12608,7 +12643,7 @@ function monthlyTargetTableRow(row = {}, includeDetails = false) {
         ${targetAmountCell(monthlyTargetRetentionGap(row), "EUR", monthlyTargetRetentionGapCellDetail(row), { signed: true, empty: !monthlyTargetActualsAreDue(row) })}
       </td>
       <td class="align-right">${targetAmountCell(row.actual_expense_eur, "EUR", monthlyTargetActualExpenseCellDetail(row))}</td>
-      <td class="align-right ${numericValue(row.structural_overspending_eur) ? "negative" : ""}">${targetAmountCell(row.structural_overspending_eur, "EUR", numericValue(row.structural_overspending_eur) ? "above ceiling" : "on target")}</td>
+      <td class="align-right">${targetAmountCell(expenseVariance, "EUR", expenseVariance === null ? "not recorded yet" : expenseVarianceDetail(expenseVariance), { signed: true, empty: expenseVariance === null })}</td>
     </tr>
     ${includeDetails ? monthlyTargetCategoryDetailRows(row) : ""}
   `;
@@ -12921,6 +12956,7 @@ function normalizeMonthlyTargetRow(row = {}, overrides = {}) {
   if (!Object.prototype.hasOwnProperty.call(overrides, "structural_overspending_eur")) {
     next.structural_overspending_eur = moneyRound(Math.max(actualExpense - numericValue(next.expense_ceiling_eur), 0));
   }
+  next.expense_variance_eur = moneyRound(numericValue(next.expense_ceiling_eur) - actualExpense);
   return refreshMonthlyTargetCategoryTotals(next);
 }
 
@@ -13135,7 +13171,7 @@ function monthlyTargetDetails(row = {}) {
       ${detailItem("Actual Retained", monthlyTargetActualsAreDue(row) ? `${signedWholeAmount(monthlyTargetActualRetained(row), "EUR")} · ${monthlyTargetActualRetainedCellDetail(row)}` : "Not recorded yet")}
       ${detailItem("Retention Gap", monthlyTargetActualsAreDue(row) ? `${signedWholeAmount(monthlyTargetRetentionGap(row), "EUR")} · actual minus planned` : "Not recorded yet")}
       ${detailItem("Actual Expenses", formatWholeCurrency(row.actual_expense_eur || 0, "EUR"))}
-      ${detailItem("Structural Overspending", formatWholeCurrency(row.structural_overspending_eur || 0, "EUR"))}
+      ${detailItem("Expense Variance", monthlyTargetExpenseVariance(row) === null ? "Not recorded yet" : `${signedWholeAmount(monthlyTargetExpenseVariance(row), "EUR")} · ${expenseVarianceDetail(monthlyTargetExpenseVariance(row))}`)}
       ${detailSectionHtml("Income Categories", targetDetailCategoryList(monthlyTargetIncomeCategories(row), "income"))}
       ${detailSectionHtml("Expense Categories", targetDetailCategoryList(row.categories || [], "expense"))}
     </dl>
