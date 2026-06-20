@@ -2109,6 +2109,7 @@ html[data-theme="light"] .skeleton-table span::after {
 }
 
 .settings-line-grid {
+  --settings-line-control-height: 24px;
   display: block;
   color: var(--muted);
   line-height: 1.55;
@@ -2240,11 +2241,12 @@ html[data-theme="light"] .skeleton-table span::after {
   width: auto;
   min-width: 0;
   max-width: 100%;
-  min-height: 34px;
-  padding: 6px 10px;
+  height: var(--settings-line-control-height);
+  min-height: var(--settings-line-control-height);
+  padding: 2px 8px;
   border-radius: 5px;
   font-size: 13px;
-  line-height: 1.2;
+  line-height: 18px;
   vertical-align: baseline;
 }
 
@@ -2253,6 +2255,7 @@ html[data-theme="light"] .skeleton-table span::after {
   width: auto;
   min-width: 168px;
   max-width: 220px;
+  padding-right: 28px;
 }
 
 .settings-line-grid .settings-card-value > input,
