@@ -5842,6 +5842,15 @@ input.is-invalid {
   width: 150px;
 }
 
+.transactions-table tbody tr {
+  height: 90px;
+}
+
+.transactions-table td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
 .trades-table {
   min-width: 1640px;
 }

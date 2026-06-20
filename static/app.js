@@ -98,7 +98,7 @@ const state = {
   },
   accountFilters: defaultAccountFilters(),
   accountOffset: 0,
-  accountPageSize: 50,
+  accountPageSize: 100,
   accountSort: {
     field: "balance",
     direction: "desc",
@@ -110,7 +110,7 @@ const state = {
   accountActionError: "",
   transactionFilters: defaultTransactionFilters(),
   transactionOffset: 0,
-  transactionPageSize: 50,
+  transactionPageSize: 100,
   transactionSort: {
     field: "transaction_date",
     direction: "desc",
@@ -126,7 +126,7 @@ const state = {
   statementImportActionError: "",
   tradeFilters: defaultTradeFilters(),
   tradeOffset: 0,
-  tradePageSize: 50,
+  tradePageSize: 100,
   tradeSort: {
     field: "activity_date",
     direction: "desc",
@@ -3147,7 +3147,7 @@ function updateTablePageSize(control) {
 function normalizePageSize(value) {
   if (String(value || "").toLowerCase() === "all") return "all";
   const size = Number(value);
-  return PAGE_SIZE_OPTIONS.includes(size) ? size : 50;
+  return PAGE_SIZE_OPTIONS.includes(size) ? size : 100;
 }
 
 function transactionTypeFilterLabel(value) {
