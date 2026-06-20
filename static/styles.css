@@ -4127,6 +4127,35 @@ kbd {
   display: none;
 }
 
+.panel.table-panel .panel-actions,
+.statement-import-section .panel-actions {
+  align-self: start;
+  min-height: 0;
+}
+
+.panel.table-panel .selection-inline,
+.statement-import-section .selection-inline {
+  gap: 10px;
+  min-height: 0;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.panel.table-panel .table-action-button,
+.statement-import-section .table-action-button {
+  min-height: 16px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.panel.table-panel .table-action-button [data-icon],
+.panel.table-panel .table-action-button svg,
+.statement-import-section .table-action-button [data-icon],
+.statement-import-section .table-action-button svg {
+  width: 12px;
+  height: 12px;
+}
+
 .panel-actions {
   display: inline-flex;
   align-items: center;
