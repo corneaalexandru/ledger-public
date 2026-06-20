@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-20
 
+- Centralized Trade Returns, Portfolio Performance, and Portfolio Funding chart cards under Overview > Charts with source-prefixed chart titles.
 - Added shared footer pagination and scrollable table bodies to Planning, target, and Portfolio support tables.
 - Extended the standard register row height to Transactions target monthly tables.
 - Added Portfolio Instruments footer pagination and brought Planning/Portfolio support tables onto the standard register row height.

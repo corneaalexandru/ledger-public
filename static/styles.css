@@ -2016,6 +2016,26 @@ html[data-theme="light"] .skeleton-table span::after {
   margin-top: 22px;
 }
 
+.overview-charts-section {
+  gap: 34px;
+  margin-top: 22px;
+}
+
+.overview-chart-group {
+  display: grid;
+  gap: 12px;
+}
+
+.overview-chart-group-title {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.overview-chart-group .reports-chart-grid {
+  margin-top: 0;
+}
+
 .overview-line-grid {
   max-width: 1760px;
 }

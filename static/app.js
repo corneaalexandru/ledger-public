@@ -1466,7 +1466,11 @@ function bindEvents() {
     if (action.dataset.action === "overview-tab") {
       state.overviewView = action.dataset.overviewView || "insights";
       state.expandedChartId = "";
-      renderPreservingScroll();
+      if (state.overviewView === "charts" && !state.portfolioReturns && !state.loading.portfolioReturns) {
+        loadPortfolioReturns();
+      } else {
+        renderPreservingScroll();
+      }
       return;
     }
     if (action.dataset.action === "quick-filter") {
@@ -3985,12 +3989,15 @@ function overviewChartsDashboard(data = {}) {
   const portfolio = data.portfolio || {};
   return `
     <section class="overview-section overview-charts-section">
-      <section class="reports-chart-grid overview-chart-grid">
-        ${chartPanel(reportNetWorthOverTime(accounts, transactions, portfolio, { chartId: "overview-net-worth" }))}
-        ${chartPanel(reportCashFlowChart(transactions, { chartId: "overview-cash-flow" }))}
-        ${chartPanel(planningMonteCarloChart(portfolio, accounts, { chartId: "overview-monte-carlo" }))}
-        ${chartPanel(reportNetWorthForecast(accounts, transactions, portfolio, { chartId: "overview-net-worth-forecast" }))}
-      </section>
+      ${overviewChartGroup("Core Financial Charts", [
+        chartPanel(reportNetWorthOverTime(accounts, transactions, portfolio, { chartId: "overview-net-worth" })),
+        chartPanel(reportCashFlowChart(transactions, { chartId: "overview-cash-flow" })),
+        chartPanel(planningMonteCarloChart(portfolio, accounts, { chartId: "overview-monte-carlo" })),
+        chartPanel(reportNetWorthForecast(accounts, transactions, portfolio, { chartId: "overview-net-worth-forecast" })),
+      ])}
+      ${overviewChartGroup("Trade Return Charts", overviewTradeReturnChartPanels())}
+      ${overviewChartGroup("Portfolio Performance Charts", overviewPortfolioPerformanceChartPanels(portfolio))}
+      ${overviewChartGroup("Portfolio Funding Charts", overviewPortfolioFundingChartPanels(portfolio))}
     </section>
     ${overviewExpandedChart(data)}
   `;
@@ -4002,6 +4009,7 @@ function overviewExpandedChart(data = {}) {
   const accounts = data.accounts || {};
   const transactions = data.transactions || {};
   const portfolio = data.portfolio || {};
+  const returnsData = state.portfolioReturns || {};
   if (chartId === "overview-net-worth") {
     return expandedChartShell(
       "Net Worth Over Time",
@@ -4026,7 +4034,84 @@ function overviewExpandedChart(data = {}) {
       reportNetWorthForecast(accounts, transactions, portfolio, { chartId, expanded: true }),
     );
   }
+  if (chartId === "overview-trade-return-timeline") {
+    return expandedChartShell(
+      "Trades - Realized P/L Over Time",
+      portfolioReturnTimelineChart(returnsData, { chartId, expanded: true }),
+    );
+  }
+  if (chartId === "overview-trade-return-monthly") {
+    return expandedChartShell(
+      "Trades - Monthly Realized P/L",
+      portfolioReturnMonthlyChart(returnsData, { chartId, expanded: true }),
+    );
+  }
   return "";
+}
+
+function overviewChartGroup(title = "", cards = []) {
+  const visibleCards = cards.filter(Boolean);
+  if (!visibleCards.length) return "";
+  return `
+    <section class="overview-chart-group" aria-label="${safe(title)}">
+      <div class="overview-chart-group-title">
+        <span class="section-kicker">${safe(title)}</span>
+      </div>
+      <section class="reports-chart-grid overview-chart-grid">
+        ${visibleCards.join("")}
+      </section>
+    </section>
+  `;
+}
+
+function overviewTradeReturnChartPanels() {
+  const returnsData = state.portfolioReturns;
+  if (state.loading.portfolioReturns && !returnsData) {
+    return [
+      chartPanel(overviewChartPlaceholder("Trades - Realized P/L Over Time", "Loading trade return history.", "trendUp")),
+      chartPanel(overviewChartPlaceholder("Trades - Monthly Realized P/L", "Loading monthly realized P/L.", "trendUp")),
+    ];
+  }
+  if (state.error.portfolioReturns && !returnsData) {
+    return [
+      chartPanel(overviewChartPlaceholder("Trade Return Charts", state.error.portfolioReturns, "trendUp")),
+    ];
+  }
+  const data = returnsData || {};
+  return [
+    chartPanel(portfolioReturnTimelineChart(data, { chartId: "overview-trade-return-timeline", label: "Trades - Realized P/L Over Time" })),
+    chartPanel(portfolioReturnMonthlyChart(data, { chartId: "overview-trade-return-monthly", label: "Trades - Monthly Realized P/L" })),
+  ];
+}
+
+function overviewPortfolioPerformanceChartPanels(portfolio = {}) {
+  const performance = portfolio.performance || {};
+  const rows = portfolioPerformanceByPortfolioRows(portfolio);
+  return [
+    chartPanel(portfolioInvestmentReturnPathChart(performance, rows, { chartId: "overview-portfolio-investment-return-path", label: "Portfolio - Investment Return Over Time" })),
+    chartPanel(portfolioInvestmentValuePathChart(performance, rows, { chartId: "overview-portfolio-investment-value-path", label: "Portfolio - Investment Value Path" })),
+  ];
+}
+
+function overviewPortfolioFundingChartPanels(portfolio = {}) {
+  const performance = portfolio.performance || {};
+  const rows = filteredPortfolioPerformanceRows(performance.portfolios || [], portfolio);
+  const summary = portfolioPerformanceSummary(rows, performance.summary || {});
+  const monthlyRows = portfolioPerformanceMonthlyRows(performance, rows, summary);
+  const windowedMonthlyRows = portfolioPerformanceVisibleMonthlyRows(monthlyRows);
+  return [
+    chartPanel(portfolioCumulativeContributionChart(windowedMonthlyRows, { chartId: "overview-portfolio-cumulative-contributions", label: "Portfolio Funding - Cumulative Contributions" })),
+    chartPanel(portfolioMonthlyContributionChart(windowedMonthlyRows, { chartId: "overview-portfolio-monthly-funding", label: "Portfolio Funding - Monthly Funding Progress" })),
+  ];
+}
+
+function overviewChartPlaceholder(label = "Chart", message = "No chart data available.", icon = "target") {
+  return compactChartCard({
+    expandable: false,
+    icon,
+    label,
+    meta: message,
+  });
 }
 
 function renderGlobalSearchPage() {
@@ -4995,12 +5080,7 @@ function portfolioPortfolioPerformanceDashboard(portfolio = {}) {
       ${transactionMetric("Lifetime P/L", signedWholeAmount(summary.profit_loss_eur || 0, "EUR"), `${signedPercent(summary.return_pct || 0)} historical return`)}
       ${transactionMetric("Monthly Plan", formatWholeCurrency(summary.monthly_contribution_eur || 0, "EUR"), queryActive ? "filtered contribution plan" : "current exit phase")}
     </section>
-    <section class="reports-chart-grid portfolio-chart-grid">
-      ${chartPanel(portfolioInvestmentReturnPathChart(performance, rows, { chartId: "portfolio-investment-return-path" }))}
-      ${chartPanel(portfolioInvestmentValuePathChart(performance, rows, { chartId: "portfolio-investment-value-path" }))}
-    </section>
     ${panel("Portfolio Performance", portfolioPortfolioPerformanceTable(rows), "full")}
-    ${portfolioPerformanceExpandedChart(portfolio)}
   `;
 }
 
@@ -5008,8 +5088,6 @@ function portfolioPerformanceDashboard(portfolio = {}) {
   const performance = portfolio.performance || {};
   const rows = filteredPortfolioPerformanceRows(performance.portfolios || [], portfolio);
   const summary = portfolioPerformanceSummary(rows, performance.summary || {});
-  const monthlyRows = portfolioPerformanceMonthlyRows(performance, rows, summary);
-  const windowedMonthlyRows = portfolioPerformanceVisibleMonthlyRows(monthlyRows);
   const queryActive = portfolioFilterActive();
   return `
     <section class="transaction-metrics portfolio-performance-metrics">
@@ -5018,14 +5096,9 @@ function portfolioPerformanceDashboard(portfolio = {}) {
       ${transactionMetric("Achieved", signedWholeAmount(summary.achieved_pl_eur || 0, "EUR"), `${signedPercent(summary.achieved_return_pct || 0)} vs paid in`)}
       ${transactionMetric("Plan Completion", formatPercent(summary.plan_completion_pct || 0), `${signedWholeAmount(summary.contribution_gap_eur || 0, "EUR")} funding gap vs plan to date`)}
     </section>
-    <section class="reports-chart-grid portfolio-chart-grid">
-      ${chartPanel(portfolioCumulativeContributionChart(windowedMonthlyRows, { chartId: "portfolio-cumulative-contributions" }))}
-      ${chartPanel(portfolioMonthlyContributionChart(windowedMonthlyRows, { chartId: "portfolio-monthly-plan" }))}
-    </section>
     <section class="planning-target-grid portfolio-performance-grid">
       ${panel("Portfolio Funding", portfolioPerformanceTable(rows, portfolio), "full")}
     </section>
-    ${portfolioFundingExpandedChart(portfolio)}
   `;
 }
 
@@ -5047,16 +5120,11 @@ function portfolioReturnsDashboard(portfolio = {}, data = {}) {
       ${transactionMetric("Unrealized P/L", signedWholeAmount(summary.unrealized_pl_eur || 0, "EUR"), `${signedPercent(summary.unrealized_pl_pct || 0)} active return`)}
       ${transactionMetric("Active Market Value", formatWholeCurrency(summary.market_value_eur || 0, "EUR"), `${formatNumber(summary.active_positions || 0)} active positions`)}
     </section>
-    <section class="reports-chart-grid portfolio-chart-grid portfolio-return-chart-grid">
-      ${chartPanel(portfolioReturnTimelineChart(data, { chartId: "portfolio-return-timeline" }))}
-      ${chartPanel(portfolioReturnMonthlyChart(data, { chartId: "portfolio-return-monthly" }))}
-    </section>
     <section class="insight-panel-grid portfolio-return-grid">
       ${panel("Active Exposure", portfolioReturnsActiveExposureBars(data))}
       ${panel("Cost & Fees", portfolioReturnsCapitalBars(data))}
       ${panel("Year Performance", tradePerformanceBars(tables.performance_by_year || [], "period"))}
     </section>
-    ${portfolioReturnsExpandedChart(portfolio, data)}
   `;
 }
 
@@ -5373,6 +5441,7 @@ function portfolioReturnTimelineRows(data = {}) {
 function portfolioReturnTimelineChart(data = {}, options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Realized P/L Over Time";
   const rows = portfolioReturnTimelineRows(data);
   if (rows.length < 2) return emptyState("Return history needs at least two months.");
   let cumulative = 0;
@@ -5394,9 +5463,9 @@ function portfolioReturnTimelineChart(data = {}, options = {}) {
   if (!expanded) {
     return compactChartCard({
       chartId,
-      expandLabel: "Expand realized P/L over time",
+      expandLabel: options.expandLabel || `Expand ${label}`,
       icon: "trendUp",
-      label: "Realized P/L Over Time",
+      label,
       value: signedWholeAmount(last.value || 0, "EUR"),
       meta: `${formatNumber(totalTrades)} closed trades · cumulative realized P/L`,
       chartPoints: points,
@@ -5471,6 +5540,7 @@ function portfolioReturnTimelineTooltip(point = {}) {
 function portfolioReturnMonthlyChart(data = {}, options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Monthly Realized P/L";
   const rows = portfolioReturnTimelineRows(data);
   if (rows.length < 2) return emptyState("Monthly return history needs at least two months.");
   const points = rows.map((row) => ({
@@ -5491,9 +5561,9 @@ function portfolioReturnMonthlyChart(data = {}, options = {}) {
   if (!expanded) {
     return compactChartCard({
       chartId,
-      expandLabel: "Expand monthly realized P/L",
+      expandLabel: options.expandLabel || `Expand ${label}`,
       icon: "trendUp",
-      label: "Monthly Realized P/L",
+      label,
       value: signedWholeAmount(last.value || 0, "EUR"),
       meta: `${formatNumber(nonZeroMonths)} active months · last closed month`,
       chartPoints: points,
@@ -5904,6 +5974,7 @@ function portfolioPerformanceWindowSelector() {
 function portfolioCumulativeContributionChart(rows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Cumulative Contributions";
   const points = rows.filter((row) => row.month);
   if (points.length < 2) return emptyState("Contribution history needs at least two months.");
   const last = points[points.length - 1];
@@ -5921,7 +5992,7 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
       chartId,
       expandLabel: "Expand cumulative contributions",
       icon: "trendUp",
-      label: "Cumulative Contributions",
+      label,
       value: formatWholeCurrency(paidIn, "EUR"),
       meta: `${formatWholeCurrency(plannedToDate, "EUR")} planned to date`,
       chartPoints: points.map((point) => ({
@@ -5989,6 +6060,7 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
 function portfolioMonthlyContributionChart(rows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Monthly Funding Progress";
   const points = rows.filter((row) => row.month);
   if (points.length < 2) return emptyState("Monthly contribution history needs at least two months.");
   const last = points[points.length - 1];
@@ -6000,7 +6072,7 @@ function portfolioMonthlyContributionChart(rows = [], options = {}) {
       chartId,
       expandLabel: "Expand monthly funding progress",
       icon: "target",
-      label: "Monthly Funding Progress",
+      label,
       value: formatWholeCurrency(last.actual_eur || 0, "EUR"),
       meta: `${formatWholeCurrency(last.planned_eur || 0, "EUR")} monthly target`,
       chartPoints: points.map((point) => ({
@@ -6899,6 +6971,7 @@ function portfolioInvestmentSnapshotBars(rows = [], mode = "return") {
 function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Investment Return Over Time";
   const rows = portfolioInvestmentVisibleRows(performance, selectedRows);
   const points = rows
     .filter((row) => numericValue(row.deployed_cost_eur) > 0)
@@ -6915,7 +6988,7 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
       chartId,
       expandLabel: "Expand investment return over time",
       icon: "trendUp",
-      label: "Investment Return Over Time",
+      label,
       value: signedPercent(snapshot.return_pct || 0),
       meta: `${signedWholeAmount(snapshot.profit_loss_eur || 0, "EUR")} lifetime P/L`,
       periodControl: {
@@ -6954,7 +7027,7 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
       chartId,
       expandLabel: "Expand investment return over time",
       icon: "trendUp",
-      label: "Investment Return Over Time",
+      label,
       value: signedPercent(last.return_pct || 0),
       meta: `${signedWholeAmount(last.lifetime_pl_eur || 0, "EUR")} lifetime P/L · ${formatWholeCurrency(last.deployed_cost_eur || 0, "EUR")} deployed`,
       chartPoints: points,
@@ -7016,6 +7089,7 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
 function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
+  const label = options.label || "Investment Value Path";
   const rows = portfolioInvestmentVisibleRows(performance, selectedRows)
     .filter((row) => numericValue(row.deployed_cost_eur) > 0 || numericValue(row.known_value_eur) > 0);
   const snapshot = portfolioInvestmentSnapshotSummary(selectedRows);
@@ -7025,7 +7099,7 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
       chartId,
       expandLabel: "Expand investment value path",
       icon: "wallet",
-      label: "Investment Value Path",
+      label,
       value: formatWholeCurrency(snapshot.current_value_eur || 0, "EUR"),
       meta: `${signedWholeAmount(snapshot.profit_loss_eur || 0, "EUR")} lifetime P/L`,
       periodControl: {
@@ -7050,7 +7124,7 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
       chartId,
       expandLabel: "Expand investment value path",
       icon: "wallet",
-      label: "Investment Value Path",
+      label,
       value: formatWholeCurrency(last.known_value_eur || 0, "EUR"),
       meta: `${signedWholeAmount(gain, "EUR")} vs deployed cost`,
       chartPoints: rows.map((row) => ({
@@ -16598,6 +16672,7 @@ function portfolioMipPhaseInput(phaseId, row) {
 async function loadDataForView() {
   if (state.view === "overview") {
     if (!overviewHasScope("full")) await loadOverview({ scope: "full" });
+    if (state.overviewView === "charts" && !state.portfolioReturns) await loadPortfolioReturns();
   }
   if (state.view === "search") {
     await loadGlobalSearch();
