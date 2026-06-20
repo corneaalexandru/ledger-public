@@ -1804,23 +1804,6 @@ kbd {
   background: var(--surface-2);
 }
 
-.skeleton-hero::after,
-.skeleton-metrics span::after,
-.skeleton-table span::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  animation: shimmer 1.15s ease-in-out infinite;
-}
-
-html[data-theme="light"] .skeleton-hero::after,
-html[data-theme="light"] .skeleton-metrics span::after,
-html[data-theme="light"] .skeleton-table span::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
-}
-
 .skeleton-hero {
   width: 34%;
   min-width: 260px;
@@ -1879,12 +1862,6 @@ html[data-theme="light"] .skeleton-table span::after {
   max-width: 620px;
   margin: 0;
   line-height: 1.45;
-}
-
-@keyframes shimmer {
-  to {
-    transform: translateX(100%);
-  }
 }
 
 @keyframes spin {
