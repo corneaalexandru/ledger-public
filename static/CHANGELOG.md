@@ -4,13 +4,29 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-20
 
-- Standardized the Portfolio Instruments table row height with the main register tables.
-- Defaulted register pagination to 100 rows and standardized transaction row height to the Deleted tab rhythm.
-- Changed Planning target variance to show under-ceiling spending as positive and over-ceiling spending as negative across monthly and yearly tables.
+- Mirrored the shared Ledger UI, health-indicator, theme, and static cache updates into Ledger Public.
+- Added deleted-date traceability display for transactions, accounts, and trades, including visible fallbacks when older deleted rows have no recorded timestamp.
+- Fixed dark/Navy form field contrast in searchable combo boxes, category/subcategory inputs, and select option lists.
 - Added a third Navy theme mode beside Dark and Light, with a dedicated deep-blue background/surface palette and sidebar cycle support.
 - Made Navy the first-load default theme and moved theme preference storage to a fresh key so older auto-saved Dark preferences do not override the new default.
 - Clarified the Monte Carlo compact card by showing planned investment, capital at work, and projected growth separately from the ending projection value.
 - Aligned compact chart card headers with their right-side controls and renamed the Monte Carlo investment basis to projected invested capital.
+- Changed Planning target variance to show under-ceiling spending as positive and over-ceiling spending as negative across monthly and yearly tables.
+- Defaulted register pagination to 100 rows and standardized transaction row height to the Deleted tab rhythm.
+- Standardized the Portfolio Instruments table row height with the main register tables.
+- Added Portfolio Instruments footer pagination and brought Planning/Portfolio support tables onto the standard register row height.
+- Extended the standard register row height to Transactions target monthly tables.
+- Added shared footer pagination and scrollable table bodies to Planning, target, and Portfolio support tables.
+- Centralized Trade Returns, Portfolio Performance, and Portfolio Funding chart cards under Overview > Charts with source-prefixed chart titles.
+- Converted Portfolio, Planning, Statements Import, and supporting summary tables to the shared minimal table shell with consistent headers, spacing, footer navigation, and row density.
+- Aligned Portfolio Overview, Performance, Funding, Planning Targets, Exit Strategy, and Monthly Plan table offsets so their headers and bodies follow the same visual rhythm.
+- Standardized Statement Import queue rows and repaired the import table layout so selection controls, headers, amounts, matches, and targets no longer drift or overlap.
+- Tightened metric-section spacing and restored insight/progress bars to fixed, proportional rendering instead of frozen or oversized markers.
+- Aligned Settings inline input/select heights to the compact currency-field rhythm.
+- Removed the animated loading skeleton and simplified loading screens to a plain text loading label.
+- Reduced shared table row height and then set the universal minimal table body row height to 60px across the project.
+- Renamed Insights tabs/sections to Metrics and converted metric pages to the same text-forward style as Overview Metrics.
+- Aligned shared table panel header actions so buttons sit on the same baseline as section titles.
 - Fixed Intelligence Threshold defaults so missing or collapsed-minimum local settings restore and persist the intended thresholds instead of showing `1`/`0` values.
 
 ## 2026-06-19
@@ -37,6 +53,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 - Added the shared Source statement-file column to Trades so linked trade confirmations are visible directly in the table.
 - Rounded visible trade quantities to two decimal places in shared tables, detail drawers, and statement-import labels while keeping source precision for stored values.
 - Aligned the Transactions Targets tab with the detailed monthly target payload used by shared monthly target actuals.
+- Kept the full Transactions tab strip visible in overall/all-period views so later filters such as Top Up, Review, and Deleted no longer fall off the edge.
 
 ## 2026-06-15
 
