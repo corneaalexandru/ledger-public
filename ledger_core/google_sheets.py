@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -219,6 +219,8 @@ class GoogleSheetsLedgerStore:
                 row["ledger_status"] = ledger_status
                 if "review_status" in row:
                     row["review_status"] = "review_done" if ledger_status == "deleted" else "review_required"
+                if sheet_name == "transactions_register" and "deleted_at" in row:
+                    row["deleted_at"] = deletion_timestamp() if ledger_status == "deleted" else ""
         missing = [row_id for row_id in row_ids if row_id not in found]
         if missing:
             raise KeyError(f"Not found: {', '.join(missing)}")
@@ -284,6 +286,10 @@ def transaction_formula_values(row_number: int, headers: list[str]) -> dict[str,
     if "amount_eur_converted" in headers:
         formulas["amount_eur_converted"] = historical_fx_formula(row_number, headers, "EUR")
     return formulas
+
+
+def deletion_timestamp() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
 
 
 def portfolio_formula_values(row_number: int, headers: list[str]) -> dict[str, str]:

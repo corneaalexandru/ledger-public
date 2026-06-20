@@ -95,6 +95,7 @@ TRANSACTIONS_HEADERS = [
     "portfolio_id",
     "imported_transaction",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -932,6 +933,10 @@ def next_id(rows: list[dict], field: str, prefix: str) -> str:
     return f"{prefix}_{max_number + 1:06d}"
 
 
+def deletion_timestamp() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
+
+
 def upsert_row(sheet_name: str, id_field: str, row_id: str, values: dict) -> dict:
     rows = read_rows(sheet_name)
     headers = SHEETS[sheet_name]
@@ -969,6 +974,8 @@ def mutate_status(sheet_name: str, id_field: str, ids: list[str], ledger_status:
             row["ledger_status"] = ledger_status
             if "review_status" in row:
                 row["review_status"] = "reviewed" if ledger_status == "deleted" else "review_required"
+            if sheet_name == "transactions_register" and "deleted_at" in row:
+                row["deleted_at"] = deletion_timestamp() if ledger_status == "deleted" else ""
         next_rows.append(row)
     missing = [row_id for row_id in ids if row_id not in found]
     if missing:
@@ -988,6 +995,8 @@ def duplicate_rows(sheet_name: str, id_field: str, prefix: str, ids: list[str]) 
         row[id_field] = next_id(rows + created, id_field, prefix)
         row["ledger_status"] = "accountable"
         row["review_status"] = "review_required"
+        if sheet_name == "transactions_register" and "deleted_at" in row:
+            row["deleted_at"] = ""
         rows.append(row)
         created.append(row)
     write_rows(sheet_name, rows)

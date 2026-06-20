@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime
 from pathlib import Path
 
 from ledger_core.fx import DEFAULT_CONVERTER, FXConverter, normalize_currency
@@ -101,6 +102,8 @@ class LocalCsvLedgerStore:
                 row["ledger_status"] = ledger_status
                 if "review_status" in row:
                     row["review_status"] = "review_done" if ledger_status == "deleted" else "review_required"
+                if sheet_name == "transactions_register" and "deleted_at" in row:
+                    row["deleted_at"] = deletion_timestamp() if ledger_status == "deleted" else ""
         missing = [row_id for row_id in row_ids if row_id not in found]
         if missing:
             raise KeyError(f"Not found: {', '.join(missing)}")
@@ -125,3 +128,7 @@ def first_value(row: dict, *keys: str) -> object:
 def normalize_country(value: object) -> str:
     code = str(value or "").strip().upper()
     return code if len(code) == 2 and code.isalpha() else ""
+
+
+def deletion_timestamp() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()

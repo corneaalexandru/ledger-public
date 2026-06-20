@@ -14913,15 +14913,24 @@ function transactionPostedDateSubline(row = {}) {
   return `posted ${formatDisplayDate(postedDate)}`;
 }
 
+function transactionDeletedAtLine(row = {}) {
+  const status = String(row.ledger_status || "").trim().toLowerCase().replace(/\s+/g, "_");
+  const deletedAt = String(row.deleted_at || "").trim();
+  if (status !== "deleted" || !deletedAt) return "";
+  return `Deleted ${formatDisplayDateTime(deletedAt)}`;
+}
+
 function transactionDescriptionCell(row = {}) {
   const id = String(row.transaction_id || "").trim();
   const primary = String(row.memo || "").trim() || String(row.counterparty_name || "").trim() || id;
   const secondary = [row.counterparty_name, id]
     .map((value) => String(value || "").trim())
     .find((value) => value && value !== primary);
+  const deletedAtLine = transactionDeletedAtLine(row);
   return `
     <span class="table-main">${quickFilterControl(primary, primary, { field: primary === id ? "transaction_id" : "" })}</span>
     ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === id ? "transaction_id" : "" })}</span>` : ""}
+    ${deletedAtLine ? `<span class="table-sub">${safe(deletedAtLine)}</span>` : ""}
   `;
 }
 
@@ -19271,6 +19280,21 @@ function formatDisplayDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDisplayDateTime(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function isoDate(date) {

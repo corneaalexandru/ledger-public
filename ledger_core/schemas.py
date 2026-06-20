@@ -49,6 +49,7 @@ TRANSACTIONS_HEADERS = [
     "portfolio_id",
     "imported_transaction",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -154,7 +155,7 @@ ID_PREFIXES = {
 
 GOOGLE_SHEET_RANGES = {
     ACCOUNTS_SHEET: "A:P",
-    TRANSACTIONS_SHEET: "A:X",
+    TRANSACTIONS_SHEET: "A:Y",
     TRADES_SHEET: "A:Y",
 }
 
