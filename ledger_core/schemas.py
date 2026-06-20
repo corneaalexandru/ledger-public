@@ -22,6 +22,7 @@ ACCOUNTS_HEADERS = [
     "credit_limit_native",
     "available_credit_native",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -78,6 +79,7 @@ TRADES_HEADERS = [
     "realized_pl_pct",
     "unrealized_pl_pct",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -154,9 +156,9 @@ ID_PREFIXES = {
 }
 
 GOOGLE_SHEET_RANGES = {
-    ACCOUNTS_SHEET: "A:P",
+    ACCOUNTS_SHEET: "A:Q",
     TRANSACTIONS_SHEET: "A:Y",
-    TRADES_SHEET: "A:Y",
+    TRADES_SHEET: "A:Z",
 }
 
 PUBLIC_RUNTIME_PATHS = {

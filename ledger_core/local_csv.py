@@ -102,7 +102,7 @@ class LocalCsvLedgerStore:
                 row["ledger_status"] = ledger_status
                 if "review_status" in row:
                     row["review_status"] = "review_done" if ledger_status == "deleted" else "review_required"
-                if sheet_name == "transactions_register" and "deleted_at" in row:
+                if "deleted_at" in row:
                     row["deleted_at"] = deletion_timestamp() if ledger_status == "deleted" else ""
         missing = [row_id for row_id in row_ids if row_id not in found]
         if missing:

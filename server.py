@@ -68,6 +68,7 @@ ACCOUNTS_HEADERS = [
     "credit_limit_native",
     "available_credit_native",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -124,6 +125,7 @@ TRADES_HEADERS = [
     "realized_pl_pct",
     "unrealized_pl_pct",
     "ledger_status",
+    "deleted_at",
     "review_status",
     "notes",
 ]
@@ -974,7 +976,7 @@ def mutate_status(sheet_name: str, id_field: str, ids: list[str], ledger_status:
             row["ledger_status"] = ledger_status
             if "review_status" in row:
                 row["review_status"] = "reviewed" if ledger_status == "deleted" else "review_required"
-            if sheet_name == "transactions_register" and "deleted_at" in row:
+            if "deleted_at" in row:
                 row["deleted_at"] = deletion_timestamp() if ledger_status == "deleted" else ""
         next_rows.append(row)
     missing = [row_id for row_id in ids if row_id not in found]
@@ -995,7 +997,7 @@ def duplicate_rows(sheet_name: str, id_field: str, prefix: str, ids: list[str]) 
         row[id_field] = next_id(rows + created, id_field, prefix)
         row["ledger_status"] = "accountable"
         row["review_status"] = "review_required"
-        if sheet_name == "transactions_register" and "deleted_at" in row:
+        if "deleted_at" in row:
             row["deleted_at"] = ""
         rows.append(row)
         created.append(row)

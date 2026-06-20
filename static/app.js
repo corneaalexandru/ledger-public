@@ -14920,6 +14920,10 @@ function transactionDeletedAtLine(row = {}) {
 }
 
 function transactionDeletedAtValue(row = {}) {
+  return recordDeletedAtValue(row);
+}
+
+function recordDeletedAtValue(row = {}) {
   const status = String(row.ledger_status || "").trim().toLowerCase().replace(/\s+/g, "_");
   const deletedAt = String(row.deleted_at || "").trim();
   if (status !== "deleted") return "";
@@ -15012,6 +15016,7 @@ function accountDetailsPanel(rows = []) {
   const row = rows.find((item) => item.account_id === state.selectedAccountId);
   if (!row) return "";
   const isEditing = state.selectedAccountEditing;
+  const deletedAtValue = recordDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Account" : "Account Details",
     row.account_reference || row.account_id,
@@ -15031,6 +15036,7 @@ function accountDetailsPanel(rows = []) {
         ${detailItem("Credit Limit", formatAccountMoney(row.credit_limit_native, row.account_currency, { project: false }))}
         ${detailItem("Available Credit", formatAccountMoney(row.available_credit_native, row.account_currency, { project: false }))}
         ${detailItem("Ledger Status", labelize(row.ledger_status))}
+        ${deletedAtValue ? detailItem("Deleted At", deletedAtValue) : ""}
         ${detailItem("Review", labelize(row.review_status))}
         ${detailItem("Notes", row.notes)}
       </dl>
@@ -15047,6 +15053,7 @@ function tradeDetailsPanel(rows = []) {
   const row = rows.find((item) => item.trade_id === state.selectedTradeId);
   if (!row) return "";
   const isEditing = state.selectedTradeEditing;
+  const deletedAtValue = recordDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Trade" : "Trade Details",
     row.symbol || row.trade_id,
@@ -15073,6 +15080,7 @@ function tradeDetailsPanel(rows = []) {
         ${detailItem("Unrealized P/L", tradePlLabel(row.unrealized_pl_native, row.unrealized_pl_pct, row.trade_currency))}
         ${detailItem("Fees", formatTradeMoney(row.fees_native, row.trade_currency))}
         ${detailItem("Ledger Status", labelize(row.ledger_status))}
+        ${deletedAtValue ? detailItem("Deleted At", deletedAtValue) : ""}
         ${detailItem("Review", labelize(row.review_status))}
         ${detailItem("Notes", row.notes)}
       </dl>
@@ -18802,9 +18810,9 @@ function filtersForPeriod() {
 
 function sourceStats() {
   const stats = state.overview?.sheet_stats || [
-    { name: "accounts_register", rows: 0, columns: 16, status: "Pending" },
-    { name: "transactions_register", rows: 0, columns: 19, status: "Pending" },
-    { name: "trades_register", rows: 0, columns: 23, status: "Pending" },
+    { name: "accounts_register", rows: 0, columns: 17, status: "Pending" },
+    { name: "transactions_register", rows: 0, columns: 25, status: "Pending" },
+    { name: "trades_register", rows: 0, columns: 26, status: "Pending" },
   ];
   return stats.map((item) => ({
     ...item,
