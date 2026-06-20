@@ -5842,11 +5842,13 @@ input.is-invalid {
   width: 150px;
 }
 
-.transactions-table tbody tr {
+.transactions-table tbody tr,
+.portfolio-table tbody tr {
   height: 90px;
 }
 
-.transactions-table td {
+.transactions-table td,
+.portfolio-table td {
   padding-top: 14px;
   padding-bottom: 14px;
 }
