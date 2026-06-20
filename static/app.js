@@ -14914,10 +14914,16 @@ function transactionPostedDateSubline(row = {}) {
 }
 
 function transactionDeletedAtLine(row = {}) {
+  const deletedAtValue = transactionDeletedAtValue(row);
+  if (!deletedAtValue) return "";
+  return deletedAtValue === "Not recorded" ? "Deleted date not recorded" : `Deleted ${deletedAtValue}`;
+}
+
+function transactionDeletedAtValue(row = {}) {
   const status = String(row.ledger_status || "").trim().toLowerCase().replace(/\s+/g, "_");
   const deletedAt = String(row.deleted_at || "").trim();
-  if (status !== "deleted" || !deletedAt) return "";
-  return `Deleted ${formatDisplayDateTime(deletedAt)}`;
+  if (status !== "deleted") return "";
+  return deletedAt ? formatDisplayDateTime(deletedAt) : "Not recorded";
 }
 
 function transactionDescriptionCell(row = {}) {
@@ -15086,6 +15092,7 @@ function transactionDetailsPanel(rows = []) {
   const primaryDate = transactionPrimaryDate(row);
   const postedDate = String(row.posted_date || "").trim();
   const hasDifferentPostedDate = postedDate && postedDate !== primaryDate;
+  const deletedAtValue = transactionDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Transaction" : "Transaction Details",
     row.memo || row.transaction_id,
@@ -15105,6 +15112,7 @@ function transactionDetailsPanel(rows = []) {
         ${detailItem("Native Amount", signedNativeCurrency(row))}
         ${detailItem("Project Amount", signedCurrency(row))}
         ${detailItem("Ledger Status", labelize(row.ledger_status))}
+        ${deletedAtValue ? detailItem("Deleted At", deletedAtValue) : ""}
         ${detailItem("Review", labelize(row.review_status))}
       </dl>
       ${state.transactionActionError ? `<p class="drawer-error">${safe(state.transactionActionError)}</p>` : ""}
