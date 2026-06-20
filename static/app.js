@@ -142,6 +142,8 @@ const state = {
     error: "",
   },
   selectedPortfolioInstruments: new Set(),
+  selectedPortfolioPerformanceRows: new Set(),
+  selectedPortfolioFundingRows: new Set(),
   portfolioInstrumentOffset: 0,
   portfolioInstrumentPageSize: 100,
   localTableOffsets: {},
@@ -381,6 +383,8 @@ function resetMonthlyTargetOverrides() {
 
 function resetPortfolioDetailState() {
   state.selectedPortfolioInstruments.clear();
+  state.selectedPortfolioPerformanceRows.clear();
+  state.selectedPortfolioFundingRows.clear();
   state.selectedPortfolioInstrumentId = "";
   state.selectedPortfolioInstrumentEditing = false;
   state.portfolioActionError = "";
@@ -1336,6 +1340,28 @@ function bindEvents() {
       return;
     }
 
+    const portfolioPerformanceSelect = event.target.closest("[data-portfolio-performance-select]");
+    if (portfolioPerformanceSelect) {
+      if (portfolioPerformanceSelect.checked) {
+        state.selectedPortfolioPerformanceRows.add(portfolioPerformanceSelect.value);
+      } else {
+        state.selectedPortfolioPerformanceRows.delete(portfolioPerformanceSelect.value);
+      }
+      renderPreservingScroll();
+      return;
+    }
+
+    const portfolioFundingSelect = event.target.closest("[data-portfolio-funding-select]");
+    if (portfolioFundingSelect) {
+      if (portfolioFundingSelect.checked) {
+        state.selectedPortfolioFundingRows.add(portfolioFundingSelect.value);
+      } else {
+        state.selectedPortfolioFundingRows.delete(portfolioFundingSelect.value);
+      }
+      renderPreservingScroll();
+      return;
+    }
+
     const accountPageSelect = event.target.closest("[data-select-account-page]");
     if (accountPageSelect && state.accounts) {
       state.accounts.rows.forEach((row) => {
@@ -1413,6 +1439,32 @@ function bindEvents() {
         }
       });
       renderPreservingScroll();
+    }
+
+    const portfolioPerformancePageSelect = event.target.closest("[data-select-portfolio-performance-page]");
+    if (portfolioPerformancePageSelect) {
+      document.querySelectorAll("[data-portfolio-performance-select]").forEach((control) => {
+        if (portfolioPerformancePageSelect.checked) {
+          state.selectedPortfolioPerformanceRows.add(control.value);
+        } else {
+          state.selectedPortfolioPerformanceRows.delete(control.value);
+        }
+      });
+      renderPreservingScroll();
+      return;
+    }
+
+    const portfolioFundingPageSelect = event.target.closest("[data-select-portfolio-funding-page]");
+    if (portfolioFundingPageSelect) {
+      document.querySelectorAll("[data-portfolio-funding-select]").forEach((control) => {
+        if (portfolioFundingPageSelect.checked) {
+          state.selectedPortfolioFundingRows.add(control.value);
+        } else {
+          state.selectedPortfolioFundingRows.delete(control.value);
+        }
+      });
+      renderPreservingScroll();
+      return;
     }
   });
 
@@ -2085,6 +2137,8 @@ function bindEvents() {
       state.expandedChartId = "";
       state.portfolioInstrumentOffset = 0;
       state.selectedPortfolioInstruments.clear();
+      state.selectedPortfolioPerformanceRows.clear();
+      state.selectedPortfolioFundingRows.clear();
       state.selectedPortfolioInstrumentId = "";
       state.selectedPortfolioInstrumentEditing = false;
       state.portfolioActionError = "";
@@ -2242,6 +2296,8 @@ function bindEvents() {
     }
     if (action.dataset.action === "clear-portfolio-selection") {
       state.selectedPortfolioInstruments.clear();
+      state.selectedPortfolioPerformanceRows.clear();
+      state.selectedPortfolioFundingRows.clear();
       render();
     }
     if (action.dataset.action === "previous-page") {
@@ -2648,6 +2704,9 @@ function resetSearchResultState() {
   state.selectedTradeId = "";
   state.selectedTradeEditing = false;
   state.tradeActionError = "";
+  state.selectedPortfolioInstruments.clear();
+  state.selectedPortfolioPerformanceRows.clear();
+  state.selectedPortfolioFundingRows.clear();
   state.portfolioReturns = null;
   state.error.portfolioReturns = "";
   resetStatementPanel();
@@ -5096,9 +5155,7 @@ function portfolioPerformanceDashboard(portfolio = {}) {
       ${transactionMetric("Achieved", signedWholeAmount(summary.achieved_pl_eur || 0, "EUR"), `${signedPercent(summary.achieved_return_pct || 0)} vs paid in`)}
       ${transactionMetric("Plan Completion", formatPercent(summary.plan_completion_pct || 0), `${signedWholeAmount(summary.contribution_gap_eur || 0, "EUR")} funding gap vs plan to date`)}
     </section>
-    <section class="planning-target-grid portfolio-performance-grid">
-      ${panel("Portfolio Funding", portfolioPerformanceTable(rows, portfolio), "full")}
-    </section>
+    ${panel("Portfolio Funding", portfolioPerformanceTable(rows, portfolio), "full")}
   `;
 }
 
@@ -6193,11 +6250,20 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
   if (!rows.length) return emptyState("No portfolio performance rows match the current search.");
   const page = localTablePageData("portfolioFunding", rows);
   const visibleRows = page.rows;
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => state.selectedPortfolioFundingRows.has(portfolioFundingRowId(row, rows)));
   return `
     <section class="minimal-table-wrap planning-target-table-wrap portfolio-performance-table-wrap">
       <table class="minimal-table planning-target-table portfolio-performance-table">
         <thead>
           <tr>
+            <th class="check-cell">
+              <input
+                aria-label="Select visible portfolio funding rows"
+                data-select-portfolio-funding-page
+                type="checkbox"
+                ${allVisibleSelected ? "checked" : ""}
+              />
+            </th>
             <th>Portfolio</th>
             <th class="align-right">Paid In</th>
             <th class="align-right">Current Value</th>
@@ -6207,8 +6273,20 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
           </tr>
         </thead>
         <tbody>
-          ${visibleRows.map((row) => `
+          ${visibleRows.map((row) => {
+            const id = portfolioFundingRowId(row, rows);
+            const label = portfolioScopeLabel(row, rows);
+            return `
             <tr>
+              <td class="check-cell">
+                <input
+                  aria-label="Select ${safe(label)} funding row"
+                  data-portfolio-funding-select
+                  type="checkbox"
+                  value="${safe(id)}"
+                  ${state.selectedPortfolioFundingRows.has(id) ? "checked" : ""}
+                />
+              </td>
               <td>
 	                <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioPerformanceLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
 	                <span class="table-sub">${[
@@ -6233,7 +6311,8 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
                 <span class="table-sub">${signedWholeAmount(row.contribution_gap_eur || 0, "EUR")} funding gap</span>
               </td>
             </tr>
-          `).join("")}
+            `;
+          }).join("")}
         </tbody>
       </table>
     </section>
@@ -6507,6 +6586,26 @@ function portfolioInstrumentId(row = {}) {
     row.portfolio_id,
     row.ticker || row.symbol || row.asset_name,
   ].filter(Boolean).join("::") || `instrument:${Date.now()}`);
+}
+
+function portfolioSummaryRowId(scope, row = {}, rows = []) {
+  return [
+    scope,
+    portfolioScopeLabel(row, rows),
+    row.portfolio_id,
+    row.portfolio_name,
+    row.provider,
+    row.contribution_type,
+    row.contribution_role,
+  ].filter(Boolean).join("::") || `${scope}:row`;
+}
+
+function portfolioPerformanceRowId(row = {}, rows = []) {
+  return portfolioSummaryRowId("portfolio-performance", row, rows);
+}
+
+function portfolioFundingRowId(row = {}, rows = []) {
+  return portfolioSummaryRowId("portfolio-funding", row, rows);
 }
 
 function displayPortfolioId(value) {
@@ -7188,11 +7287,20 @@ function portfolioPortfolioPerformanceTable(rows = []) {
   if (!rows.length) return emptyState("No portfolio performance rows match the current search.");
   const page = localTablePageData("portfolioPerformance", rows);
   const visibleRows = page.rows;
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => state.selectedPortfolioPerformanceRows.has(portfolioPerformanceRowId(row, rows)));
   return `
     <section class="minimal-table-wrap planning-target-table-wrap portfolio-performance-table-wrap">
       <table class="minimal-table planning-target-table portfolio-performance-table">
         <thead>
           <tr>
+            <th class="check-cell">
+              <input
+                aria-label="Select visible portfolio performance rows"
+                data-select-portfolio-performance-page
+                type="checkbox"
+                ${allVisibleSelected ? "checked" : ""}
+              />
+            </th>
             <th>Portfolio</th>
             <th class="align-right">Current Value</th>
             <th class="align-right">Historical Cost</th>
@@ -7203,8 +7311,20 @@ function portfolioPortfolioPerformanceTable(rows = []) {
           </tr>
         </thead>
         <tbody>
-          ${visibleRows.map((row) => `
+          ${visibleRows.map((row) => {
+            const id = portfolioPerformanceRowId(row, rows);
+            const label = portfolioScopeLabel(row, rows);
+            return `
             <tr>
+              <td class="check-cell">
+                <input
+                  aria-label="Select ${safe(label)} performance row"
+                  data-portfolio-performance-select
+                  type="checkbox"
+                  value="${safe(id)}"
+                  ${state.selectedPortfolioPerformanceRows.has(id) ? "checked" : ""}
+                />
+              </td>
               <td>
                 <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioScopeLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
                 <span class="table-sub">${[
@@ -7237,7 +7357,8 @@ function portfolioPortfolioPerformanceTable(rows = []) {
                 <span class="table-sub">${row.plan_to_date_eur ? `${formatWholeCurrency(row.plan_to_date_eur, "EUR")} plan to date` : "current phase"}</span>
               </td>
             </tr>
-          `).join("")}
+            `;
+          }).join("")}
         </tbody>
       </table>
     </section>
