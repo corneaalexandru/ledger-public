@@ -3863,6 +3863,22 @@ function overviewSupportingInsightLine(card = {}) {
   });
 }
 
+function metricLineDashboard(sections = [], ariaLabel = "Metrics") {
+  const content = settingsLineSections(sections, "overview-line-grid overview-continuous-list", ariaLabel);
+  return `
+    <section class="overview-section overview-insights-section register-metrics-section">
+      ${content || emptyState("No metrics available.")}
+    </section>
+  `;
+}
+
+function metricLineItems(items = []) {
+  return items
+    .filter((item) => item && (item.label || item.value || item.meta || item.note))
+    .map((item) => metricCard(item.label, item.value, item.meta, item.note, item.icon, item.options || {}))
+    .join("");
+}
+
 function overviewSupportingInsightGroupId(card = {}) {
   const text = overviewInsightCardSearchText(card);
   if (/(overspending|concentration|credit utilization|deficit|ledger gap|liability ratio|liquidity below)/.test(text)) return "risk";
@@ -11885,7 +11901,7 @@ function dashboardCard(id, label, value, meta = "", note = "", icon = "", extra 
   return { id, label, value, meta, note, icon, ...extra };
 }
 
-function dashboardToolbar(cards = [], title = "Insights") {
+function dashboardToolbar(cards = [], title = "Metrics") {
   const hiddenCount = cards.filter((card) => state.hiddenDashboardCards.has(card.id)).length;
   return `
     <div class="dashboard-toolbar">
@@ -12397,26 +12413,83 @@ function accountInsightsDashboard(data = {}) {
   const insights = data?.insights || {};
   const tables = data?.insight_tables || {};
   const netWorth = numericValue(insights.net_worth_eur);
-  return `
-    <section class="transaction-metrics account-insight-metrics">
-      ${transactionMetric("Net Worth", formatWholeCurrency(netWorth, "EUR"), `${formatNumber(insights.active_accounts || 0)} active accounts`)}
-      ${transactionMetric("Assets", formatWholeCurrency(insights.assets_eur || 0, "EUR"), "positive balances")}
-      ${transactionMetric("Liabilities", formatWholeCurrency(insights.liabilities_eur || 0, "EUR"), "active liabilities")}
-      ${transactionMetric("Liquid Capital", formatWholeCurrency(insights.liquid_capital_eur || 0, "EUR"), "reserve + trading capital")}
-    </section>
+  return metricLineDashboard([
+    {
+      title: "Core Position",
+      html: metricLineItems([
+        { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: `${formatNumber(insights.active_accounts || 0)} active accounts`, note: "Balance across active account registers.", icon: "wallet" },
+        { label: "Assets", value: formatWholeCurrency(insights.assets_eur || 0, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp" },
+        { label: "Liabilities", value: formatWholeCurrency(insights.liabilities_eur || 0, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard" },
+        { label: "Liquid Capital", value: formatWholeCurrency(insights.liquid_capital_eur || 0, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet" },
+      ]),
+    },
+    { title: "Account Type Mix", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
+    { title: "Provider Breakdown", html: accountBreakdownMetricLines(tables.provider_breakdown || [], "provider_id", netWorth, "provider", "provider") },
+    { title: "Top Accounts By Value", html: topAccountsMetricLines(insights.top_accounts || []) },
+    { title: "Allocation", html: accountAllocationMetricLines(insights.by_bucket || [], netWorth, "allocation") },
+    { title: "Currency Exposure", html: accountAllocationMetricLines(insights.by_currency || [], netWorth, "currency") },
+    { title: "Credit Utilization", html: accountCreditMetricLines(tables.credit_cards || []) },
+  ], "Account metrics");
+}
 
-    <section class="insight-panel-grid account-insight-bars">
-      ${panel("Account Type Mix", accountTypeBreakdownBars(tables.account_type_breakdown || []))}
-      ${panel("Provider Breakdown", accountProviderBreakdownBars(tables.provider_breakdown || []))}
-      ${panel("Top Accounts by Value", topAccountsBars(insights.top_accounts))}
-    </section>
+function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, iconContext = "", noteLabel = "group") {
+  return metricLineItems(rows.slice(0, 6).map((row) => {
+    const amount = numericValue(row.amount_eur);
+    const share = Number.isFinite(numericValue(row.pct_of_net, Number.NaN))
+      ? numericValue(row.pct_of_net)
+      : percentOf(amount, netWorth);
+    const native = nativeCurrencySummaryOrBlank(row.native_amounts);
+    return {
+      label: labelize(row[nameKey] || row.name || noteLabel),
+      value: formatWholeCurrency(amount, "EUR"),
+      meta: [formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
+      note: `${formatPercent(share)} of net worth by ${noteLabel}.`,
+      icon: insightIconFor(row[nameKey] || row.name || noteLabel, iconContext),
+    };
+  }));
+}
 
-    <section class="insight-panel-grid">
-      ${panel("Allocation", allocationBars(insights.by_bucket, netWorth))}
-      ${panel("Currency Exposure", exposureBars(insights.by_currency, netWorth))}
-      ${panel("Credit Utilization", accountCreditBars(tables.credit_cards || []))}
-    </section>
-  `;
+function topAccountsMetricLines(rows = []) {
+  return metricLineItems((rows || [])
+    .filter((row) => Number(row.amount_eur || 0) > 0)
+    .slice(0, 6)
+    .map((row) => ({
+      label: accountDisplayName(row),
+      value: formatWholeCurrency(row.amount_eur, "EUR"),
+      meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
+      note: `${formatPercent(row.pct_of_net || 0)} of net worth.`,
+      icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
+    })));
+}
+
+function accountAllocationMetricLines(rows = [], netWorth = 0, iconContext = "") {
+  return metricLineItems((rows || [])
+    .filter((row) => Number(row.eur || 0) > 0)
+    .slice(0, 6)
+    .map((row) => ({
+      label: labelize(row.name),
+      value: formatWholeCurrency(row.eur, "EUR"),
+      meta: nativeCurrencySummaryOrBlank(row.native_amounts),
+      note: `${formatPercent(percentOf(row.eur, netWorth))} of net worth.`,
+      icon: insightIconFor(row.name, iconContext),
+    })));
+}
+
+function accountCreditMetricLines(rows = []) {
+  return metricLineItems((rows || [])
+    .filter((row) => numericValue(row.credit_limit_native) > 0)
+    .slice(0, 6)
+    .map((row) => {
+      const used = clampValue(row.utilization_pct || 0, 0, 100);
+      const available = clampValue(100 - used, 0, 100);
+      return {
+        label: accountDisplayName(row),
+        value: `Used ${formatPercent(used)}`,
+        meta: labelize(row.provider_id),
+        note: `${formatPercent(available)} available · ${formatWholeCurrency(row.available_credit_native || 0, row.currency || "")} headroom.`,
+        icon: "creditCard",
+      };
+    }));
 }
 
 function accountProviderBreakdownBars(rows = []) {
@@ -12495,25 +12568,79 @@ function transactionInsightsDashboard(data = {}) {
   const income = numericValue(insights.current_month_income_eur);
   const expenses = numericValue(insights.current_month_expense_eur);
   const net = numericValue(insights.current_month_net_eur);
-  return `
-    <section class="transaction-metrics transaction-insight-metrics">
-      ${transactionMetric("Total Income", formatCurrency(income, "EUR"), "selected period")}
-      ${transactionMetric("Total Expenses", formatCurrency(expenses, "EUR"), percentOfIncomeNote(expenses, income))}
-      ${transactionMetric("Net Flow", signedAmount(net, "EUR"), percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }))}
-      ${transactionMetric("Review", formatNumber(insights.review_open || 0), "transactions")}
-    </section>
+  return metricLineDashboard([
+    {
+      title: "Core Flow",
+      html: metricLineItems([
+        { label: "Total Income", value: formatCurrency(income, "EUR"), meta: "selected period", note: `${formatNumber(insights.total || 0)} ledger rows included.`, icon: "trendUp" },
+        { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown" },
+        { label: "Net Flow", value: signedAmount(net, "EUR"), meta: percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }), note: "Income minus expenses in project currency.", icon: net >= 0 ? "trendUp" : "trendDown" },
+        { label: "Review", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target" },
+      ]),
+    },
+    {
+      title: "Activity",
+      html: metricLineItems([
+        transactionHeatmapMetric("Income Activity", insights.income_heatmap, "income"),
+        transactionHeatmapMetric("Spending Activity", insights.spending_heatmap, "expense"),
+      ]),
+    },
+    { title: "Category Spend", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
+    { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
+    { title: "Income Sources", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
+  ], "Transaction metrics");
+}
 
-    <section class="overview-split lower heatmap-pair transaction-insight-heatmaps">
-      ${panel("Income Heatmap", activityHeatmap(insights.income_heatmap, "income"))}
-      ${panel("Spending Heatmap", activityHeatmap(insights.spending_heatmap, "expense"))}
-    </section>
+function transactionHeatmapMetric(label = "Activity", payload = {}, type = "expense") {
+  const items = payload?.items || [];
+  const activeItems = items.filter((row) => numericValue(row.amount_eur) > 0);
+  const granularity = payload?.granularity || "day";
+  const peak = activeItems.slice().sort((a, b) => numericValue(b.amount_eur) - numericValue(a.amount_eur))[0];
+  const unit = granularity === "day" ? "days" : "periods";
+  const peakLabel = peak ? heatmapRangeLabel(peak.date, granularity) : "";
+  return {
+    label,
+    value: formatCurrency(payload?.total_eur || 0, "EUR"),
+    meta: `${formatNumber(activeItems.length)} active ${unit}`,
+    note: peak ? `Peak ${peakLabel} · ${formatCurrency(peak.amount_eur || 0, "EUR")}.` : "No period activity recorded.",
+    icon: type === "income" ? "trendUp" : "trendDown",
+  };
+}
 
-    <section class="insight-panel-grid transaction-insight-grid">
-      ${panel("Category Spend", transactionCategorySpendBars(insights.category_spend || []))}
-      ${panel("Currency Flow", transactionCurrencyFlowBars(insights.currency_flow || []))}
-      ${panel("Income Sources", transactionIncomeSourceBars(insights.income_sources || []))}
-    </section>
-  `;
+function transactionCategorySpendMetricLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
+  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
+    label: taxonomyLabel(row.category || "expense"),
+    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period category spend.`,
+    icon: insightIconFor(row.category, "category"),
+  })));
+}
+
+function transactionIncomeSourceMetricLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
+  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
+    label: row.name || "Income",
+    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period income.`,
+    icon: insightIconFor(row.name || "income", "income"),
+  })));
+}
+
+function transactionCurrencyFlowMetricLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + Math.abs(numericValue(row.net_eur)), 0);
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const net = numericValue(row.net_eur);
+    return {
+      label: row.currency || "-",
+      value: signedWholeAmount(net, "EUR"),
+      meta: `${signedWholeAmount(row.net_native || 0, row.currency || "EUR")} native · ${formatPlural(row.count || 0, "row")}`,
+      note: `${formatWholeCurrency(row.income_eur || 0, "EUR")} income · ${formatWholeCurrency(row.expense_eur || 0, "EUR")} expense · ${formatPercent(percentOf(Math.abs(net), total))} of currency movement.`,
+      icon: "currency",
+    };
+  }));
 }
 
 function transactionMonthlyTargetsDashboard(data = {}) {
@@ -13568,7 +13695,7 @@ function accountTabs() {
         class="${state.accountView === "insights" ? "is-active" : ""}"
         data-action="account-insights-tab"
         type="button"
-      >Insights</button>
+      >Metrics</button>
       ${otherTabs
         .map((tab) => `
           ${accountTabButton(tab)}
@@ -14239,7 +14366,7 @@ function transactionTabs(classes = [], insights = {}) {
         class="${state.transactionView === "insights" ? "is-active" : ""}"
         data-action="transaction-insights-tab"
         type="button"
-      >Insights</button>
+      >Metrics</button>
       ${targetTab}
       ${values
         .map((value) => transactionTabButton(value, labels))
@@ -14400,7 +14527,7 @@ function tradeTabs() {
         class="${state.tradeView === "insights" ? "is-active" : ""}"
         data-action="trade-insights-tab"
         type="button"
-      >Insights</button>
+      >Metrics</button>
       <button
         class="${state.tradeView === "returns" ? "is-active" : ""}"
         data-action="trade-returns-tab"
@@ -14556,20 +14683,110 @@ function tradeInsightsDashboard(data = {}) {
   const marketValue = currencyRowsTotal(insights.market_value_by_currency);
   const realized = currencyRowsTotal(insights.realized_pl_by_currency);
   const unrealized = currencyRowsTotal(insights.unrealized_pl_by_currency);
-  return `
-    <section class="transaction-metrics trade-insight-metrics">
-      ${transactionMetric("Active Positions", formatNumber(insights.active_positions || 0), `${formatNumber(insights.closed_positions || 0)} closed`)}
-      ${transactionMetric("Market Value", formatWholeCurrency(marketValue, "EUR"), "active positions")}
-      ${transactionMetric("Realized P/L", signedWholeAmount(realized, "EUR"), `${signedPercent(insights.realized_pl_pct)} return`)}
-      ${transactionMetric("Unrealized P/L", signedWholeAmount(unrealized, "EUR"), `${signedPercent(insights.unrealized_pl_pct)} return`)}
-    </section>
+  return metricLineDashboard([
+    {
+      title: "Core Position",
+      html: metricLineItems([
+        { label: "Active Positions", value: formatNumber(insights.active_positions || 0), meta: `${formatNumber(insights.closed_positions || 0)} closed`, note: "Open versus closed trade records.", icon: "pie" },
+        { label: "Market Value", value: formatWholeCurrency(marketValue, "EUR"), meta: "active positions", note: "Current active market exposure converted to project currency.", icon: "wallet" },
+        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown" },
+        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown" },
+      ]),
+    },
+    { title: "Month Performance", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
+    { title: "Instrument Performance", html: tradePerformanceMetricLines(tables.instrument_performance || [], "instrument") },
+    { title: "Position Watchlist", html: tradePositionWatchlistMetricLines(data) },
+  ], "Trade metrics");
+}
 
-    <section class="insight-panel-grid trade-insight-grid">
-      ${panel("Month Performance", tradePerformanceBars(tables.performance_by_month || [], "period"))}
-      ${panel("Instrument Performance", tradePerformanceBars(tables.instrument_performance || [], "instrument"))}
-      ${panel("Position Watchlist", tradePositionWatchlistBars(data))}
-    </section>
-  `;
+function tradePerformanceMetricLines(rows = [], key = "period") {
+  const total = rows.reduce((sum, row) => sum + Math.abs(numericValue(row.pl_eur)), 0);
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const pl = numericValue(row.pl_eur);
+    const label = key === "period" ? performancePeriodLabel(row[key]) : row[key] || "-";
+    const detail = key === "period"
+      ? [
+        `${signedPercent(row.return_pct || 0)} realized return`,
+        `${formatPlural(row.trades || 0, "closed trade")}`,
+        `${formatWholeCurrency(row.fees_eur || 0, "EUR")} fees`,
+      ].join(" · ")
+      : `${signedPercent(row.return_pct || 0)} return · ${formatWholeCurrency(row.market_value_eur || 0, "EUR")} market · ${formatWholeCurrency(row.fees_eur || 0, "EUR")} fees`;
+    return {
+      label,
+      value: signedWholeAmount(pl, "EUR"),
+      meta: detail,
+      note: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement.`,
+      icon: pl >= 0 ? "trendUp" : "trendDown",
+    };
+  }));
+}
+
+function tradePositionWatchlistMetricLines(data = {}) {
+  const tables = data?.insight_tables || {};
+  const insights = data?.insights || data?.summary || {};
+  const activeRows = (data?.rows || []).filter((row) => row.position_status === "active");
+  const marketTotal = currencyRowsTotal(insights.market_value_by_currency)
+    || activeRows.reduce((sum, row) => sum + Math.abs(numericValue(row.current_market_value_native)), 0);
+  const attentionRows = (tables.attention || []).slice(0, 2).map((row) => ({
+    label: row.name || "-",
+    value: formatNumber(row.trades || 0),
+    meta: "attention signal",
+    note: row.note || "Trade rows requiring attention.",
+    icon: "target",
+  }));
+  const items = [...attentionRows];
+
+  const byMarketValue = [...activeRows].sort((a, b) => Math.abs(numericValue(b.current_market_value_native)) - Math.abs(numericValue(a.current_market_value_native)));
+  const largestExposure = byMarketValue[0];
+  if (largestExposure) {
+    const value = Math.abs(numericValue(largestExposure.current_market_value_native));
+    items.push({
+      label: "Largest Exposure",
+      value: formatWholeCurrency(value, largestExposure.trade_currency || "EUR"),
+      meta: tradePositionLabel(largestExposure),
+      note: `${formatPercent(percentOf(value, marketTotal))} of active market value.`,
+      icon: "pie",
+    });
+  }
+
+  const returnRows = activeRows.filter((row) => Number.isFinite(numericValue(row.unrealized_pl_pct)));
+  const worstReturn = returnRows.slice().sort((a, b) => numericValue(a.unrealized_pl_pct) - numericValue(b.unrealized_pl_pct))[0];
+  const bestReturn = returnRows.slice().sort((a, b) => numericValue(b.unrealized_pl_pct) - numericValue(a.unrealized_pl_pct))[0];
+  if (worstReturn) {
+    items.push({
+      label: "Worst Active Return",
+      value: signedPercent(worstReturn.unrealized_pl_pct || 0),
+      meta: tradePositionLabel(worstReturn),
+      note: `${signedWholeAmount(worstReturn.unrealized_pl_native || 0, worstReturn.trade_currency || "EUR")} unrealized.`,
+      icon: numericValue(worstReturn.unrealized_pl_pct) < 0 ? "trendDown" : "trendUp",
+    });
+  }
+  if (bestReturn && bestReturn !== worstReturn) {
+    items.push({
+      label: "Best Active Return",
+      value: signedPercent(bestReturn.unrealized_pl_pct || 0),
+      meta: tradePositionLabel(bestReturn),
+      note: `${signedWholeAmount(bestReturn.unrealized_pl_native || 0, bestReturn.trade_currency || "EUR")} unrealized.`,
+      icon: numericValue(bestReturn.unrealized_pl_pct) >= 0 ? "trendUp" : "trendDown",
+    });
+  }
+
+  if (insights.latest_price_as_of || insights.oldest_price_as_of) {
+    const stalePositions = numericValue(insights.stale_price_positions);
+    const staleDays = numericValue(insights.stale_price_days, state.intelligenceThresholds.tradeStalePriceDays);
+    items.push({
+      label: "Price Freshness",
+      value: stalePositions ? `${formatNumber(stalePositions)} stale` : "Fresh",
+      meta: insights.latest_price_as_of ? `Latest ${formatDisplayDate(insights.latest_price_as_of)}` : "",
+      note: [
+        insights.oldest_price_as_of ? `oldest ${formatDisplayDate(insights.oldest_price_as_of)}` : "",
+        `limit ${formatNumber(staleDays)} days`,
+      ].filter(Boolean).join(" · "),
+      icon: "calendar",
+    });
+  }
+
+  return metricLineItems(items.slice(0, 6));
 }
 
 function tradeCurrencyBars(rows = [], signed = false, positionStatus = "") {
