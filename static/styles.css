@@ -66,7 +66,7 @@
   --metric-section-gap: 20px;
   --table-section-gap: 16px;
   --table-header-gap: 10px;
-  --table-row-height: 90px;
+  --table-row-height: 72px;
   --overview-deep-gap: 48px;
   --control-height: 40px;
   --control-radius: 6px;
@@ -5864,8 +5864,8 @@ input.is-invalid {
 .planning-target-table td,
 .monthly-target-table td,
 .statement-import-table td {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 11px;
+  padding-bottom: 11px;
 }
 
 .trades-table {
