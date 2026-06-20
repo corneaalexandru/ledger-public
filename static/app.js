@@ -4,6 +4,8 @@ const INTELLIGENCE_THRESHOLDS_STORAGE_KEY = "ledger-intelligence-thresholds";
 const INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION = 4;
 const PROJECT_CURRENCY_STORAGE_KEY = "ledger-project-currency";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ledger-sidebar-width";
+const DEFAULT_THEME = "navy";
+const THEME_STORAGE_KEY = "ledger-theme-v2";
 const THEME_OPTIONS = ["dark", "navy", "light"];
 const SIDEBAR_DEFAULT_WIDTH = 214;
 const SIDEBAR_MIN_WIDTH = 168;
@@ -902,7 +904,7 @@ function startSidebarResize(event) {
 }
 
 function initTheme() {
-  const theme = normalizedTheme(storageGet("ledger-theme"));
+  const theme = normalizedTheme(storageGet(THEME_STORAGE_KEY));
   setTheme(theme);
 }
 
@@ -910,7 +912,7 @@ function setTheme(theme) {
   const nextTheme = normalizedTheme(theme);
   const themeMeta = themeOptionMeta(nextTheme);
   document.documentElement.dataset.theme = nextTheme;
-  storageSet("ledger-theme", nextTheme);
+  storageSet(THEME_STORAGE_KEY, nextTheme);
   elements.themeToggle.innerHTML = `
     <span class="nav-glyph">${icons[themeMeta.icon]}</span>
     <span>${themeMeta.label} Mode</span>
@@ -919,7 +921,7 @@ function setTheme(theme) {
 
 function normalizedTheme(theme) {
   const value = String(theme || "").trim().toLowerCase();
-  return THEME_OPTIONS.includes(value) ? value : "dark";
+  return THEME_OPTIONS.includes(value) ? value : DEFAULT_THEME;
 }
 
 function nextTheme(theme) {

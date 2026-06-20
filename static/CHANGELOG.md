@@ -5,6 +5,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 ## 2026-06-20
 
 - Added a third Navy theme mode beside Dark and Light, with a dedicated deep-blue background/surface palette and sidebar cycle support.
+- Made Navy the first-load default theme and moved theme preference storage to a fresh key so older auto-saved Dark preferences do not override the new default.
 - Fixed Intelligence Threshold defaults so missing or collapsed-minimum local settings restore and persist the intended thresholds instead of showing `1`/`0` values.
 
 ## 2026-06-19
