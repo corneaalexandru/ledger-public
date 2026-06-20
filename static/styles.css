@@ -14,6 +14,7 @@
   --control-bg: rgba(255, 255, 255, 0.02);
   --details-shadow: rgba(0, 0, 0, 0.42);
   --accent: #72d6a8;
+  --income-positive: #72d6a8;
   --accent-2: #8db7ff;
   --warning: #f0bd6a;
   --danger: #ee806f;
@@ -21,6 +22,15 @@
   --target-progress-planned: #d8d8d8;
   --target-progress-achieved: #555555;
   --target-progress-over: #c43b32;
+  --ledger-bar-height: 4px;
+  --table-header-font-size: 10px;
+  --table-header-font-weight: 760;
+  --table-main-font-size: 14px;
+  --table-main-font-weight: 650;
+  --table-main-line-height: 1.22;
+  --table-sub-font-size: 11px;
+  --table-sub-font-weight: 500;
+  --table-sub-line-height: 1.25;
   --heat-0: #101010;
   --heat-1: #1d1d1d;
   --heat-2: #2b2b2b;
@@ -83,6 +93,7 @@ html[data-theme="light"] {
   --control-bg: rgba(255, 255, 255, 0.78);
   --details-shadow: rgba(15, 23, 42, 0.14);
   --accent: #147a52;
+  --income-positive: #147a52;
   --accent-2: #2f64c8;
   --warning: #9c650e;
   --danger: #b53b2f;
@@ -121,6 +132,68 @@ html[data-theme="light"] {
   --treemap-fg-on-7: #101418;
   --treemap-fg-on-8: #101418;
   --treemap-muted-on-dark: rgba(55, 64, 73, 0.68);
+}
+
+html[data-theme="navy"] {
+  color-scheme: dark;
+  --bg: #07111f;
+  --surface: #0b1728;
+  --surface-2: #102035;
+  --surface-3: #172a44;
+  --line: #233957;
+  --line-soft: color-mix(in srgb, var(--line) 68%, transparent);
+  --line-subtle: color-mix(in srgb, var(--line) 44%, transparent);
+  --line-faint: color-mix(in srgb, var(--line) 30%, transparent);
+  --line-strong: color-mix(in srgb, var(--line) 76%, var(--strong) 6%);
+  --control-line: color-mix(in srgb, var(--line) 58%, transparent);
+  --text: #f2f6fb;
+  --muted: #a7b4c6;
+  --faint: #72839c;
+  --strong: #ffffff;
+  --inverse: #06101c;
+  --shadow: rgba(1, 8, 20, 0.44);
+  --control-bg: rgba(255, 255, 255, 0.035);
+  --details-shadow: rgba(1, 8, 20, 0.52);
+  --accent: #66d2b3;
+  --income-positive: #66d2b3;
+  --accent-2: #82b7ff;
+  --warning: #e7bc72;
+  --danger: #f08078;
+  --negative-subtle: #ced8e5;
+  --target-progress-planned: #2d4057;
+  --target-progress-achieved: #d9e4ef;
+  --target-progress-over: #d45b52;
+  --heat-0: #0d1b2d;
+  --heat-1: #13263e;
+  --heat-2: #1b3452;
+  --heat-3: #294d75;
+  --heat-4: #52759d;
+  --heat-5: #e8f2ff;
+  --heat-text: #edf5ff;
+  --heat-4-text: #ffffff;
+  --heat-5-text: #06101c;
+  --heat-income-outline: rgba(102, 210, 179, 0.34);
+  --chart-band: rgba(130, 183, 255, 0.13);
+  --treemap-shade-1: #e9f0f8;
+  --treemap-shade-2: #dbe7f3;
+  --treemap-shade-3: #ccdeee;
+  --treemap-shade-4: #bdd4e8;
+  --treemap-shade-5: #acc8df;
+  --treemap-shade-6: #9abbd5;
+  --treemap-shade-7: #89adca;
+  --treemap-shade-8: #789fbe;
+  --treemap-separator: rgba(11, 23, 40, 0.18);
+  --treemap-separator-strong: rgba(11, 23, 40, 0.28);
+  --treemap-depth-target: #f4f8fc;
+  --treemap-fg-on-1: #07111f;
+  --treemap-fg-on-2: #07111f;
+  --treemap-fg-on-3: #07111f;
+  --treemap-fg-on-4: #07111f;
+  --treemap-fg-on-5: #07111f;
+  --treemap-fg-on-6: #07111f;
+  --treemap-fg-on-7: #07111f;
+  --treemap-fg-on-8: #07111f;
+  --treemap-muted-on-dark: rgba(7, 17, 31, 0.7);
 }
 
 * {
@@ -1503,8 +1576,11 @@ kbd {
 }
 
 .data-table .table-sub {
-  margin-top: 3px;
-  font-size: 12px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--table-sub-font-size);
+  font-weight: var(--table-sub-font-weight);
+  line-height: var(--table-sub-line-height);
 }
 
 .status-chip,
@@ -4124,16 +4200,14 @@ html[data-theme="light"] .skeleton-table span::after {
   min-width: 0;
 }
 
-.minimal-bars strong,
-.minimal-table .table-main {
+.minimal-bars strong {
   color: var(--strong);
   font-weight: 560;
 }
 
 .minimal-bars span,
 .minimal-bars small,
-.muted-cell,
-.minimal-table .table-sub {
+.muted-cell {
   color: var(--muted);
 }
 
@@ -4149,14 +4223,17 @@ html[data-theme="light"] .skeleton-table span::after {
   text-align: right;
 }
 
-.minimal-bars i {
+.minimal-bars .insight-marker {
   display: block;
-  width: 48px;
-  max-width: 100%;
+  width: 44px;
   height: 4px;
-  min-width: 8px;
-  border-radius: 999px;
-  background: var(--strong);
+  color: var(--strong);
+  overflow: visible;
+  shape-rendering: crispEdges;
+}
+
+.minimal-bars .insight-marker rect {
+  fill: currentColor;
 }
 
 .minimal-table-wrap {
@@ -4178,8 +4255,8 @@ html[data-theme="light"] .skeleton-table span::after {
   padding: 10px 8px;
   background: var(--bg);
   color: var(--faint);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
   letter-spacing: 0;
   text-align: left;
   text-transform: uppercase;
@@ -4224,9 +4301,20 @@ html[data-theme="light"] .skeleton-table span::after {
   white-space: nowrap;
 }
 
+.minimal-table .table-main,
+.data-table .table-main {
+  color: var(--strong);
+  font-size: var(--table-main-font-size);
+  font-weight: var(--table-main-font-weight);
+  line-height: var(--table-main-line-height);
+}
+
 .minimal-table .table-sub {
-  margin-top: 3px;
-  font-size: 12px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--table-sub-font-size);
+  font-weight: var(--table-sub-font-weight);
+  line-height: var(--table-sub-line-height);
 }
 
 .minimal-table-wrap.statement-import-table-wrap {
@@ -5209,10 +5297,10 @@ input.is-invalid {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--strong);
+  color: inherit;
   cursor: pointer;
   font: inherit;
-  font-weight: 560;
+  font-weight: inherit;
   text-align: left;
 }
 
@@ -5397,27 +5485,39 @@ input.is-invalid {
 
 .target-progress-planned {
   width: var(--planned-pct);
-  height: 8px;
+  height: var(--ledger-bar-height);
   background: var(--target-progress-planned);
 }
 
 .target-progress-achieved {
   width: var(--achieved-pct);
-  height: 8px;
+  height: var(--ledger-bar-height);
+  background: var(--target-progress-achieved);
+}
+
+.target-progress-strip.is-income .target-progress-achieved {
   background: var(--target-progress-achieved);
 }
 
 .target-progress-over {
   left: var(--over-left-pct);
   width: var(--over-pct);
-  height: 8px;
+  height: var(--ledger-bar-height);
   background: var(--target-progress-over);
+}
+
+.target-progress-strip.is-actual-only .target-progress-over {
+  background: var(--target-progress-achieved);
+}
+
+.target-progress-strip.is-income.is-over .target-progress-over {
+  background: var(--income-positive);
 }
 
 .target-progress-strip.is-compact .target-progress-planned,
 .target-progress-strip.is-compact .target-progress-achieved,
 .target-progress-strip.is-compact .target-progress-over {
-  height: 5px;
+  height: var(--ledger-bar-height);
 }
 
 .target-progress-strip.is-over .target-progress-achieved {

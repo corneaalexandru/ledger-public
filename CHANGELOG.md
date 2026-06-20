@@ -2,6 +2,19 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-20
+
+- Added a third Navy theme mode beside Dark and Light, with a dedicated deep-blue background/surface palette and sidebar cycle support.
+- Fixed Intelligence Threshold defaults so missing or collapsed-minimum local settings restore and persist the intended thresholds instead of showing `1`/`0` values.
+
+## 2026-06-19
+
+- Treated explicit `uncategorized` transaction categories as data-health issues and kept public transaction summaries aligned with that rule.
+- Reordered transaction insight panels to Category Spend, Currency Flow, and Income Sources, and pinned income target achieved bars to the dark progress color.
+- Corrected income target bars so achieved progress stays dark and only above-target surplus renders green, including zero-target surplus rows.
+- Standardized table typography tokens so Portfolio, Trades, Planning, import, and data tables share one primary/subtitle font treatment.
+- Rendered compact indicator bars as crisp SVG fixed-height strokes, and kept income surplus green only on the over-target segment.
+
 ## 2026-06-18
 
 - Changed insight-list indicator bars to a uniform fixed width so the first/highest row no longer visually dominates the breakdown.

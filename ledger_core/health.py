@@ -20,7 +20,8 @@ def data_health_summary(rows_by_sheet: dict[str, list[dict]], *, today: date | N
         currency = normalized_text(row.get("statement_currency")).upper()
         if not has_sheet_value(row.get("amount_eur_converted")) and currency not in {"", "EUR"}:
             issues.append(issue("missing_fx", "transactions_register", tx_id, "Transaction is missing EUR conversion."))
-        if ledger_status == "accountable" and not has_sheet_value(row.get("category_id")):
+        category_id = normalized_text(row.get("category_id"))
+        if ledger_status == "accountable" and category_id in {"", "uncategorized"}:
             issues.append(issue("uncategorized", "transactions_register", tx_id, "Transaction has no category."))
         if normalized_text(row.get("imported_transaction")) not in {"yes", "no"}:
             issues.append(issue("unlinked_import", "transactions_register", tx_id, "Transaction import link status is missing."))

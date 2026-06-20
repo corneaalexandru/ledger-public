@@ -1,9 +1,10 @@
 const DASHBOARD_CARD_STORAGE_KEY = "ledger-hidden-dashboard-cards";
 const PRIVACY_MODE_STORAGE_KEY = "ledger-privacy-mode";
 const INTELLIGENCE_THRESHOLDS_STORAGE_KEY = "ledger-intelligence-thresholds";
-const INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION = 2;
+const INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION = 4;
 const PROJECT_CURRENCY_STORAGE_KEY = "ledger-project-currency";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ledger-sidebar-width";
+const THEME_OPTIONS = ["dark", "navy", "light"];
 const SIDEBAR_DEFAULT_WIDTH = 214;
 const SIDEBAR_MIN_WIDTH = 168;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -719,6 +720,11 @@ function defaultIntelligenceThresholds() {
 function readIntelligenceThresholds() {
   try {
     const values = JSON.parse(storageGet(INTELLIGENCE_THRESHOLDS_STORAGE_KEY) || "{}");
+    if (isCollapsedLegacyThresholds(values)) {
+      const defaults = defaultIntelligenceThresholds();
+      writeIntelligenceThresholds(defaults);
+      return defaults;
+    }
     if (values?._version !== INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION && Number(values?.tradeStalePriceDays) === 5) {
       values.tradeStalePriceDays = 1;
     }
@@ -732,13 +738,38 @@ function normalizeIntelligenceThresholds(values = {}) {
   const defaults = defaultIntelligenceThresholds();
   return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [
     key,
-    clampValue(numericValue(values[key], fallback), key === "expenseCeilingWarningEur" ? 0 : 1, key === "tradeStalePriceDays" ? 365 : 1000000),
+    clampValue(thresholdNumber(values, key, fallback), thresholdMinimum(key), thresholdMaximum(key)),
   ]));
 }
 
+function thresholdNumber(values, key, fallback) {
+  if (!Object.prototype.hasOwnProperty.call(values, key)) return fallback;
+  const text = String(values[key] ?? "").trim();
+  return text ? numericValue(text, fallback) : fallback;
+}
+
+function isCollapsedLegacyThresholds(values = {}) {
+  if (!values || values._version === INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION) return false;
+  const defaults = defaultIntelligenceThresholds();
+  const keys = Object.keys(defaults);
+  return keys.every((key) => Number(values[key]) === thresholdMinimum(key)) && keys.some((key) => defaults[key] !== thresholdMinimum(key));
+}
+
+function thresholdMinimum(key) {
+  return key === "expenseCeilingWarningEur" ? 0 : 1;
+}
+
+function thresholdMaximum(key) {
+  return key === "tradeStalePriceDays" ? 365 : 1000000;
+}
+
 function persistIntelligenceThresholds() {
+  writeIntelligenceThresholds(state.intelligenceThresholds || defaultIntelligenceThresholds());
+}
+
+function writeIntelligenceThresholds(values) {
   storageSet(INTELLIGENCE_THRESHOLDS_STORAGE_KEY, JSON.stringify({
-    ...(state.intelligenceThresholds || defaultIntelligenceThresholds()),
+    ...values,
     _version: INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION,
   }));
 }
@@ -871,17 +902,38 @@ function startSidebarResize(event) {
 }
 
 function initTheme() {
-  const theme = storageGet("ledger-theme") || "dark";
+  const theme = normalizedTheme(storageGet("ledger-theme"));
   setTheme(theme);
 }
 
 function setTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  storageSet("ledger-theme", theme);
+  const nextTheme = normalizedTheme(theme);
+  const themeMeta = themeOptionMeta(nextTheme);
+  document.documentElement.dataset.theme = nextTheme;
+  storageSet("ledger-theme", nextTheme);
   elements.themeToggle.innerHTML = `
-    <span class="nav-glyph">${icons[theme === "dark" ? "moon" : "sun"]}</span>
-    <span>${theme === "dark" ? "Dark Mode" : "Light Mode"}</span>
+    <span class="nav-glyph">${icons[themeMeta.icon]}</span>
+    <span>${themeMeta.label} Mode</span>
   `;
+}
+
+function normalizedTheme(theme) {
+  const value = String(theme || "").trim().toLowerCase();
+  return THEME_OPTIONS.includes(value) ? value : "dark";
+}
+
+function nextTheme(theme) {
+  const current = normalizedTheme(theme);
+  const index = THEME_OPTIONS.indexOf(current);
+  return THEME_OPTIONS[(index + 1) % THEME_OPTIONS.length];
+}
+
+function themeOptionMeta(theme) {
+  return {
+    dark: { label: "Dark", icon: "moon" },
+    navy: { label: "Navy", icon: "shield" },
+    light: { label: "Light", icon: "sun" },
+  }[normalizedTheme(theme)];
 }
 
 function readPrivacyMode() {
@@ -1051,7 +1103,7 @@ function bindEvents() {
 
   elements.themeToggle.addEventListener("click", () => {
     const current = document.documentElement.dataset.theme || "dark";
-    setTheme(current === "dark" ? "light" : "dark");
+    setTheme(nextTheme(current));
   });
 
   elements.search.addEventListener("input", (event) => {
@@ -10628,8 +10680,9 @@ function settingsThresholdCards() {
 }
 
 function settingsPreferencesCards() {
+  const themeMeta = themeOptionMeta(document.documentElement.dataset.theme);
   return settingsRowsToMetricCards([
-    ["Theme", document.documentElement.dataset.theme === "dark" ? "Dark" : "Light", "Toggle from the sidebar."],
+    ["Theme", themeMeta.label, "Cycles Dark, Navy, and Light from the sidebar."],
     ["Reporting period", periodValueLabel(), "Controls Overview and default Transactions scope."],
     ["Manual entries", "Review required", "New and duplicated transactions are kept visible for review."],
   ], "settings");
@@ -10859,7 +10912,9 @@ function insightBars(items = [], emptyLabel = "No values available.") {
                 ${Number.isFinite(Number(item.share)) && item.shareLabel !== "" ? `<small>${safe(item.shareLabel || formatPercent(item.share))}</small>` : ""}
               </span>
             </div>
-            <i></i>
+            <svg class="insight-marker" width="44" height="4" viewBox="0 0 44 4" aria-hidden="true" focusable="false">
+              <rect x="0" y="1" width="44" height="2"></rect>
+            </svg>
           </${tag}>
         `;
       }).join("")}
@@ -12197,9 +12252,9 @@ function transactionInsightsDashboard(data = {}) {
     </section>
 
     <section class="insight-panel-grid transaction-insight-grid">
-      ${panel("Income Sources", transactionIncomeSourceBars(insights.income_sources || []))}
       ${panel("Category Spend", transactionCategorySpendBars(insights.category_spend || []))}
       ${panel("Currency Flow", transactionCurrencyFlowBars(insights.currency_flow || []))}
+      ${panel("Income Sources", transactionIncomeSourceBars(insights.income_sources || []))}
     </section>
   `;
 }
@@ -12745,13 +12800,21 @@ function targetProgressBar({ target = 0, actual = 0, actualAvailable = true, cla
     ? "empty"
     : actualValue > targetValue
       ? "over"
+    : !hasTarget
+      ? "actual-only"
       : "active";
+  const isIncomeProgress = String(className || "").split(/\s+/).includes("is-income");
+  const overColor = status === "actual-only"
+    ? "var(--target-progress-achieved)"
+    : isIncomeProgress && status === "over"
+      ? "var(--income-positive)"
+      : "var(--target-progress-over)";
   const classes = ["target-progress-strip", className, `is-${status}`].filter(Boolean).join(" ");
   return `
     <span class="${safe(classes)}" style="--planned-pct: ${plannedPct}%; --achieved-pct: ${achievedPct}%; --over-left-pct: ${overLeftPct}%; --over-pct: ${overPct}%;" aria-hidden="true">
       <span class="target-progress-planned"></span>
-      <span class="target-progress-achieved"></span>
-      <span class="target-progress-over"></span>
+      <span class="target-progress-achieved" style="background: var(--target-progress-achieved);"></span>
+      <span class="target-progress-over" style="background: ${safe(overColor)};"></span>
     </span>
   `;
 }

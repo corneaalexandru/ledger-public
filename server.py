@@ -1126,7 +1126,7 @@ def transaction_summary(rows: list[dict]) -> dict:
         "yearly_targets": yearly_targets,
         "monthly_targets": monthly_targets,
         "review_open": sum(1 for row in rows if row.get("review_status") != "reviewed"),
-        "uncategorized": sum(1 for row in active if not row.get("category_id")),
+        "uncategorized": sum(1 for row in active if str(row.get("category_id") or "").strip().lower() in {"", "uncategorized"}),
         "missing_core_fields": 0,
         "imported_no": sum(1 for row in active if row.get("imported_transaction") != "yes"),
         "total": len(active),
