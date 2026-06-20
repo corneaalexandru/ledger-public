@@ -3779,7 +3779,7 @@ function renderOverview() {
 
 function overviewTabs() {
   const tabs = [
-    { id: "insights", label: "Insights" },
+    { id: "insights", label: "Metrics" },
     { id: "charts", label: "Charts" },
   ];
   return `
@@ -4567,7 +4567,7 @@ function printPageName() {
 }
 
 function printViewName() {
-  if (state.view === "overview") return state.overviewView === "charts" ? "Charts" : "Insights";
+  if (state.view === "overview") return state.overviewView === "charts" ? "Charts" : "Metrics";
   if (state.view === "accounts") return labelize(state.accountView || "accounts");
   if (state.view === "transactions") return labelize(state.transactionView || "transactions");
   if (state.view === "trades") return labelize(state.tradeView || "trades");
@@ -10376,7 +10376,7 @@ function statementImportTable(rows = [], isFiltered = false) {
   const selectableRows = visibleRows.filter(statementImportRowSelectable);
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => state.selectedStatementImportRecords.has(statementImportRecordId(row)));
   return `
-    <section class="minimal-table-wrap transactions-table-wrap statement-import-table-wrap">
+    <section class="minimal-table-wrap statement-import-table-wrap">
       <table class="minimal-table statement-import-table">
         <thead>
           <tr>
@@ -10438,7 +10438,7 @@ function statementUnsupportedTable(rows = []) {
   const selectableRows = visibleRows.filter((row) => Boolean(statementFileName(row)));
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => state.selectedStatementImportFiles.has(statementFileName(row)));
   return `
-    <section class="minimal-table-wrap transactions-table-wrap statement-import-table-wrap">
+    <section class="minimal-table-wrap statement-import-table-wrap">
       <table class="minimal-table statement-import-table statement-unsupported-table">
         <thead>
           <tr>
