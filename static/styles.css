@@ -64,6 +64,9 @@
   --treemap-muted-on-dark: rgba(55, 64, 73, 0.68);
   --section-gap: 28px;
   --metric-section-gap: 20px;
+  --table-section-gap: 16px;
+  --table-header-gap: 10px;
+  --table-row-height: 90px;
   --overview-deep-gap: 48px;
   --control-height: 40px;
   --control-radius: 6px;
@@ -1218,7 +1221,8 @@ kbd {
 
 .statement-import-section {
   display: grid;
-  gap: 10px;
+  gap: 0;
+  margin-top: var(--table-section-gap);
 }
 
 .statement-import-table-wrap {
@@ -2560,7 +2564,7 @@ html[data-theme="light"] .skeleton-table span::after {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px;
-  margin-top: var(--metric-section-gap);
+  margin-top: var(--table-section-gap);
 }
 
 .portfolio-chart-grid,
@@ -4164,6 +4168,25 @@ html[data-theme="light"] .skeleton-table span::after {
   letter-spacing: 0;
 }
 
+.panel.table-panel .panel-header,
+.statement-import-section .panel-header {
+  min-height: 22px;
+  margin-bottom: var(--table-header-gap);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.panel.table-panel .panel-header h2,
+.statement-import-section .panel-header h2 {
+  gap: 0;
+  color: color-mix(in srgb, var(--muted) 82%, var(--strong));
+}
+
+.panel.table-panel .panel-title-icon,
+.statement-import-section .panel-title-icon {
+  display: none;
+}
+
 .panel-actions {
   display: inline-flex;
   align-items: center;
@@ -5724,6 +5747,10 @@ input.is-invalid {
   margin-top: var(--metric-section-gap);
 }
 
+.transaction-metrics + .panel.table-panel {
+  margin-top: var(--table-section-gap);
+}
+
 .transaction-metrics.monthly-target-metrics {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
@@ -5849,7 +5876,7 @@ input.is-invalid {
 .planning-target-table tbody tr,
 .monthly-target-table tbody tr,
 .statement-import-table tbody tr {
-  height: 90px;
+  height: var(--table-row-height);
 }
 
 .transactions-table td,
