@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-21
 
+- Made shared metric cards clickable where they can drill into a real filtered register or Portfolio/Transactions target subpage.
 - Added the shared topbar text-size control and moved the monthly target category/month model blocks into Transactions > Metrics with the Overview-style line format.
 - Removed the compact asterisk progress meters from Metrics rows and refreshed the static asset cache so the text-only metrics layout is restored.
 

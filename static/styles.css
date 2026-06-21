@@ -5465,6 +5465,31 @@ input.is-invalid {
   padding: 14px 16px;
 }
 
+button.metric-card {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.metric-card.is-clickable {
+  cursor: pointer;
+}
+
+.metric-card.is-clickable:hover .metric-card-label,
+.metric-card.is-clickable:hover strong,
+.metric-card.is-clickable:focus-visible .metric-card-label,
+.metric-card.is-clickable:focus-visible strong {
+  color: var(--strong);
+}
+
+.metric-card.is-clickable:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
 .metric-card-hide {
   position: absolute;
   top: 10px;
@@ -6115,7 +6140,7 @@ input.is-invalid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.transaction-metrics article {
+.transaction-metrics .metric-card {
   position: relative;
   min-height: 104px;
   padding: 16px;
