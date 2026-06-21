@@ -7,7 +7,7 @@ const SIDEBAR_WIDTH_STORAGE_KEY = "ledger-sidebar-width";
 const FONT_SCALE_STORAGE_KEY = "ledger-font-scale";
 const DEFAULT_THEME = "navy";
 const THEME_STORAGE_KEY = "ledger-theme-v2";
-const THEME_OPTIONS = ["dark", "navy", "navy-translucent", "light"];
+const THEME_OPTIONS = ["dark", "navy", "light"];
 const SIDEBAR_DEFAULT_WIDTH = 214;
 const SIDEBAR_MIN_WIDTH = 168;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -1037,7 +1037,6 @@ function themeOptionMeta(theme) {
   return {
     dark: { label: "Dark", icon: "moon" },
     navy: { label: "Navy", icon: "shield" },
-    "navy-translucent": { label: "Navy Translucent", icon: "shield", toggleLabel: "Navy Translucent" },
     light: { label: "Light", icon: "sun" },
   }[normalizedTheme(theme)];
 }
@@ -11679,7 +11678,7 @@ function settingsThresholdCards() {
 function settingsPreferencesCards() {
   const themeMeta = themeOptionMeta(document.documentElement.dataset.theme);
   return settingsRowsToMetricCards([
-    ["Theme", themeMeta.label, "Cycles Dark, Navy, Navy Translucent, and Light from the sidebar."],
+    ["Theme", themeMeta.label, "Cycles Dark, Navy, and Light from the sidebar."],
     ["Reporting period", periodValueLabel(), "Controls Overview and default Transactions scope."],
     ["Manual entries", "Review required", "New and duplicated transactions are kept visible for review."],
   ], "settings");
