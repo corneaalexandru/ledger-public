@@ -4,12 +4,91 @@ const INTELLIGENCE_THRESHOLDS_STORAGE_KEY = "ledger-intelligence-thresholds";
 const INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION = 4;
 const PROJECT_CURRENCY_STORAGE_KEY = "ledger-project-currency";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ledger-sidebar-width";
+const FONT_SCALE_STORAGE_KEY = "ledger-font-scale";
 const DEFAULT_THEME = "navy";
 const THEME_STORAGE_KEY = "ledger-theme-v2";
 const THEME_OPTIONS = ["dark", "navy", "light"];
 const SIDEBAR_DEFAULT_WIDTH = 214;
 const SIDEBAR_MIN_WIDTH = 168;
 const SIDEBAR_MAX_WIDTH = 360;
+const FONT_SCALE_STEPS = [-2, -1, 0, 1, 2];
+const FONT_SCALE_TOKENS = {
+  "-2": {
+    body: "12.5px",
+    micro: "9px",
+    small: "10px",
+    control: "11px",
+    base: "12.5px",
+    medium: "13.5px",
+    title: "28px",
+    metric: "19px",
+    metricLarge: "22px",
+    hero: "54px",
+    heroWide: "74px",
+    periodHero: "21px",
+    bullet: "16px",
+  },
+  "-1": {
+    body: "13.25px",
+    micro: "9.5px",
+    small: "10.5px",
+    control: "11.5px",
+    base: "13.25px",
+    medium: "14px",
+    title: "30px",
+    metric: "20.5px",
+    metricLarge: "23.5px",
+    hero: "59px",
+    heroWide: "80px",
+    periodHero: "22.5px",
+    bullet: "17px",
+  },
+  "0": {
+    body: "14px",
+    micro: "10px",
+    small: "11px",
+    control: "12px",
+    base: "14px",
+    medium: "15px",
+    title: "32px",
+    metric: "22px",
+    metricLarge: "25px",
+    hero: "64px",
+    heroWide: "88px",
+    periodHero: "24px",
+    bullet: "18px",
+  },
+  "1": {
+    body: "15px",
+    micro: "10.75px",
+    small: "11.75px",
+    control: "13px",
+    base: "15px",
+    medium: "16px",
+    title: "35px",
+    metric: "24px",
+    metricLarge: "27px",
+    hero: "70px",
+    heroWide: "96px",
+    periodHero: "26px",
+    bullet: "19px",
+  },
+  "2": {
+    body: "16px",
+    micro: "11.5px",
+    small: "12.5px",
+    control: "14px",
+    base: "16px",
+    medium: "17px",
+    title: "38px",
+    metric: "26px",
+    metricLarge: "29px",
+    hero: "76px",
+    heroWide: "104px",
+    periodHero: "28px",
+    bullet: "20px",
+  },
+};
 
 const ISO_COUNTRY_CODES = [
   "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
@@ -57,6 +136,17 @@ const PROJECT_CURRENCY_RATES_TO_EUR = {
 };
 
 const PROJECT_CURRENCY_FALLBACK_CODES = Object.keys(PROJECT_CURRENCY_RATES_TO_EUR);
+
+const NET_WORTH_CONTEXT_DEFAULT_LINES = [
+  "leakage-adjusted",
+  "compounding-adjusted",
+  "total-income",
+  "forecast",
+];
+
+function defaultNetWorthContextLines() {
+  return new Set(NET_WORTH_CONTEXT_DEFAULT_LINES);
+}
 
 const state = {
   view: "overview",
@@ -165,16 +255,19 @@ const state = {
   overviewView: "insights",
   portfolioView: "overview",
   portfolioPerformanceWindow: "all",
+  portfolioContributionWindow: "all",
+  portfolioFundingProgressWindow: "all",
   portfolioReturnsWindow: "all",
   reportNetWorthWindow: "all",
   reportCashFlowWindow: "all",
   cashFlowContextLines: new Set(["income", "expense"]),
   standardChartHiddenLines: new Map(),
   reportForecastYears: "10",
+  netWorthDetailMode: "net",
   monteCarloWindow: "plan",
   monteCarloScope: "plan",
-  monteCarloContextLines: new Set(),
-  netWorthContextLines: new Set(),
+  monteCarloAssumption: "conservative",
+  netWorthContextLines: defaultNetWorthContextLines(),
   expandedChartId: "",
   reportForecastOverrides: defaultReportForecastOverrides(),
   planningView: "targets",
@@ -200,6 +293,7 @@ const state = {
   hiddenDashboardCards: readHiddenDashboardCards(),
   privacyMode: readPrivacyMode(),
   projectCurrency: readProjectCurrency(),
+  fontScale: readFontScale(),
   periodPanelOpen: false,
   period: {
     mode: "all",
@@ -222,12 +316,6 @@ const state = {
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, "all"];
 
 const MODERATE_INDEX_RATE = 0.06;
-const NET_WORTH_CONTEXT_DEFAULT_LINES = [
-  "leakage-adjusted",
-  "compounding-adjusted",
-  "total-income",
-  "forecast",
-];
 const REVIEW_REQUIRED_TAB = "__review_required__";
 const DELETED_TRANSACTION_TAB = "__deleted_transactions__";
 const ACCOUNTABLE_TRANSACTION_TAB = "__accountable_transactions__";
@@ -354,6 +442,7 @@ const elements = {
   privacyAction: document.querySelector("#privacyAction"),
   search: document.querySelector("#globalSearch"),
   filterChips: document.querySelector("#activeFilterChips"),
+  fontScaleControl: document.querySelector("#fontScaleControl"),
   pagePrintControl: document.querySelector("#pagePrintControl"),
   periodControl: document.querySelector("#periodControl"),
 };
@@ -692,6 +781,15 @@ const exitPhaseFields = [
   ["end_date", "End Date"],
 ];
 
+const drawerEditFormSelector = [
+  "[data-account-edit-form]",
+  "[data-trade-edit-form]",
+  "[data-transaction-edit-form]",
+  "[data-portfolio-instrument-edit-form]",
+  "[data-portfolio-mip-edit-form]",
+  "[data-exit-phase-edit-form]",
+].join(", ");
+
 try {
   init();
 } catch (error) {
@@ -811,6 +909,7 @@ function setDashboardCardHidden(cardId, hidden) {
 function init() {
   initTheme();
   initPrivacyMode();
+  initFontScale();
   initKeyboardShortcutLabel();
   initResizableSidebar();
   renderNavigation();
@@ -944,6 +1043,49 @@ function themeOptionMeta(theme) {
 
 function readPrivacyMode() {
   return storageGet(PRIVACY_MODE_STORAGE_KEY) === "on";
+}
+
+function initFontScale() {
+  setFontScale(state.fontScale, { persist: false, render: false });
+}
+
+function readFontScale() {
+  const saved = Number.parseInt(storageGet(FONT_SCALE_STORAGE_KEY), 10);
+  return FONT_SCALE_STEPS.includes(saved) ? saved : 0;
+}
+
+function clampFontScaleStep(step) {
+  const numeric = Number.parseInt(step, 10);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(Math.max(numeric, FONT_SCALE_STEPS[0]), FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1]);
+}
+
+function fontScaleTokens(step = state.fontScale) {
+  return FONT_SCALE_TOKENS[String(clampFontScaleStep(step))] || FONT_SCALE_TOKENS["0"];
+}
+
+function setFontScale(step, options = {}) {
+  const nextScale = clampFontScaleStep(step);
+  state.fontScale = nextScale;
+  document.documentElement.dataset.fontScale = String(nextScale);
+  const tokens = fontScaleTokens(nextScale);
+  Object.entries(tokens).forEach(([key, value]) => {
+    document.documentElement.style.setProperty(`--ledger-font-${kebabCase(key)}`, value);
+  });
+  if (options.persist !== false) {
+    storageSet(FONT_SCALE_STORAGE_KEY, String(nextScale));
+  }
+  renderFontScaleControl();
+  if (options.render) render();
+}
+
+function adjustFontScale(delta = 0) {
+  setFontScale(state.fontScale + Number(delta || 0));
+}
+
+function fontScaleLabel(step = state.fontScale) {
+  if (step === 0) return "Standard text";
+  return step > 0 ? `Text +${step}` : `Text ${step}`;
 }
 
 function ledgerAppConfig() {
@@ -1151,6 +1293,16 @@ function bindEvents() {
     setPrivacyMode(!state.privacyMode);
   });
 
+  elements.fontScaleControl?.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-font-scale-action]");
+    if (!action) return;
+    event.preventDefault();
+    const value = action.dataset.fontScaleAction || "";
+    if (value === "decrease") adjustFontScale(-1);
+    if (value === "increase") adjustFontScale(1);
+    if (value === "reset") setFontScale(0);
+  });
+
   elements.pagePrintControl?.addEventListener("click", (event) => {
     const action = event.target.closest("[data-action='print-page']");
     if (!action) return;
@@ -1194,6 +1346,8 @@ function bindEvents() {
   });
 
   elements.pageStage.addEventListener("change", (event) => {
+    markDrawerEditFormDirty(event.target);
+
     const projectCurrencyControl = event.target.closest("[data-project-currency]");
     if (projectCurrencyControl) {
       setProjectCurrency(projectCurrencyControl.value);
@@ -1417,6 +1571,14 @@ function bindEvents() {
   });
 
   elements.pageStage.addEventListener("input", (event) => {
+    const drawerChoiceSearch = event.target.closest("[data-drawer-choice-search]");
+    if (drawerChoiceSearch) {
+      filterDrawerChoiceOptions(drawerChoiceSearch.closest("[data-drawer-choice]"), drawerChoiceSearch.value);
+      return;
+    }
+
+    markDrawerEditFormDirty(event.target);
+
     const formattedNumberControl = event.target.closest("[data-format-number], [data-format-percent]");
     if (formattedNumberControl && !handleFormattedNumberInput(formattedNumberControl)) return;
 
@@ -1456,6 +1618,20 @@ function bindEvents() {
   });
 
   elements.pageStage.addEventListener("click", (event) => {
+    const drawerChoiceToggle = event.target.closest("[data-drawer-choice-toggle]");
+    if (drawerChoiceToggle) {
+      event.preventDefault();
+      toggleDrawerChoice(drawerChoiceToggle);
+      return;
+    }
+    const drawerChoiceOption = event.target.closest("[data-drawer-choice-option]");
+    if (drawerChoiceOption) {
+      event.preventDefault();
+      selectDrawerChoiceOption(drawerChoiceOption);
+      return;
+    }
+    if (!event.target.closest("[data-drawer-choice]")) closeDrawerChoices();
+
     const action = event.target.closest("[data-action]");
     if (!action) return;
     if (action.dataset.action === "print-page") {
@@ -2096,6 +2272,16 @@ function bindEvents() {
       renderPreservingScroll();
       return;
     }
+    if (action.dataset.action === "portfolio-contribution-window") {
+      state.portfolioContributionWindow = action.dataset.portfolioContributionWindow || "all";
+      renderPreservingScroll();
+      return;
+    }
+    if (action.dataset.action === "portfolio-funding-progress-window") {
+      state.portfolioFundingProgressWindow = action.dataset.portfolioFundingProgressWindow || "all";
+      renderPreservingScroll();
+      return;
+    }
     if (action.dataset.action === "trade-returns-window" || action.dataset.action === "portfolio-returns-window") {
       state.portfolioReturnsWindow = action.dataset.portfolioReturnsWindow || "all";
       renderPreservingScroll();
@@ -2124,6 +2310,11 @@ function bindEvents() {
     }
     if (action.dataset.action === "report-net-worth-window") {
       state.reportNetWorthWindow = action.dataset.reportNetWorthWindow || "all";
+      renderPreservingScroll();
+      return;
+    }
+    if (action.dataset.action === "net-worth-detail-mode") {
+      state.netWorthDetailMode = action.dataset.netWorthDetailMode || "net";
       renderPreservingScroll();
       return;
     }
@@ -2169,14 +2360,13 @@ function bindEvents() {
       renderPreservingScroll();
       return;
     }
-    if (action.dataset.action === "toggle-monte-carlo-context-line") {
-      const lineId = action.dataset.lineId || "";
-      if (!lineId) return;
-      if (state.monteCarloContextLines.has(lineId)) {
-        state.monteCarloContextLines.delete(lineId);
-      } else {
-        state.monteCarloContextLines.add(lineId);
-      }
+    if (action.dataset.action === "monte-carlo-assumption") {
+      state.monteCarloAssumption = action.dataset.monteCarloAssumption || "conservative";
+      renderPreservingScroll();
+      return;
+    }
+    if (action.dataset.action === "monte-carlo-scope") {
+      state.monteCarloScope = action.dataset.monteCarloScope || "plan";
       renderPreservingScroll();
       return;
     }
@@ -2193,14 +2383,6 @@ function bindEvents() {
     }
     if (action.dataset.action === "open-chart-modal") {
       state.expandedChartId = action.dataset.chartId || "";
-      if (state.expandedChartId === "overview-net-worth") {
-        state.reportNetWorthWindow = "36";
-        state.reportForecastYears = "3";
-        state.netWorthContextLines = new Set(NET_WORTH_CONTEXT_DEFAULT_LINES);
-      }
-      if (state.expandedChartId === "overview-cash-flow") {
-        state.cashFlowContextLines = new Set(["income", "expense"]);
-      }
       renderPreservingScroll();
       return;
     }
@@ -2385,6 +2567,19 @@ function bindEvents() {
   });
 
   elements.pageStage.addEventListener("keydown", (event) => {
+    const drawerEditForm = drawerEditFormForElement(event.target);
+    if (drawerEditForm && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      closeDrawerChoices(drawerEditForm);
+      submitDrawerEditForm(drawerEditForm);
+      return;
+    }
+
+    const drawerChoice = event.target instanceof Element
+      ? event.target.closest("[data-drawer-choice]")
+      : null;
+    if (drawerChoice && handleDrawerChoiceKeydown(event, drawerChoice)) return;
+
     const reportForecastControl = event.target.closest("[data-report-forecast-field]");
     if (reportForecastControl && event.key === "Enter") {
       event.preventDefault();
@@ -2961,7 +3156,7 @@ function registerFilterChipLabel(view, field, value) {
   if (field === "transaction_class") return transactionTypeFilterLabel(value);
   if (field === "category_id" || field === "subcategory_id") return taxonomyLabel(value);
   if (field === "country_code") return countryOptionLabel(value);
-  if (field === "portfolio_id") return portfolioNameFromId(value);
+  if (field === "portfolio_id") return portfolioReferenceLabel(value);
   return labelize(value);
 }
 
@@ -3044,7 +3239,7 @@ function quickFilterValueLabel(chip = {}) {
   if (chip.field === "year") return chip.value;
   if (chip.field === "category_id" || chip.field === "subcategory_id") return taxonomyLabel(chip.value);
   if (chip.field === "country_code") return chip.label || chip.value;
-  if (chip.field === "portfolio_id") return chip.label || portfolioNameFromId(chip.value);
+  if (chip.field === "portfolio_id") return chip.label || portfolioReferenceLabel(chip.value);
   if (chip.field === "phase_id") return chip.label || displayPhaseId(chip.value);
   return chip.label || labelize(chip.value);
 }
@@ -3235,6 +3430,59 @@ function quickFilterHtml(value, html = "", options = "") {
   `;
 }
 
+function tableRecordRowClasses(row = {}) {
+  const classes = [];
+  const ledger = String(row.ledger_status || "").trim().toLowerCase();
+  const review = String(row.review_status || "").trim().toLowerCase();
+  const transactionClass = String(row.transaction_class || "").trim().toLowerCase();
+  if (ledger === "deleted") classes.push("is-deleted-row");
+  if (ledger === "not_accountable") classes.push("is-muted-row");
+  if (reviewNeedsAttention(review)) classes.push("needs-review");
+  if (transactionClass === "income") classes.push("row-income");
+  if (transactionClass === "expense") classes.push("row-expense");
+  return classes.join(" ");
+}
+
+function reviewNeedsAttention(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["open", "review", "review_required", "needs_review", "pending"].includes(normalized);
+}
+
+function tableBadge(label, tone = "") {
+  if (!label) return "";
+  return `<span class="table-badge ${tone ? `is-${safe(tone)}` : ""}">${safe(label)}</span>`;
+}
+
+function transactionRowBadges(row = {}) {
+  const badges = [];
+  const ledger = String(row.ledger_status || "").trim().toLowerCase();
+  const review = String(row.review_status || "").trim().toLowerCase();
+  if (reviewNeedsAttention(review)) badges.push(tableBadge("Review", "warning"));
+  if (ledger === "not_accountable") badges.push(tableBadge("Not accountable", "muted"));
+  if (ledger === "deleted") badges.push(tableBadge("Deleted", "danger"));
+  if (String(row.imported_transaction || "").toLowerCase() === "yes") badges.push(tableBadge("Imported", "muted"));
+  return badges.join("");
+}
+
+function tradeRowBadges(row = {}) {
+  const badges = [];
+  const ledger = String(row.ledger_status || "").trim().toLowerCase();
+  const review = String(row.review_status || "").trim().toLowerCase();
+  if (reviewNeedsAttention(review)) badges.push(tableBadge("Review", "warning"));
+  if (ledger === "deleted") badges.push(tableBadge("Deleted", "danger"));
+  if (tradePriceIsStale(row)) badges.push(tableBadge("Stale price", "warning"));
+  return badges.join("");
+}
+
+function tradePriceIsStale(row = {}) {
+  const status = String(row.position_status || "").trim().toLowerCase();
+  if (status && status !== "active") return false;
+  const date = String(row.price_as_of || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return true;
+  const days = Math.floor((new Date(`${currentDateKey()}T00:00:00`) - new Date(`${date}T00:00:00`)) / 86400000);
+  return Number.isFinite(days) && days > numericValue(state.intelligenceThresholds.tradeStalePriceDays, 10);
+}
+
 function render(options = {}) {
   const scrollPosition = options.preserveScroll ? captureScrollPosition() : null;
   document.querySelectorAll("[data-view]").forEach((button) => {
@@ -3243,6 +3491,7 @@ function render(options = {}) {
 
   const config = topbarConfig();
   elements.search.placeholder = config.search;
+  renderFontScaleControl();
   renderPagePrintControl();
   elements.periodControl.innerHTML = periodTrigger();
   renderActiveFilterChips();
@@ -3860,7 +4109,6 @@ function overviewSupportingInsightLine(card = {}) {
   return metricCard(card.label, card.value, card.meta, card.note, card.icon, {
     id: card.id,
     tone: card.tone,
-    progress: metricProgressFromCard(card),
   });
 }
 
@@ -3876,31 +4124,8 @@ function metricLineDashboard(sections = [], ariaLabel = "Metrics") {
 function metricLineItems(items = []) {
   return items
     .filter((item) => item && (item.label || item.value || item.meta || item.note))
-    .map((item) => {
-      const options = { ...(item.options || {}) };
-      if (item.progress !== undefined && item.progress !== null) options.progress = item.progress;
-      if (item.progressLabel) options.progressLabel = item.progressLabel;
-      if (item.progressTone) options.progressTone = item.progressTone;
-      return metricCard(item.label, item.value, item.meta, item.note, item.icon, options);
-    })
+    .map((item) => metricCard(item.label, item.value, item.meta, item.note, item.icon, item.options || {}))
     .join("");
-}
-
-function metricProgressFromCard(card = {}) {
-  return metricProgressFromText(card.progress, card.value, card.meta, card.note);
-}
-
-function metricProgressFromText(...values) {
-  for (const value of values) {
-    if (typeof value === "number" && Number.isFinite(value)) return Math.abs(value);
-    const text = String(value ?? "");
-    if (!text.trim()) continue;
-    const score = text.match(/([+-]?\d+(?:\.\d+)?)\s*\/\s*100\b/i);
-    if (score) return Math.abs(Number(score[1]));
-    const percent = text.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
-    if (percent) return Math.abs(Number(percent[1]));
-  }
-  return null;
 }
 
 function overviewSupportingInsightGroupId(card = {}) {
@@ -4047,34 +4272,7 @@ function overviewChartsDashboard(data = {}) {
 function overviewExpandedChart(data = {}) {
   const chartId = state.expandedChartId || "";
   if (!chartId || state.view !== "overview") return "";
-  const accounts = data.accounts || {};
-  const transactions = data.transactions || {};
-  const portfolio = data.portfolio || {};
   const returnsData = state.portfolioReturns || {};
-  if (chartId === "overview-net-worth") {
-    return expandedChartShell(
-      "Net Worth Over Time",
-      reportNetWorthOverTime(accounts, transactions, portfolio, { chartId, expanded: true }),
-    );
-  }
-  if (chartId === "overview-cash-flow") {
-    return expandedChartShell(
-      "Cash Flow",
-      reportCashFlowChart(transactions, { chartId, expanded: true }),
-    );
-  }
-  if (chartId === "overview-monte-carlo") {
-    return expandedChartShell(
-      "Monte Carlo Projection",
-      planningMonteCarloChart(portfolio, accounts, { chartId, expanded: true }),
-    );
-  }
-  if (chartId === "overview-net-worth-forecast") {
-    return expandedChartShell(
-      "Net Worth Forecast",
-      reportNetWorthForecast(accounts, transactions, portfolio, { chartId, expanded: true }),
-    );
-  }
   if (chartId === "overview-trade-return-timeline") {
     return expandedChartShell(
       "Trades - Realized P/L Over Time",
@@ -4139,10 +4337,13 @@ function overviewPortfolioFundingChartPanels(portfolio = {}) {
   const rows = filteredPortfolioPerformanceRows(performance.portfolios || [], portfolio);
   const summary = portfolioPerformanceSummary(rows, performance.summary || {});
   const monthlyRows = portfolioPerformanceMonthlyRows(performance, rows, summary);
-  const windowedMonthlyRows = portfolioPerformanceVisibleMonthlyRows(monthlyRows);
+  const contributionWindow = normalizedPortfolioContributionWindow();
+  const fundingProgressWindow = normalizedPortfolioFundingProgressWindow();
+  const contributionMonthlyRows = portfolioPerformanceVisibleMonthlyRows(monthlyRows, contributionWindow);
+  const fundingProgressMonthlyRows = portfolioPerformanceVisibleMonthlyRows(monthlyRows, fundingProgressWindow);
   return [
-    chartPanel(portfolioCumulativeContributionChart(windowedMonthlyRows, { chartId: "overview-portfolio-cumulative-contributions", label: "Portfolio Funding - Cumulative Contributions" })),
-    chartPanel(portfolioMonthlyContributionChart(windowedMonthlyRows, { chartId: "overview-portfolio-monthly-funding", label: "Portfolio Funding - Monthly Funding Progress" })),
+    chartPanel(portfolioCumulativeContributionChart(contributionMonthlyRows, { chartId: "overview-portfolio-cumulative-contributions", windowValue: contributionWindow, label: "Portfolio Funding - Cumulative Contributions" })),
+    chartPanel(portfolioMonthlyContributionChart(fundingProgressMonthlyRows, { chartId: "overview-portfolio-monthly-funding", windowValue: fundingProgressWindow, label: "Portfolio Funding - Monthly Funding Progress" })),
   ];
 }
 
@@ -4487,6 +4688,39 @@ function planningPayloadFromTransactions(transactions = {}) {
   };
 }
 
+function renderFontScaleControl() {
+  if (!elements.fontScaleControl) return;
+  const scale = clampFontScaleStep(state.fontScale);
+  elements.fontScaleControl.innerHTML = `
+    <div class="font-scale-stepper" aria-label="${safe(fontScaleLabel(scale))}">
+      <button
+        class="font-scale-button"
+        data-font-scale-action="decrease"
+        type="button"
+        aria-label="Decrease text size"
+        ${scale <= FONT_SCALE_STEPS[0] ? "disabled" : ""}
+        ${tooltipAttrs("Decrease text size")}
+      >A-</button>
+      <button
+        class="font-scale-button font-scale-reset-button ${scale === 0 ? "is-active" : ""}"
+        data-font-scale-action="reset"
+        type="button"
+        aria-label="Standard text size"
+        ${scale === 0 ? "disabled" : ""}
+        ${tooltipAttrs("Standard text size")}
+      >A</button>
+      <button
+        class="font-scale-button"
+        data-font-scale-action="increase"
+        type="button"
+        aria-label="Increase text size"
+        ${scale >= FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1] ? "disabled" : ""}
+        ${tooltipAttrs("Increase text size")}
+      >A+</button>
+    </div>
+  `;
+}
+
 function renderPagePrintControl() {
   if (!elements.pagePrintControl) return;
   const label = pagePrintLabel();
@@ -4623,33 +4857,47 @@ function chartPanel(body = "") {
 function compactChartCard(options = {}) {
   const label = options.label || "Chart";
   const iconKey = options.icon || panelIcon(label) || metricIcon(label);
+  const cardClassName = ["metric-card", "chart-compact-card", options.className || ""].filter(Boolean).join(" ");
   const hasValue = options.value !== null && options.value !== undefined && String(options.value) !== "";
   const sparklineValues = Array.isArray(options.sparkline) ? options.sparkline : [];
   const sparklineId = options.sparklineId || chartSparklineId(options.chartId, label);
-  const deltas = metricDeltaHtml(options.metrics || []);
   const periodControl = compactChartPeriodControl(options.periodControl || {});
+  const toolsHtml = String(options.toolsHtml || "");
   const chart = compactStandardChart(options, sparklineValues, sparklineId, label);
+  const showDetails = Boolean(options.showCompactDetails);
+  const canExpand = options.expandable !== false && Boolean(options.chartId);
+  const deltas = showDetails ? metricDeltaHtml(options.metrics || []) : "";
   const subMeta = compactChartSubMeta(options.subMeta || []);
   return `
-    <article class="metric-card chart-compact-card">
+    <article class="${safe(cardClassName)}">
       <div class="chart-compact-header">
         <div class="metric-card-head">
           <span class="metric-card-icon" aria-hidden="true">${icons[iconKey] || icons.target}</span>
           <span class="metric-card-label">${safe(label)}</span>
         </div>
         <div class="chart-compact-tools">
+          ${toolsHtml}
           ${periodControl}
-          ${chartExpandButton(options.chartId, options.expandLabel || `Expand ${label}`)}
+          ${canExpand ? chartExpandButton(options.chartId, options.expandLabel || `Expand ${label}`) : ""}
         </div>
       </div>
       <strong class="${hasValue ? "" : "is-empty"}">${hasValue ? safe(options.value) : "&nbsp;"}</strong>
-      ${options.meta ? `<small>${safe(options.meta)}</small>` : ""}
+      ${options.meta ? `<small>${safe(compactChartMeta(options.meta))}</small>` : ""}
       ${subMeta}
       ${chart}
       ${deltas}
-      ${options.note ? `<em>${safe(options.note)}</em>` : ""}
+      ${showDetails && options.note ? `<em>${safe(options.note)}</em>` : ""}
     </article>
   `;
+}
+
+function compactChartMeta(value = "") {
+  return String(value || "")
+    .split("·")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" · ");
 }
 
 function compactChartSubMeta(items = []) {
@@ -4688,15 +4936,18 @@ function compactStandardChart(options = {}, sparklineValues = [], sparklineId = 
     bands: chart.bands || [],
     className,
     currency: chart.currency || "EUR",
-    height: chart.height || 320,
-    labelIndexes: chart.labelIndexes || standardChartLabelIndexes(Math.max(...series.map((item) => (item.points || []).length)), chart.labelCount || 4),
+    height: chart.height || 220,
+    labelIndexes: chart.labelIndexes || standardChartLabelIndexes(Math.max(...series.map((item) => (item.points || []).length)), chart.labelCount || 2),
     markers: chart.markers || [],
-    padding: chart.padding || { top: 18, right: 18, bottom: 38, left: 70 },
+    padding: chart.padding || { top: 10, right: 10, bottom: 10, left: 10 },
     regions: chart.regions || [],
     series,
-    showLastDot: chart.showLastDot !== false,
-    showPoints: Boolean(chart.showPoints),
-    tickCount: chart.tickCount || 4,
+    showGrid: Boolean(chart.showGrid),
+    showXAxis: Boolean(chart.showXAxis),
+    showYAxis: Boolean(chart.showYAxis),
+    showLastDot: Boolean(chart.showLastDot),
+    showPoints: Boolean(chart.showPointsInCompact),
+    tickCount: chart.tickCount || 3,
     tooltipContext: chart.tooltipContext || {},
     tooltipFormatter: chart.tooltipFormatter || standardChartTooltip,
     width: chart.width || 1120,
@@ -4821,7 +5072,7 @@ function yearlyTargetsTable(rows = []) {
   const visibleRows = page.rows;
   return `
     <section class="minimal-table-wrap planning-target-table-wrap">
-      <table class="minimal-table planning-target-table">
+      <table class="minimal-table planning-target-table yearly-target-table">
         <thead>
           <tr>
             <th>Year</th>
@@ -4839,7 +5090,6 @@ function yearlyTargetsTable(rows = []) {
               <td>
                 <span class="target-period-cell">
                   <span class="table-main">${safe(row.year)}</span>
-                  ${yearlyTargetProgressBar(row)}
                 </span>
               </td>
               <td class="align-right">
@@ -5553,7 +5803,7 @@ function portfolioReturnTimelineChart(data = {}, options = {}) {
       series: [
         { id: "realized", label: "Realized P/L", points },
       ],
-      showLastDot: true,
+      showLastDot: false,
       tickCount: 4,
       tooltipFormatter: portfolioReturnTimelineTooltip,
       width: 1120,
@@ -5650,9 +5900,10 @@ function portfolioReturnMonthlyChart(data = {}, options = {}) {
       labelIndexes: standardChartLabelIndexes(points.length, 4),
       padding: { top: 18, right: 18, bottom: 38, left: 70 },
       series: [
-        { id: "monthly-realized", label: "Monthly P/L", points, showPoints: true },
+        { id: "monthly-realized", label: "Monthly P/L", points },
       ],
-      showLastDot: true,
+      showLastDot: false,
+      showPoints: false,
       tickCount: 4,
       tooltipFormatter: portfolioReturnMonthlyTooltip,
       width: 1120,
@@ -5901,6 +6152,50 @@ function portfolioPerformanceLabel(row = {}, rows = []) {
   return portfolioScopeLabel(row, rows);
 }
 
+function tableSubLine(value = "") {
+  const text = String(value || "").trim();
+  return text ? `<span class="table-sub">${safe(text)}</span>` : "";
+}
+
+function tableSubHtml(html = "") {
+  const value = String(html || "").trim();
+  return value ? `<span class="table-sub">${value}</span>` : "";
+}
+
+function compactPlanToDateLabel(value) {
+  const amount = numericValue(value);
+  return amount > 0 ? `${formatWholeCurrency(amount, "EUR")} to date` : "";
+}
+
+function compactFundingProgressLabel(value) {
+  const amount = numericValue(value);
+  if (Math.abs(amount) < 1) return "On plan";
+  return `${formatWholeCurrency(Math.abs(amount), "EUR")} ${amount >= 0 ? "ahead" : "short"}`;
+}
+
+function compactContributionMetaLine(row = {}) {
+  return [
+    row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
+    row.contribution_type ? quickFilterControl(row.contribution_type, displayContributionType(row.contribution_type || "investment"), { field: "contribution_type" }) : "",
+    row.contribution_role && String(row.contribution_role).toLowerCase() !== "self"
+      ? quickFilterControl(row.contribution_role, labelize(row.contribution_role), { field: "contribution_role" })
+      : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function compactPortfolioInstrumentMetaLine(row = {}) {
+  return [
+    row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
+    formatPlural(row.instrument_count || 0, "instrument"),
+  ].filter(Boolean).join(" · ");
+}
+
+function compactPortfolioScopeControl(row = {}, rows = []) {
+  const value = row.portfolio_name || row.portfolio_id;
+  const label = compactPortfolioName(portfolioScopeLabel(row, rows));
+  return quickFilterControl(value, label, { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" });
+}
+
 function portfolioPerformanceSummary(rows = [], fallback = {}) {
   if (!rows.length) return {
     current_value_eur: 0,
@@ -5989,13 +6284,24 @@ function reconcilePortfolioFundingRows(rows = [], summary = {}) {
   });
 }
 
-function normalizedPortfolioPerformanceWindow() {
-  const selected = String(state.portfolioPerformanceWindow || "all");
+function normalizedPortfolioTrendWindow(selectedWindow = "all") {
+  const selected = String(selectedWindow || "all");
   return monthlyTrendHistoryOptions().some((option) => option.value === selected) ? selected : "3";
 }
 
-function portfolioPerformanceVisibleMonthlyRows(rows = []) {
-  const historyWindow = normalizedPortfolioPerformanceWindow();
+function normalizedPortfolioPerformanceWindow() {
+  return normalizedPortfolioTrendWindow(state.portfolioPerformanceWindow);
+}
+
+function normalizedPortfolioContributionWindow() {
+  return normalizedPortfolioTrendWindow(state.portfolioContributionWindow);
+}
+
+function normalizedPortfolioFundingProgressWindow() {
+  return normalizedPortfolioTrendWindow(state.portfolioFundingProgressWindow);
+}
+
+function portfolioPerformanceVisibleMonthlyRows(rows = [], historyWindow = normalizedPortfolioPerformanceWindow()) {
   const monthCount = reportHistoryMonthCount(historyWindow);
   return monthCount === Infinity ? rows : rows.slice(-monthCount);
 }
@@ -6014,6 +6320,7 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
   const label = options.label || "Cumulative Contributions";
+  const windowValue = options.windowValue || normalizedPortfolioContributionWindow();
   const points = rows.filter((row) => row.month);
   if (points.length < 2) return emptyState("Contribution history needs at least two months.");
   const last = points[points.length - 1];
@@ -6029,6 +6336,7 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
   if (!expanded) {
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand cumulative contributions",
       icon: "trendUp",
       label,
@@ -6044,11 +6352,11 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
         yMin: 0,
       },
       periodControl: {
-        action: "portfolio-performance-window",
-        dataKey: "portfolioPerformanceWindow",
-        selectedValue: normalizedPortfolioPerformanceWindow(),
+        action: "portfolio-contribution-window",
+        dataKey: "portfolioContributionWindow",
+        selectedValue: windowValue,
         options: monthlyTrendHistoryOptions(),
-        ariaLabel: "Funding period",
+        ariaLabel: "Contribution period",
       },
       metrics: [
         { value: formatPercent(completion), label: "completion" },
@@ -6083,7 +6391,7 @@ function portfolioCumulativeContributionChart(rows = [], options = {}) {
         { id: "actual", label: "Paid in", points: points.map((point) => ({ label: point.month, value: point.cumulative_paid_in_eur ?? point.cumulative_actual_eur })) },
         { id: "plan", label: "Planned", points: points.map((point) => ({ label: point.month, value: point.cumulative_planned_eur })) },
       ],
-      showLastDot: true,
+      showLastDot: false,
       tickCount: 4,
       width: 1120,
       xLabelFormatter: shortMonthLabel,
@@ -6100,6 +6408,7 @@ function portfolioMonthlyContributionChart(rows = [], options = {}) {
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
   const label = options.label || "Monthly Funding Progress";
+  const windowValue = options.windowValue || normalizedPortfolioFundingProgressWindow();
   const points = rows.filter((row) => row.month);
   if (points.length < 2) return emptyState("Monthly contribution history needs at least two months.");
   const last = points[points.length - 1];
@@ -6109,6 +6418,7 @@ function portfolioMonthlyContributionChart(rows = [], options = {}) {
   if (!expanded) {
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand monthly funding progress",
       icon: "target",
       label,
@@ -6124,11 +6434,11 @@ function portfolioMonthlyContributionChart(rows = [], options = {}) {
         yMin: 0,
       },
       periodControl: {
-        action: "portfolio-performance-window",
-        dataKey: "portfolioPerformanceWindow",
-        selectedValue: normalizedPortfolioPerformanceWindow(),
+        action: "portfolio-funding-progress-window",
+        dataKey: "portfolioFundingProgressWindow",
+        selectedValue: windowValue,
         options: monthlyTrendHistoryOptions(),
-        ariaLabel: "Funding period",
+        ariaLabel: "Monthly funding period",
       },
       metrics: [
         { value: signedWholeAmount(currentGap, "EUR"), label: "monthly gap" },
@@ -6153,7 +6463,6 @@ function portfolioMonthlyContributionChart(rows = [], options = {}) {
       { label: "Planned In View", value: formatWholeCurrency(plannedInView, "EUR"), detail: `${formatNumber(points.length)} months` },
     ])}
     ${portfolioMonthlyContributionBarChart(points, { expanded: true })}
-    ${chartLegend([["actual", "Actual"], ["plan", "Target"]], "monthly linked transfers vs target")}
   `;
 }
 
@@ -6238,11 +6547,11 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
         <thead>
           <tr>
             <th>Portfolio</th>
-            <th class="align-right">Paid In</th>
-            <th class="align-right">Current Value</th>
+            <th class="align-right">Paid</th>
+            <th class="align-right">Value</th>
             <th class="align-right">Achieved</th>
-            <th class="align-right">Plan To Date</th>
-            <th class="align-right">Completion</th>
+            <th class="align-right">Plan</th>
+            <th class="align-right">Complete</th>
           </tr>
         </thead>
         <tbody>
@@ -6250,27 +6559,26 @@ function portfolioPerformanceTable(rows = [], portfolio = {}) {
             return `
             <tr>
               <td>
-	                <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioPerformanceLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
-	                <span class="table-sub">${[
-	                  row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
-	                  row.contribution_type ? quickFilterControl(row.contribution_type, displayContributionType(row.contribution_type || "investment"), { field: "contribution_type" }) : "",
-	                  row.contribution_role ? quickFilterControl(row.contribution_role, labelize(row.contribution_role || "self"), { field: "contribution_role" }) : "",
-	                  formatPlural(row.contribution_count || 0, "transfer"),
-                ].filter(Boolean).join(" · ")}</span>
+                <span class="table-main">${compactPortfolioScopeControl(row, rows)}</span>
+                ${tableSubHtml(compactContributionMetaLine(row))}
               </td>
               <td class="align-right">
                 <span class="table-main">${formatWholeCurrency(row.contributed_eur || 0, "EUR")}</span>
-                <span class="table-sub">${row.latest_contribution_date ? `latest ${safe(formatDisplayDate(row.latest_contribution_date))}` : "no matched transfers"}</span>
+                ${tableSubLine(row.latest_contribution_date ? formatDisplayDate(row.latest_contribution_date) : "")}
               </td>
-              <td class="align-right">${formatWholeCurrency(row.current_value_eur || 0, "EUR")}</td>
+              <td class="align-right">
+                <span class="table-main">${formatWholeCurrency(row.current_value_eur || 0, "EUR")}</span>
+              </td>
               <td class="align-right">
                 <span class="table-main ${signedClass(row.achieved_pl_eur)}">${signedWholeAmount(row.achieved_pl_eur || 0, "EUR")}</span>
-                <span class="table-sub">${signedPercent(row.achieved_return_pct || 0)} vs paid in</span>
+                ${tableSubLine(signedPercent(row.achieved_return_pct || 0))}
               </td>
-              <td class="align-right">${formatWholeCurrency(row.plan_to_date_eur || 0, "EUR")}</td>
+              <td class="align-right">
+                <span class="table-main">${formatWholeCurrency(row.plan_to_date_eur || 0, "EUR")}</span>
+              </td>
               <td class="align-right">
                 <span class="table-main">${formatPercent(row.plan_completion_pct || 0)}</span>
-                <span class="table-sub">${signedWholeAmount(row.contribution_gap_eur || 0, "EUR")} funding gap</span>
+                ${tableSubLine(compactFundingProgressLabel(row.contribution_gap_eur))}
               </td>
             </tr>
             `;
@@ -6574,6 +6882,14 @@ function displayPortfolioId(value) {
   return String(value || "").replace(/\bp(\d+[a-z]?)\b/gi, (_match, suffix) => `P${String(suffix).toUpperCase()}`);
 }
 
+function compactPortfolioName(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^Portfolio\s+(\d+[a-z]?)(?:\s*[-–]\s*(.+))?$/i);
+  if (!match) return displayPortfolioId(raw);
+  const [, suffix, detail = ""] = match;
+  return [`P${String(suffix).toUpperCase()}`, detail].filter(Boolean).join(" · ");
+}
+
 function portfolioNameFromId(value) {
   const raw = String(value || "").trim();
   const match = raw.match(/^p(\d+)([a-z])?$/i);
@@ -6589,7 +6905,7 @@ function portfolioNameFromId(value) {
 function portfolioReferenceLabel(value) {
   const id = String(value || "").trim();
   if (!id) return "";
-  return portfolioNameFromId(id) || displayPortfolioId(id);
+  return compactPortfolioName(portfolioNameFromId(id) || displayPortfolioId(id));
 }
 
 function storedPortfolioId(value) {
@@ -6622,19 +6938,16 @@ function displayContributionType(value) {
 }
 
 function portfolioAllocationMainLabel(row = {}) {
-  return `${formatPercent(row.target_allocation_pct || 0)} target / ${formatPercent(row.current_allocation_pct || 0)} now`;
+  return `${formatPercent(row.current_allocation_pct || 0)} now · ${formatPercent(row.target_allocation_pct || 0)} target`;
 }
 
 function portfolioAllocationStatusLabel(row = {}) {
   const rebalanceAmount = numericValue(row.allocation_backlog_eur);
   const driftPct = numericValue(row.allocation_gap_pct);
   if (Math.abs(rebalanceAmount) < 1 && Math.abs(driftPct) < 0.1) {
-    return "On target allocation";
+    return "On target";
   }
-  const amountLabel = rebalanceAmount >= 0
-    ? `${formatWholeCurrency(Math.abs(rebalanceAmount), "EUR")} under`
-    : `${formatWholeCurrency(Math.abs(rebalanceAmount), "EUR")} over`;
-  return `${signedPercent(driftPct)} drift · ${amountLabel}`;
+  return `${formatPercent(Math.abs(driftPct))} ${driftPct >= 0 ? "under" : "over"}`;
 }
 
 function portfolioBuyNeededMainLabel(row = {}) {
@@ -6657,9 +6970,9 @@ function portfolioBuyNeededSubLabel(row = {}) {
   const targetToDate = numericValue(row.funding_target_to_date_eur);
   const completion = numericValue(row.funding_completion_pct);
   if (targetToDate <= 0) {
-    return "No funding target to date";
+    return "";
   }
-  return `${formatWholeCurrency(targetToDate, "EUR")} target · ${formatPercent(completion)} funded`;
+  return `${formatPercent(completion)} funded`;
 }
 
 function portfolioPerformanceSnapshot(row = {}) {
@@ -6704,7 +7017,7 @@ function portfolioPerformanceSummaryFromInstruments(instruments = []) {
 
 function portfolioPerformanceSubLabel(row = {}) {
   const performance = portfolioPerformanceSnapshot(row);
-  return `${signedPercent(performance.return_pct)} historical return`;
+  return signedPercent(performance.return_pct);
 }
 
 function portfolioPerformanceByPortfolioRows(portfolio = {}) {
@@ -7047,6 +7360,7 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
     if (expanded) return portfolioInvestmentReturnSnapshotChart(selectedRows);
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand investment return over time",
       icon: "trendUp",
       label,
@@ -7069,23 +7383,18 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
   const first = points[0];
   const last = points[points.length - 1];
   const monthLabels = rows.map((row) => row.month).filter(Boolean);
-  const portfolioGroups = portfolioInvestmentPortfolioGroups(performance, selectedRows, monthLabels);
-  const portfolioSeries = portfolioGroups.map((group) => ({
-    id: group.lineId,
-    label: group.label,
-    points: group.points,
-  }));
+  const returnSeriesLabel = portfolioInvestmentUsesAllScope(performance, selectedRows) ? "All investments" : "Selected portfolios";
   const series = [
     {
       id: "portfolio-total",
-      label: portfolioInvestmentUsesAllScope(performance, selectedRows) ? "All investments" : "Selected portfolios",
+      label: returnSeriesLabel,
       points: alignInvestmentPointsToLabels(points, monthLabels),
     },
-    ...portfolioSeries,
   ];
   if (!expanded) {
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand investment return over time",
       icon: "trendUp",
       label,
@@ -7110,7 +7419,7 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
         { value: signedWholeAmount(last.lifetime_pl_eur || 0, "EUR"), label: "lifetime P/L" },
         { value: formatWholeCurrency(last.deployed_cost_eur || 0, "EUR"), label: "deployed" },
       ],
-      note: `${monthLabel(first.month)} - ${monthLabel(last.month)} · open for portfolio lines`,
+      note: `${monthLabel(first.month)} - ${monthLabel(last.month)} · open for focused return path`,
     });
   }
   return `
@@ -7122,29 +7431,44 @@ function portfolioInvestmentReturnPathChart(performance = {}, selectedRows = [],
       </div>
       ${portfolioPerformanceWindowSelector()}
     </div>
-    ${standardLineChartWithControls({
-      ariaLabel: "Investment return over time by portfolio",
+    ${chartDetailGrid([
+      { label: "Return", value: signedPercent(last.return_pct || 0), detail: `${returnSeriesLabel} path` },
+      { label: "Lifetime P/L", value: signedWholeAmount(last.lifetime_pl_eur || 0, "EUR"), detail: "profit and loss in view" },
+      { label: "Deployed Cost", value: formatWholeCurrency(last.deployed_cost_eur || 0, "EUR"), detail: "historical cost basis" },
+      { label: "Scope", value: formatNumber(snapshot.rows.length), detail: snapshot.rows.length === 1 ? "portfolio in selection" : "portfolios in selection" },
+    ])}
+    ${standardLineChart({
+      ariaLabel: "Investment return over time",
       className: "portfolio-investment-return-chart expanded-chart",
       height: 420,
       labelIndexes: standardChartLabelIndexes(monthLabels.length, 4),
       padding: { top: 18, right: 18, bottom: 38, left: 70 },
       series,
-      showLastDot: true,
+      showLastDot: false,
       tickCount: 4,
       tooltipContext: {
         investedLabel: "Deployed cost",
         valueFormatter: signedPercent,
       },
+      tooltipFormatter: portfolioInvestmentReturnTooltip,
       width: 1120,
       xLabelFormatter: shortMonthLabel,
       yMin: Math.min(0, ...points.map((point) => numericValue(point.value))),
       yValueFormatter: formatPercent,
-    }, {
-      chartId,
-      note: "ledger-estimated monthly path from trade entries, closed P/L, and latest open-position prices",
-      ariaLabel: "Investment return chart lines",
     })}
   `;
+}
+
+function portfolioInvestmentReturnTooltip(point = {}, context = {}) {
+  const value = numericValue(point.value);
+  const deployedCost = numericValue(point.invested || point.deployed_cost_eur);
+  const lifetimePl = numericValue(point.lifetime_pl_eur);
+  return [
+    monthLabel(point.label || point.month || ""),
+    `${context.series?.label || "Return"}: ${signedPercent(value)}`,
+    `P/L: ${signedWholeAmount(lifetimePl, "EUR")}`,
+    deployedCost ? `Deployed cost: ${formatWholeCurrency(deployedCost, "EUR")}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], options = {}) {
@@ -7158,6 +7482,7 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
     if (expanded) return portfolioInvestmentExposureSnapshotChart(selectedRows);
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand investment value path",
       icon: "wallet",
       label,
@@ -7183,6 +7508,7 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
   if (!expanded) {
     return compactChartCard({
       chartId,
+      expandable: false,
       expandLabel: "Expand investment value path",
       icon: "wallet",
       label,
@@ -7232,7 +7558,7 @@ function portfolioInvestmentValuePathChart(performance = {}, selectedRows = [], 
         { id: "known-value", label: "Known value", points: rows.map((row) => ({ ...row, label: row.month, value: row.known_value_eur })) },
         { id: "deployed-cost", label: "Historical cost", points: rows.map((row) => ({ ...row, label: row.month, value: row.deployed_cost_eur })) },
       ],
-      showLastDot: true,
+      showLastDot: false,
       tickCount: 4,
       width: 1120,
       xLabelFormatter: shortMonthLabel,
@@ -7255,12 +7581,12 @@ function portfolioPortfolioPerformanceTable(rows = []) {
         <thead>
           <tr>
             <th>Portfolio</th>
-            <th class="align-right">Current Value</th>
-            <th class="align-right">Historical Cost</th>
-            <th class="align-right">Lifetime P/L</th>
-            <th class="align-right">Historical Return</th>
+            <th class="align-right">Value</th>
+            <th class="align-right">Cost</th>
+            <th class="align-right">P/L</th>
+            <th class="align-right">Return</th>
             <th class="align-right">Expected</th>
-            <th class="align-right">Monthly Plan</th>
+            <th class="align-right">Monthly</th>
           </tr>
         </thead>
         <tbody>
@@ -7268,35 +7594,27 @@ function portfolioPortfolioPerformanceTable(rows = []) {
             return `
             <tr>
               <td>
-                <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, portfolioScopeLabel(row, rows), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
-                <span class="table-sub">${[
-                  row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
-                  formatPlural(row.instrument_count || 0, "instrument"),
-                ].filter(Boolean).join(" · ")}</span>
+                <span class="table-main">${compactPortfolioScopeControl(row, rows)}</span>
+                ${tableSubHtml(compactPortfolioInstrumentMetaLine(row))}
               </td>
               <td class="align-right">
                 <span class="table-main">${formatWholeCurrency(row.current_value_eur || 0, "EUR")}</span>
-                <span class="table-sub">current strategy value</span>
               </td>
               <td class="align-right">
                 <span class="table-main">${formatWholeCurrency(row.cost_base_eur || 0, "EUR")}</span>
-                <span class="table-sub">deployed cost basis</span>
               </td>
               <td class="align-right">
                 <span class="table-main ${signedClass(row.profit_loss_eur)}">${signedWholeAmount(row.profit_loss_eur || 0, "EUR")}</span>
-                <span class="table-sub">realized + open</span>
               </td>
               <td class="align-right">
                 <span class="table-main ${signedClass(row.return_pct)}">${signedPercent(row.return_pct || 0)}</span>
-                <span class="table-sub">vs historical cost</span>
               </td>
               <td class="align-right">
                 <span class="table-main">${formatPercent(row.expected_cagr_pct || 0)}</span>
-                <span class="table-sub">net expected CAGR</span>
               </td>
               <td class="align-right">
                 <span class="table-main">${formatWholeCurrency(row.monthly_contribution_eur || 0, "EUR")}</span>
-                <span class="table-sub">${row.plan_to_date_eur ? `${formatWholeCurrency(row.plan_to_date_eur, "EUR")} plan to date` : "current phase"}</span>
+                ${tableSubLine(compactPlanToDateLabel(row.plan_to_date_eur))}
               </td>
             </tr>
             `;
@@ -7308,20 +7626,13 @@ function portfolioPortfolioPerformanceTable(rows = []) {
   `;
 }
 
-function portfolioMetaLine(row = {}) {
+function portfolioCompactBookLine(row = {}) {
+  const portfolioValue = row.portfolio_name || row.portfolio_id;
+  const portfolioLabel = compactPortfolioName(row.portfolio_name || displayPortfolioId(row.portfolio_id));
   return [
+    portfolioValue ? quickFilterControl(portfolioValue, portfolioLabel, { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" }) : "",
     row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
   ].filter(Boolean).join(" · ");
-}
-
-function portfolioNativeValueLabel(row = {}) {
-  const currency = String(row.current_value_currency || row.base_currency || "EUR").toUpperCase();
-  const eur = moneyRound(row.current_value_eur || 0);
-  const native = moneyRound(row.current_value_native || 0);
-  if (!currency || currency === "EUR" || Math.abs(native) < 0.01 || Math.abs(eur - native) < 0.01) {
-    return "";
-  }
-  return `${formatWholeCurrency(native, currency)} native`;
 }
 
 function portfolioInstrumentTable(rows = []) {
@@ -7353,9 +7664,9 @@ function portfolioInstrumentTable(rows = []) {
         <tbody>
           ${visibleRows.map((row) => {
             const id = portfolioInstrumentId(row);
-            const nativeValueLabel = portfolioNativeValueLabel(row);
+            const buySubLabel = portfolioBuyNeededSubLabel(row);
             return `
-            <tr class="clickable-row ${state.selectedPortfolioInstrumentId === id ? "is-selected" : ""}" data-action="open-portfolio-instrument" data-portfolio-instrument-id="${safe(id)}" tabindex="0">
+            <tr class="clickable-row ${state.selectedPortfolioInstrumentId === id ? "is-selected" : ""} ${portfolioInstrumentRowClass(row)}" data-action="open-portfolio-instrument" data-portfolio-instrument-id="${safe(id)}" tabindex="0">
               <td class="check-cell">
                 <input
                   aria-label="Select ${safe(row.ticker || row.asset_name || "portfolio instrument")}"
@@ -7366,13 +7677,11 @@ function portfolioInstrumentTable(rows = []) {
                 />
               </td>
               <td class="portfolio-instrument-cell">${portfolioInstrumentNameCell(row)}</td>
-	              <td class="portfolio-book-cell">
-		                <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, row.portfolio_name || displayPortfolioId(row.portfolio_id), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
-		                <span class="table-sub">${portfolioMetaLine(row)}</span>
-		              </td>
-	              <td class="portfolio-current-value-cell align-right">
-	                <span class="table-main">${formatWholeCurrency(row.current_value_eur || 0, "EUR")}</span>
-	                ${nativeValueLabel ? `<span class="table-sub">${safe(nativeValueLabel)}</span>` : ""}
+              <td class="portfolio-book-cell">
+                <span class="table-main">${portfolioCompactBookLine(row)}</span>
+              </td>
+              <td class="portfolio-current-value-cell align-right">
+                <span class="table-main">${formatWholeCurrency(row.current_value_eur || 0, "EUR")}</span>
               </td>
               <td class="portfolio-performance-cell align-right">
                 <span class="table-main ${signedClass(row.achieved_pl_eur)}">${signedWholeAmount(row.achieved_pl_eur || 0, "EUR")}</span>
@@ -7380,13 +7689,13 @@ function portfolioInstrumentTable(rows = []) {
               </td>
               <td class="portfolio-buy-needed-cell align-right">
                 <span class="table-main">${safe(portfolioBuyNeededMainLabel(row))}</span>
-                <span class="table-sub">${safe(portfolioBuyNeededSubLabel(row))}</span>
+                ${buySubLabel ? `<span class="table-sub">${safe(buySubLabel)}</span>` : ""}
               </td>
-	              <td class="portfolio-allocation-cell align-right">
-	                <span class="table-main">${safe(portfolioAllocationMainLabel(row))}</span>
-	                <span class="table-sub">${safe(portfolioAllocationStatusLabel(row))}</span>
-	              </td>
-	            </tr>
+              <td class="portfolio-allocation-cell align-right">
+                <span class="table-main">${safe(portfolioAllocationMainLabel(row))}</span>
+                <span class="table-sub">${safe(portfolioAllocationStatusLabel(row))}</span>
+              </td>
+            </tr>
             `;
           }).join("")}
         </tbody>
@@ -7401,6 +7710,13 @@ function portfolioInstrumentTable(rows = []) {
       </div>
     </footer>
   `;
+}
+
+function portfolioInstrumentRowClass(row = {}) {
+  const classes = [];
+  if (Math.abs(numericValue(row.allocation_gap_pct)) >= 2) classes.push("needs-review");
+  if (numericValue(row.achieved_pl_eur) < 0) classes.push("row-expense");
+  return classes.join(" ");
 }
 
 function portfolioInstrumentNameCell(row = {}) {
@@ -7536,11 +7852,14 @@ function portfolioMipTable(rows = [], phases = []) {
             const { row, id, planCapital, futurePlanCapital } = item;
             const windowMonths = monthsBetweenInclusive(row.start_date, row.portfolio_exit_date);
             const planShare = percentOf(planCapital, totalPlanCapital);
+            const portfolioValue = row.portfolio_id || row.portfolio_name;
+            const portfolioField = row.portfolio_id ? "portfolio_id" : "portfolio_name";
+            const portfolioLabel = compactPortfolioName(row.portfolio_name || portfolioReferenceLabel(row.portfolio_id));
             return `
-	              <tr class="clickable-row ${state.selectedPortfolioMipId === id ? "is-selected" : ""}" data-action="open-portfolio-mip" data-portfolio-mip-id="${safe(id)}" tabindex="0">
-		                <td>
-		                  <span class="table-main">${quickFilterControl(row.portfolio_name || row.portfolio_id, row.portfolio_name || displayPortfolioId(row.portfolio_id), { field: row.portfolio_name ? "portfolio_name" : "portfolio_id" })}</span>
-		                  <span class="table-sub">${[
+		              <tr class="clickable-row ${state.selectedPortfolioMipId === id ? "is-selected" : ""}" data-action="open-portfolio-mip" data-portfolio-mip-id="${safe(id)}" tabindex="0">
+			                <td>
+			                  <span class="table-main">${portfolioValue ? quickFilterControl(portfolioValue, portfolioLabel, { field: portfolioField }) : "-"}</span>
+			                  <span class="table-sub">${[
 	                        row.provider ? quickFilterControl(row.provider, labelize(row.provider), { field: "provider" }) : "",
 	                        row.contribution_type ? quickFilterControl(row.contribution_type, displayContributionType(row.contribution_type || "investment"), { field: "contribution_type" }) : "",
 	                        row.contribution_role ? quickFilterControl(row.contribution_role, labelize(row.contribution_role || "self"), { field: "contribution_role" }) : "",
@@ -7551,12 +7870,16 @@ function portfolioMipTable(rows = [], phases = []) {
 	                  <span class="table-main">${formatDisplayDate(row.start_date)} - ${formatDisplayDate(row.portfolio_exit_date)}</span>
 	                  <span class="table-sub">${formatPlural(windowMonths, "month")}</span>
 	                </td>
-	                <td class="align-right">${formatWholeCurrency(row.current_monthly_contribution_eur || 0, "EUR")}</td>
+                <td class="align-right">
+                  <span class="table-main">${formatWholeCurrency(row.current_monthly_contribution_eur || 0, "EUR")}</span>
+                </td>
 	                <td class="align-right">
                     <span class="table-main">${formatWholeCurrency(planCapital, "EUR")}</span>
                     <span class="table-sub">${formatPercent(planShare)} of plan · ${formatWholeCurrency(futurePlanCapital, "EUR")} remaining</span>
                   </td>
-	                <td class="align-right">${formatPercent(row.weighted_cagr_pct || 0)}</td>
+                <td class="align-right">
+                  <span class="table-main">${formatPercent(row.weighted_cagr_pct || 0)}</span>
+                </td>
 	              </tr>
             `;
           }).join("")}
@@ -7719,17 +8042,23 @@ function exitStrategyPhaseTable(rows = []) {
         <tbody>
           ${visibleRows.map((row) => `
             <tr class="clickable-row ${state.selectedExitPhaseId === row.phase_id ? "is-selected" : ""}" data-action="open-exit-phase" data-exit-phase-id="${safe(row.phase_id)}" tabindex="0">
-	              <td>
-	                <span class="table-main">${safe(row.phase_name)}</span>
-	                <span class="table-sub">${safe(displayPhaseId(row.phase_id))}</span>
-	              </td>
+              <td>
+                <span class="table-main">${safe(row.phase_name)}</span>
+                <span class="table-sub">${safe(displayPhaseId(row.phase_id))}</span>
+              </td>
               <td>
                 <span class="table-main">${formatDisplayDate(row.start_date)} - ${formatDisplayDate(row.end_date)}</span>
                 <span class="table-sub">${formatPlural(row.months || 0, "month")}</span>
               </td>
-              <td class="align-right">${formatWholeCurrency(row.monthly_contribution_eur || 0, "EUR")}</td>
-              <td class="align-right">${formatWholeCurrency(row.phase_contribution_eur || 0, "EUR")}</td>
-              <td class="align-right">${formatWholeCurrency(row.cumulative_contribution_eur || 0, "EUR")}</td>
+              <td class="align-right">
+                <span class="table-main">${formatWholeCurrency(row.monthly_contribution_eur || 0, "EUR")}</span>
+              </td>
+              <td class="align-right">
+                <span class="table-main">${formatWholeCurrency(row.phase_contribution_eur || 0, "EUR")}</span>
+              </td>
+              <td class="align-right">
+                <span class="table-main">${formatWholeCurrency(row.cumulative_contribution_eur || 0, "EUR")}</span>
+              </td>
             </tr>
           `).join("")}
         </tbody>
@@ -7787,6 +8116,13 @@ function netWorthHistoryOptions() {
   return reportHistoryOptions().filter((option) => !["1d", "7d"].includes(option.value));
 }
 
+function netWorthDetailModeOptions() {
+  return [
+    { value: "net", label: "Net" },
+    { value: "context", label: "Context" },
+  ];
+}
+
 function reportForecastOptions() {
   return [
     { value: "1m", label: "1M" },
@@ -7814,17 +8150,21 @@ function compactChartPeriodControl(control = {}) {
   if (!action || !dataKey || !options.length) return "";
   const selectedValue = String(control.selectedValue ?? "");
   const dataAttribute = dataAttributeName(dataKey);
+  const className = ["chart-compact-period", control.className || ""].filter(Boolean).join(" ");
   return `
-    <div class="chart-compact-period" role="group" aria-label="${safe(control.ariaLabel || "Chart period")}">
+    <div class="${safe(className)}" role="group" aria-label="${safe(control.ariaLabel || "Chart period")}">
       ${options.map((option) => {
         const value = String(option.value);
+        const label = option.compactLabel || option.label;
+        const title = option.title || option.label || label;
         return `
           <button
             class="${selectedValue === value ? "is-active" : ""}"
             data-action="${safe(action)}"
             data-${safe(dataAttribute)}="${safe(value)}"
+            title="${safe(title)}"
             type="button"
-          >${safe(option.label)}</button>
+          >${safe(label)}</button>
         `;
       }).join("")}
     </div>
@@ -7870,6 +8210,11 @@ function normalizedReportHistoryWindow(field = "reportNetWorthWindow") {
   return options.some((option) => option.value === selected) ? selected : "all";
 }
 
+function normalizedNetWorthDetailMode() {
+  const selected = String(state.netWorthDetailMode || "net");
+  return netWorthDetailModeOptions().some((option) => option.value === selected) ? selected : "net";
+}
+
 function reportHistoryMonthCount(historyWindow = "all", options = {}) {
   const value = String(historyWindow || "all");
   if (value === "all") return Infinity;
@@ -7912,6 +8257,28 @@ function monteCarloWindowOptions() {
   ];
 }
 
+function monteCarloAssumptionOptions() {
+  return [
+    { value: "historical", label: "Historic" },
+    { value: "conservative", label: "Conservative" },
+  ];
+}
+
+function normalizedMonteCarloAssumption() {
+  const selected = String(state.monteCarloAssumption || "conservative");
+  return monteCarloAssumptionOptions().some((option) => option.value === selected) ? selected : "conservative";
+}
+
+function monteCarloAssumptionControl(selected = normalizedMonteCarloAssumption()) {
+  return compactChartPeriodControl({
+    action: "monte-carlo-assumption",
+    dataKey: "monteCarloAssumption",
+    selectedValue: selected,
+    options: monteCarloAssumptionOptions(),
+    ariaLabel: "Monte Carlo assumption",
+  });
+}
+
 function normalizedMonteCarloWindow() {
   const selected = String(state.monteCarloWindow || "plan");
   return monteCarloWindowOptions().some((option) => option.value === selected) ? selected : "plan";
@@ -7921,6 +8288,52 @@ function monteCarloVisiblePoints(points = []) {
   const selected = normalizedMonteCarloWindow();
   if (selected === "plan") return points;
   return points.slice(0, normalizedForecastMonthCount(Number(selected)) + 1);
+}
+
+function monteCarloScenarioForAssumption(model = {}, assumption = normalizedMonteCarloAssumption()) {
+  const scenarios = Array.isArray(model.scenarios) ? model.scenarios : [];
+  if (assumption === "historical") {
+    return scenarios.find((scenario) => {
+      const id = String(scenario.id || "").toLowerCase();
+      const label = String(scenario.label || "").toLowerCase();
+      return id.includes("historical") || label.includes("historical") || scenario.assumption_source === "configured_historical_10y";
+    });
+  }
+  return scenarios.find((scenario) => {
+    const id = String(scenario.id || "").toLowerCase();
+    const label = String(scenario.label || "").toLowerCase();
+    return id.includes("current_forward") || label.includes("conservative") || Boolean(scenario.is_primary);
+  });
+}
+
+function monteCarloCompactPath(model = {}, fallbackPoints = [], assumption = normalizedMonteCarloAssumption(), startingBase = 0) {
+  const scenario = monteCarloScenarioForAssumption(model, assumption);
+  const scenarioPoints = monteCarloVisiblePoints(scenario?.points || []);
+  const usesScenario = scenarioPoints.length >= 2;
+  const sourcePoints = usesScenario ? scenarioPoints : fallbackPoints;
+  const valueKey = assumption === "conservative" && !usesScenario ? "p10" : "p50";
+  const label = assumption === "historical" ? "Historical" : "Conservative";
+  const className = usesScenario
+    ? `scenario-${kebabCase(scenario.id || scenario.label || label)}`
+    : (assumption === "conservative" ? "p10" : "p50");
+  const base = numericValue(startingBase);
+  return {
+    assumption,
+    className,
+    expected_return_pct: scenario ? numericValue(scenario.expected_return_pct) : numericValue(model.expected_return_pct),
+    expected_volatility_pct: scenario ? numericValue(scenario.expected_volatility_pct) : numericValue(model.expected_volatility_pct),
+    label,
+    source: usesScenario ? (scenario?.label || label) : label,
+    points: sourcePoints.map((point) => ({
+      ...point,
+      label: point.month,
+      value: numericValue(point[valueKey]),
+      invested: base + numericValue(point.invested),
+      deployed: point.deployed,
+      mip_contribution: point.mip_contribution,
+      undeployed_cash: point.undeployed_cash,
+    })),
+  };
 }
 
 function optionalPercentValue(value) {
@@ -7954,21 +8367,39 @@ function monteCarloScopeOptions(portfolio = {}) {
   const instrumentOptions = instruments.map((row) => {
     const id = portfolioInstrumentId(row);
     const symbol = row.ticker && row.ticker !== "N/A" ? row.ticker : row.asset_name || id;
-    const portfolioLabel = row.portfolio_name || displayPortfolioId(row.portfolio_id) || "";
+    const portfolioLabel = compactPortfolioName(row.portfolio_name || portfolioReferenceLabel(row.portfolio_id)) || "";
+    const compactLabel = row.ticker && row.ticker !== "N/A"
+      ? row.ticker
+      : compactMonteCarloScopeLabel(row.asset_name || portfolioLabel || id);
     return {
       value: `instrument:${id}`,
       label: `${symbol}${portfolioLabel ? ` · ${portfolioLabel}` : ""}`,
+      compactLabel,
     };
   });
 
   return [
-    { value: "plan", label: "Plan" },
+    { value: "plan", label: "Plan", compactLabel: "Plan" },
     ...Array.from(portfolioOptions.entries()).map(([id, label]) => ({
       value: `portfolio:${id}`,
-      label,
+      label: compactPortfolioName(label),
+      compactLabel: compactPortfolioName(label),
     })),
     ...instrumentOptions,
   ];
+}
+
+function compactMonteCarloScopeLabel(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "Item";
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length <= 2 && raw.length <= 16) return raw;
+  const initials = words
+    .filter((word) => /^[a-z0-9]/i.test(word))
+    .slice(0, 4)
+    .map((word) => word[0].toUpperCase())
+    .join("");
+  return initials || raw.slice(0, 16);
 }
 
 function normalizedMonteCarloScope(portfolio = {}) {
@@ -7976,16 +8407,26 @@ function normalizedMonteCarloScope(portfolio = {}) {
   return monteCarloScopeOptions(portfolio).some((option) => option.value === selected) ? selected : "plan";
 }
 
-function monteCarloScopeSelect(portfolio = {}, selected = normalizedMonteCarloScope(portfolio)) {
-  const options = monteCarloScopeOptions(portfolio);
-  if (options.length <= 1) return "";
+function monteCarloScopeSelect(portfolio = {}, selected = normalizedMonteCarloScope(portfolio), config = {}) {
+  const scopeOptions = monteCarloScopeOptions(portfolio);
+  if (scopeOptions.length <= 1) return "";
+  const compact = Boolean(config.compact);
+  const selectedOption = scopeOptions.find((option) => option.value === selected) || scopeOptions[0];
+  const shellClassName = ["report-chart-select-shell", compact ? "compact" : ""].filter(Boolean).join(" ");
+  const selectClassName = ["report-chart-select", compact ? "compact monte-carlo-scope-select" : ""].filter(Boolean).join(" ");
   return `
-    <select class="report-chart-select" data-monte-carlo-scope aria-label="Simulation scope">
-      ${options.map((option) => `
-        <option value="${safe(option.value)}" ${option.value === selected ? "selected" : ""}>${safe(option.label)}</option>
+    <span class="${safe(shellClassName)}" title="${safe(selectedOption?.label || "Simulation scope")}">
+      <select class="${safe(selectClassName)}" data-monte-carlo-scope aria-label="Simulation scope">
+      ${scopeOptions.map((option) => `
+        <option value="${safe(option.value)}" ${option.value === selected ? "selected" : ""}>${safe(compact ? (option.compactLabel || option.label) : option.label)}</option>
       `).join("")}
-    </select>
+      </select>
+    </span>
   `;
+}
+
+function monteCarloScopeControl(portfolio = {}, selected = normalizedMonteCarloScope(portfolio)) {
+  return monteCarloScopeSelect(portfolio, selected, { compact: true });
 }
 
 function monteCarloScopeRows(portfolio = {}, selected = "plan") {
@@ -7996,7 +8437,9 @@ function monteCarloScopeRows(portfolio = {}, selected = "plan") {
     const portfolioId = selected.slice("portfolio:".length);
     const instruments = allInstruments.filter((row) => String(row.portfolio_id || "") === portfolioId);
     const mipRows = allMipRows.filter((row) => String(row.portfolio_id || "") === portfolioId);
-    const label = mipRows[0] ? portfolioScopeLabel(mipRows[0], allMipRows) : instruments[0]?.portfolio_name || displayPortfolioId(portfolioId);
+    const label = mipRows[0]
+      ? compactPortfolioName(portfolioScopeLabel(mipRows[0], allMipRows))
+      : compactPortfolioName(instruments[0]?.portfolio_name || portfolioReferenceLabel(portfolioId));
     return { contributionMultiplier: 1, instruments, mipRows, scopeLabel: label };
   }
 
@@ -8051,6 +8494,29 @@ function monteCarloInstrumentReturn(row = {}) {
   const gross = percentNumericValue(row.expected_cagr_pct, 5);
   const fees = percentNumericValue(row.total_fees_pct, 0);
   return clampValue(gross - fees, -20, 30);
+}
+
+function monteCarloScenarioInstruments(instruments = [], scenarioId = "") {
+  if (scenarioId !== "historical_10y") return instruments.map((row) => ({ ...row }));
+  return instruments.map((row) => {
+    const assumption = MONTE_CARLO_HISTORICAL_10Y_ASSUMPTIONS[monteCarloAssumptionGroup(row)];
+    if (!assumption) return { ...row };
+    const totalFees = percentNumericValue(row.total_fees_pct, 0);
+    return {
+      ...row,
+      expected_cagr_pct: assumption.expected_cagr_pct,
+      expected_volatility_pct: assumption.expected_volatility_pct,
+      net_expected_cagr_pct: assumption.expected_cagr_pct - totalFees,
+    };
+  });
+}
+
+function monteCarloAssumptionGroup(row = {}) {
+  const ticker = String(row.ticker || "").toUpperCase();
+  const text = `${row.asset_class || ""} ${row.asset_bucket || ""} ${row.asset_name || ""} ${row.ticker || ""}`.toLowerCase();
+  if (["SXRV.DE", "XNAS.DE"].includes(ticker) || text.includes("nasdaq")) return "nasdaq";
+  if (ticker === "VWCE.DE" || text.includes("all-world") || text.includes("all world") || text.includes("global equity")) return "global_equity";
+  return "strategy";
 }
 
 function monteCarloInstrumentVolatility(row = {}) {
@@ -8147,30 +8613,71 @@ function backendMonteCarloProjectionModel(portfolio = {}) {
   const rows = Array.isArray(source.points) ? source.points : [];
   if (rows.length < 2) return null;
   const base = Math.max(0, numericValue(source.base_value_eur || rows[0]?.p50));
-  let plannedContributions = 0;
-  const points = rows.map((row, index) => {
-    if (index > 0) plannedContributions += numericValue(row.contribution_eur);
-    return {
-      month: row.month,
-      invested: moneyRound(plannedContributions),
-      p10: moneyRound(numericValue(row.p10)),
-      p50: moneyRound(numericValue(row.p50)),
-      p90: moneyRound(numericValue(row.p90)),
-    };
-  });
+  const points = backendMonteCarloPoints(rows);
+  const scenarios = Array.isArray(source.scenario_results)
+    ? source.scenario_results
+      .filter((scenario) => Array.isArray(scenario.points) && scenario.points.length >= 2)
+      .map((scenario) => ({
+        id: scenario.scenario_id || "",
+        label: scenario.scenario_name || labelize(scenario.scenario_id || "scenario"),
+        description: scenario.description || "",
+        assumption_source: scenario.assumption_source || "",
+        expected_return_pct: numericValue(scenario.expected_return_pct),
+        expected_volatility_pct: numericValue(scenario.expected_volatility_pct),
+        is_primary: Boolean(scenario.is_primary),
+        points: backendMonteCarloPoints(scenario.points || []),
+      }))
+    : [];
   return {
     expected_return_pct: numericValue(source.expected_return_pct),
     expected_volatility_pct: numericValue(source.expected_volatility_pct),
     points,
+    scenarios,
     scope_label: "Plan",
     starting_base_eur: base,
     actual_invested_base_eur: numericValue(source.actual_invested_base_eur),
     unassigned_invested_base_eur: numericValue(source.unassigned_invested_base_eur),
+    deployment_cash_base_eur: numericValue(source.deployment_cash_base_eur),
+    deployment_cash_floor_eur: numericValue(source.deployment_cash_floor_eur),
+    deployment_model: source.deployment_model || "",
     correlation_model: source.correlation_model || "",
     simulation_count: numericValue(source.simulation_count || 0),
     simulation_kind: "stochastic",
   };
 }
+
+function backendMonteCarloPoints(rows = []) {
+  let externalContributions = 0;
+  let mipDeployment = 0;
+  let mipContributions = 0;
+  return (rows || []).map((row, index) => {
+    const contribution = numericValue(row.contribution_eur);
+    const deployment = numericValue(row.deployment_eur);
+    const external = row.external_contribution_eur === undefined
+      ? contribution
+      : numericValue(row.external_contribution_eur);
+    if (index > 0) {
+      mipContributions += contribution;
+      mipDeployment += deployment;
+      externalContributions += Math.max(0, external);
+    }
+    return {
+      month: row.month,
+      invested: moneyRound(externalContributions),
+      deployed: moneyRound(mipDeployment),
+      mip_contribution: moneyRound(mipContributions),
+      undeployed_cash: moneyRound(numericValue(row.undeployed_cash_eur)),
+      p10: moneyRound(numericValue(row.p10)),
+      p50: moneyRound(numericValue(row.p50)),
+      p90: moneyRound(numericValue(row.p90)),
+    };
+  });
+}
+
+const MONTE_CARLO_HISTORICAL_10Y_ASSUMPTIONS = {
+  global_equity: { expected_cagr_pct: 12.7523, expected_volatility_pct: 15.1161 },
+  nasdaq: { expected_cagr_pct: 19.1462, expected_volatility_pct: 25.5782 },
+};
 
 function monteCarloProjectionModel(portfolio = {}, selectedScope = normalizedMonteCarloScope(portfolio)) {
   if (selectedScope === "plan") {
@@ -8188,10 +8695,75 @@ function monteCarloProjectionModel(portfolio = {}, selectedScope = normalizedMon
     : scopedValue;
   const expectedReturnPct = monteCarloWeightedReturn(scope.instruments);
   const volatilityPct = monteCarloWeightedVolatility(scope.instruments);
-  const monthlyReturn = monthlyRateFromAnnual(expectedReturnPct / 100);
   const months = monteCarloHorizonMonths(scope.mipRows, phases);
+  const points = monteCarloProjectionBandPoints({
+    base,
+    contributionMultiplier: scope.contributionMultiplier,
+    expectedReturnPct,
+    mipRows: scope.mipRows,
+    months,
+    phases,
+    volatilityPct,
+  });
+  const historicalInstruments = monteCarloScenarioInstruments(scope.instruments, "historical_10y");
+  const historicalReturnPct = monteCarloWeightedReturn(historicalInstruments);
+  const historicalVolatilityPct = monteCarloWeightedVolatility(historicalInstruments);
+  const historicalPoints = monteCarloProjectionBandPoints({
+    base,
+    contributionMultiplier: scope.contributionMultiplier,
+    expectedReturnPct: historicalReturnPct,
+    mipRows: scope.mipRows,
+    months,
+    phases,
+    volatilityPct: historicalVolatilityPct,
+  });
+
+  return {
+    expected_return_pct: expectedReturnPct,
+    expected_volatility_pct: volatilityPct,
+    points,
+    scenarios: [
+      {
+        id: "current_forward",
+        label: "Conservative Forward",
+        description: "Strategy-file expected return and volatility assumptions.",
+        assumption_source: "strategy_file",
+        expected_return_pct: expectedReturnPct,
+        expected_volatility_pct: volatilityPct,
+        is_primary: true,
+        points,
+      },
+      {
+        id: "historical_10y",
+        label: "Historical 10Y",
+        description: "Configured recent 10-year All-World and Nasdaq annualized return/volatility path.",
+        assumption_source: "configured_historical_10y",
+        expected_return_pct: historicalReturnPct,
+        expected_volatility_pct: historicalVolatilityPct,
+        is_primary: false,
+        points: historicalPoints,
+      },
+    ],
+    scope_label: scope.scopeLabel,
+    starting_base_eur: base,
+    simulation_count: 0,
+    simulation_kind: "projection_band",
+  };
+}
+
+function monteCarloProjectionBandPoints(options = {}) {
+  const {
+    base = 0,
+    contributionMultiplier = 1,
+    expectedReturnPct = 5,
+    mipRows = [],
+    months = 120,
+    phases = [],
+    volatilityPct = 14,
+  } = options;
+  const monthlyReturn = monthlyRateFromAnnual(expectedReturnPct / 100);
   const points = [];
-  let p50 = Math.max(0, base);
+  let p50 = Math.max(0, numericValue(base));
   let plannedContributions = 0;
 
   for (let index = 0; index <= months; index += 1) {
@@ -8201,6 +8773,9 @@ function monteCarloProjectionModel(portfolio = {}, selectedScope = normalizedMon
     points.push({
       month,
       invested: moneyRound(plannedContributions),
+      deployed: 0,
+      mip_contribution: moneyRound(plannedContributions),
+      undeployed_cash: 0,
       p10: moneyRound(Math.max(0, p50 * (1 - band))),
       p50: moneyRound(p50),
       p90: moneyRound(p50 * (1 + band)),
@@ -8208,19 +8783,12 @@ function monteCarloProjectionModel(portfolio = {}, selectedScope = normalizedMon
 
     if (index === months) continue;
     const nextMonth = addMonthsToMonthKey(currentMonthKey(), index + 1);
-    const contribution = monteCarloContributionForMonth(scope.mipRows, phases, nextMonth, scope.contributionMultiplier);
+    const contribution = monteCarloContributionForMonth(mipRows, phases, nextMonth, contributionMultiplier);
     plannedContributions = Math.max(0, plannedContributions + contribution);
     p50 = Math.max(0, (p50 * (1 + monthlyReturn)) + contribution);
   }
 
-  return {
-    expected_return_pct: expectedReturnPct,
-    points,
-    scope_label: scope.scopeLabel,
-    starting_base_eur: base,
-    simulation_count: 0,
-    simulation_kind: "projection_band",
-  };
+  return points;
 }
 
 function reportCashFlowChart(transactions = {}, options = {}) {
@@ -8239,7 +8807,7 @@ function reportCashFlowChart(transactions = {}, options = {}) {
   if (!expanded) {
     return compactChartCard({
       chartId,
-      expandLabel: "Expand cash flow",
+      expandable: false,
       icon: "currency",
       label: "Cash Flow",
       value: signedWholeAmount(retainedInView, "EUR"),
@@ -8437,6 +9005,7 @@ function cashFlowTooltip(point = {}, context = {}) {
   return [
     period,
     `${context.series?.label || "Value"}: ${formatWholeCurrency(point.value || 0, "EUR")}${incomeShare}`,
+    context.series?.detail || "",
     partialNote,
   ].filter(Boolean).join("\n");
 }
@@ -8505,7 +9074,7 @@ function reportCashFlowLineChart(points = [], options = {}) {
     labelIndexes: standardChartLabelIndexes(points.length, 4),
     padding: { top: 18, right: 18, bottom: 38, left: 70 },
     series,
-    showLastDot: true,
+    showLastDot: false,
     tickCount: 4,
     tooltipFormatter: cashFlowTooltip,
     width,
@@ -8519,58 +9088,62 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
   const chartId = options.chartId || "";
   const selectedWindow = normalizedMonteCarloWindow();
   const selectedScope = normalizedMonteCarloScope(portfolio);
+  const selectedAssumption = normalizedMonteCarloAssumption();
   const model = monteCarloProjectionModel(portfolio, selectedScope);
   const points = monteCarloVisiblePoints(model.points || []);
   if (points.length < 2) return emptyState("Monte Carlo simulation needs portfolio strategy data.");
   const first = points[0];
   const last = points[points.length - 1];
   const plannedCapital = numericValue(last.invested);
+  const deployedCapital = numericValue(last.deployed);
   const scopeInvestmentBase = selectedScope === "plan"
     ? numericValue(model.starting_base_eur ?? first.p50)
     : numericValue(first.p50);
-  const actualInvestmentReference = selectedScope === "plan"
-    ? numericValue(model.actual_invested_base_eur || scopeInvestmentBase)
-    : scopeInvestmentBase;
   const totalCapitalAtWork = plannedCapital + scopeInvestmentBase;
   const expectedReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p50) - totalCapitalAtWork, totalCapitalAtWork)) : "";
   const conservativeReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p10) - totalCapitalAtWork, totalCapitalAtWork)) : "";
-  const upsideReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(last.p90) - totalCapitalAtWork, totalCapitalAtWork)) : "";
-  const projectedGrowth = numericValue(last.p50) - totalCapitalAtWork;
-  const contributionLabel = selectedWindow === "plan" ? "remaining" : "planned in view";
-  const referenceMetaLabel = selectedScope === "plan" ? "actual invested" : "current value";
-  const showLikelyRange = state.monteCarloContextLines.has("projection-band");
-  const showInvestmentReference = state.monteCarloContextLines.has("actual-base");
+  const contributionLabel = selectedWindow === "plan" ? "new capital remaining" : "new capital in view";
+  const scenarioSeries = monteCarloScenarioLineSeries(model, selectedWindow, scopeInvestmentBase);
+  const compactPath = monteCarloCompactPath(model, points, selectedAssumption, scopeInvestmentBase);
+  const compactPoints = compactPath.points.length >= 2 ? compactPath.points : points.map((point) => ({ ...point, label: point.month, value: point.p50 }));
+  const compactLast = compactPoints[compactPoints.length - 1] || last;
+  const compactReturn = totalCapitalAtWork ? signedPercent(percentOf(numericValue(compactLast.value) - totalCapitalAtWork, totalCapitalAtWork)) : "";
+  const compactGrowth = numericValue(compactLast.value) - totalCapitalAtWork;
+  const projectionSeries = scenarioSeries.length ? scenarioSeries : [
+    { id: "p50", label: "Expected", points: points.map((point) => ({ label: point.month, value: point.p50, invested: scopeInvestmentBase + numericValue(point.invested), deployed: point.deployed, undeployed_cash: point.undeployed_cash })) },
+  ];
   const summaryParts = [
     model.scope_label || "Plan",
-    `${formatWholeCurrency(plannedCapital, "EUR")} ${contributionLabel}`,
+    deployedCapital ? `${formatWholeCurrency(deployedCapital, "EUR")} deployed by MIP` : "",
+    plannedCapital ? `${formatWholeCurrency(plannedCapital, "EUR")} ${contributionLabel}` : "",
     expectedReturn ? `${expectedReturn} expected` : "",
   ].filter(Boolean);
-  const investedLabel = selectedWindow === "plan" ? "Remaining planned contributions" : "Planned in view";
+  const investedLabel = "Capital at work";
   if (!expanded) {
     return compactChartCard({
       chartId,
-      expandLabel: "Expand Monte Carlo projection",
+      expandable: false,
       icon: "trendUp",
+      className: "has-monte-carlo-controls",
       label: "Monte Carlo Projection",
-      value: formatWholeCurrency(last.p50 || 0, "EUR"),
-      meta: model.scope_label || "Plan",
+      value: formatWholeCurrency(compactLast.value || 0, "EUR"),
+      meta: [model.scope_label || "Plan", compactPath.label, compactReturn].filter(Boolean).join(" · "),
       subMeta: [
         plannedCapital ? { value: formatWholeCurrency(plannedCapital, "EUR"), label: selectedWindow === "plan" ? "planned contribution" : "planned in view" } : null,
         totalCapitalAtWork ? { value: formatWholeCurrency(totalCapitalAtWork, "EUR"), label: "projected invested" } : null,
-        { value: signedWholeAmount(projectedGrowth, "EUR"), label: "projected growth" },
+        { value: signedWholeAmount(compactGrowth, "EUR"), label: "projected growth" },
       ].filter(Boolean),
-      chartPoints: points.map((point) => ({
-        ...point,
-        label: point.month,
-        value: point.p50,
-      })),
+      chartPoints: compactPoints,
       chart: {
-        ariaLabel: "Monte Carlo projection",
-        className: "p50",
+        ariaLabel: `Monte Carlo projection (${compactPath.label})`,
+        id: compactPath.className,
+        label: compactPath.label,
+        className: compactPath.className,
         tooltipContext: { investedLabel, showReturnPercent: true },
         tooltipFormatter: standardChartTooltip,
         yMin: 0,
       },
+      toolsHtml: `${monteCarloScopeControl(portfolio, selectedScope)}${monteCarloAssumptionControl(selectedAssumption)}`,
       periodControl: {
         action: "monte-carlo-window",
         dataKey: "monteCarloWindow",
@@ -8579,42 +9152,20 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
         ariaLabel: "Simulation period",
       },
       metrics: [
-        expectedReturn ? { value: expectedReturn, label: "expected" } : null,
-        conservativeReturn ? { value: conservativeReturn, label: "low" } : null,
-        upsideReturn ? { value: upsideReturn, label: "high" } : null,
+        compactReturn ? { value: compactReturn, label: compactPath.label.toLowerCase() } : null,
+        expectedReturn && selectedAssumption !== "conservative" ? { value: expectedReturn, label: "expected" } : null,
+        conservativeReturn && selectedAssumption !== "historical" ? { value: conservativeReturn, label: "low" } : null,
       ].filter(Boolean),
-      note: `${monthLabel(first.month)} - ${monthLabel(last.month)} · ${model.scope_label || "Plan"}`,
+      note: `${monthLabel(first.month)} - ${monthLabel(last.month)} · ${compactPath.source}`,
     });
   }
   const controls = `
     ${monteCarloScopeSelect(portfolio, selectedScope)}
     ${reportChartSelector("monte-carlo-window", "monteCarloWindow", String(selectedWindow), monteCarloWindowOptions(), "Simulation period")}
   `;
-  const actualSeries = actualInvestmentReference && showInvestmentReference
-    ? [{
-        id: "actual-base",
-        label: selectedScope === "plan" ? "Actual invested" : "Current value",
-        noReturnPercent: true,
-        pointIndexes: [0],
-        showPoints: true,
-        points: points.map((point) => ({ label: point.month, value: actualInvestmentReference, invested: point.invested })),
-      }]
-    : [];
-  const rangeSeries = showLikelyRange
-    ? [
-        { id: "p10", label: "Low range", lineVisible: false, points: points.map((point) => ({ label: point.month, value: point.p10, invested: point.invested })) },
-        { id: "p90", label: "High range", lineVisible: false, points: points.map((point) => ({ label: point.month, value: point.p90, invested: point.invested })) },
-      ]
-    : [];
-  const rangeBands = showLikelyRange
-    ? [{
-        id: "projection-band",
-        lower: points.map((point) => ({ label: point.month, value: point.p10 })),
-        upper: points.map((point) => ({ label: point.month, value: point.p90 })),
-      }]
-    : [];
   const details = expanded ? chartDetailGrid([
-    { label: "Future Contributions", value: formatWholeCurrency(plannedCapital, "EUR"), detail: selectedScope === "plan" ? "planned from strategy" : (model.scope_label || "selected scope") },
+    { label: "Parked Cash Deployment", value: formatWholeCurrency(deployedCapital, "EUR"), detail: deployedCapital ? "released through MIP schedule" : "none in selected scope" },
+    { label: "New Contributions", value: formatWholeCurrency(plannedCapital, "EUR"), detail: selectedScope === "plan" ? "external capital after cash deployment" : (model.scope_label || "selected scope") },
     { label: "Expected Value", value: formatWholeCurrency(last.p50 || 0, "EUR"), detail: `${expectedReturn || "0%"} vs simulated inputs` },
     {
       label: "Likely Range",
@@ -8646,11 +9197,8 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
       height: expanded ? 420 : 280,
       labelIndexes: standardChartLabelIndexes(points.length, 4),
       padding: { top: 18, right: 18, bottom: 38, left: 70 },
-      bands: rangeBands,
       series: [
-        { id: "p50", label: "Expected", points: points.map((point) => ({ label: point.month, value: point.p50, invested: point.invested })) },
-        ...rangeSeries,
-        ...actualSeries,
+        ...projectionSeries,
       ],
       tickCount: 4,
       tooltipContext: { investedLabel, showReturnPercent: true },
@@ -8658,41 +9206,39 @@ function planningMonteCarloChart(portfolio = {}, accounts = {}, options = {}) {
       width: expanded ? 1120 : 760,
       xLabelFormatter: shortMonthLabel,
       yMin: 0,
+      showLastDot: false,
       showPoints: false,
     })}
-    ${monteCarloContextLineControls(last, actualInvestmentReference, selectedScope, model)}
   `;
 }
 
-function monteCarloContextLineControls(last = {}, actualInvestmentReference = 0, selectedScope = "plan", model = {}) {
-  const legendNote = model.simulation_kind === "stochastic"
-    ? `${model.scope_label || "Plan"} · ${formatNumber(model.simulation_count || 0)} correlated paths · ${formatPercent(model.expected_return_pct || 0)} return`
-    : `${model.scope_label || "Plan"} · ${formatPercent(model.expected_return_pct || 0)} return`;
-  return chartLineToggleControls(
-    [
-      {
-        id: "p50",
-        label: "Expected",
-        valueLabel: legendNote,
-        readOnly: true,
-      },
-      {
-        id: "projection-band",
-        label: "Likely range",
-        valueLabel: `${formatShortCurrency(last.p10 || 0, "EUR")} - ${formatShortCurrency(last.p90 || 0, "EUR")}`,
-        detail: "simulation band",
-      },
-      {
-        id: "actual-base",
-        label: selectedScope === "plan" ? "Actual invested" : "Current value",
-        value: actualInvestmentReference,
-        detail: "reference line",
-      },
-    ].filter((item) => item.id !== "actual-base" || numericValue(item.value) > 0),
-    state.monteCarloContextLines,
-    "toggle-monte-carlo-context-line",
-    "Monte Carlo reference lines",
-  );
+function monteCarloScenarioLineSeries(model = {}, selectedWindow = "plan", startingBase = 0) {
+  const scenarios = Array.isArray(model.scenarios) ? model.scenarios : [];
+  const base = numericValue(startingBase);
+  return scenarios
+    .filter((scenario) => Array.isArray(scenario.points) && scenario.points.length >= 2)
+    .map((scenario) => {
+      const points = monteCarloVisiblePoints(scenario.points || []);
+      const last = points[points.length - 1] || {};
+      const id = `scenario-${kebabCase(scenario.id || scenario.label || "scenario")}`;
+      const sourceLabel = scenario.assumption_source === "configured_historical_10y"
+        ? "configured 10Y history"
+        : "strategy assumptions";
+      return {
+        id,
+        label: scenario.label || "Scenario",
+        detail: `${formatPercent(scenario.expected_return_pct || 0)} return · ${formatPercent(scenario.expected_volatility_pct || 0)} vol · ${sourceLabel}`,
+        value: numericValue(last.p50),
+        points: points.map((point) => ({
+          label: point.month,
+          value: point.p50,
+          invested: base + numericValue(point.invested),
+          deployed: point.deployed,
+          mip_contribution: point.mip_contribution,
+          undeployed_cash: point.undeployed_cash,
+        })),
+      };
+    });
 }
 
 function reportNetWorthForecast(accounts = {}, transactions = {}, portfolio = {}, options = {}) {
@@ -8719,11 +9265,13 @@ function reportNetWorthForecast(accounts = {}, transactions = {}, portfolio = {}
   if (!expanded) {
     return compactChartCard({
       chartId,
-      expandLabel: "Expand net worth forecast",
+      expandable: false,
       icon: "trendUp",
+      className: "has-forecast-controls",
       label: "Net Worth Forecast",
       value: formatWholeCurrency(last, "EUR"),
       meta: `${signedWholeAmount(last - first, "EUR")} forecast · ${signedWholeAmount(monthlyFlowNumber, "EUR")} monthly net flow`,
+      toolsHtml: reportForecastControls(monthlyFlowValue, annualReturnValue),
       chartPoints: model.points,
       chart: {
         ariaLabel: "Net worth forecast",
@@ -9066,6 +9614,8 @@ function reportNetWorthOverTime(accounts = {}, transactions = {}, portfolio = {}
   const expanded = Boolean(options.expanded);
   const chartId = options.chartId || "";
   const historyWindow = normalizedReportHistoryWindow("reportNetWorthWindow");
+  const detailMode = normalizedNetWorthDetailMode();
+  const showContext = detailMode === "context";
   const points = reportNetWorthSeries(accounts, transactions, historyWindow);
   const hasTrend = points.length >= 2;
   const fallbackPoints = hasTrend ? points : reportNetWorthSeries(accounts, transactions, "all");
@@ -9085,48 +9635,69 @@ function reportNetWorthOverTime(accounts = {}, transactions = {}, portfolio = {}
   const first = hasTrend ? points[0].value : numericValue(chartFirstPoint.value);
   const last = hasTrend ? points[points.length - 1].value : numericValue(chartLastPoint.value);
   const change = last - first;
-  const leakageModel = netWorthLeakageContext(accounts, transactions);
-  const forecastModel = expanded ? reportForecastModel(accounts, transactions, normalizedReportForecastYears(), portfolio) : {};
-  const contextSeries = expanded ? netWorthContextSeries(chartPoints, leakageModel, transactions) : [];
-  const forecastSeries = expanded ? netWorthForecastContextSeries(forecastModel) : [];
+  const leakageModel = showContext ? netWorthLeakageContext(accounts, transactions) : {};
+  const forecastModel = showContext ? reportForecastModel(accounts, transactions, normalizedReportForecastYears(), portfolio) : {};
+  const contextSeries = showContext ? netWorthContextSeries(chartPoints, leakageModel, transactions) : [];
+  const forecastSeries = showContext ? netWorthForecastContextSeries(forecastModel) : [];
   const extraSeries = [...contextSeries, ...forecastSeries];
-  const forecastAnnotations = netWorthForecastChartAnnotations(forecastSeries[0]);
+  const forecastAnnotations = showContext ? netWorthForecastChartAnnotations(forecastSeries[0]) : { markers: [], regions: [] };
   const domainPoints = extraSeries.length
     ? [...chartPoints, ...extraSeries.flatMap((item) => item.points || [])]
     : chartPoints;
-  const historySelector = chartControlCluster(
-    "History",
-    reportChartSelector("report-net-worth-window", "reportNetWorthWindow", String(historyWindow), netWorthHistoryOptions(), "Historical period"),
-  );
-  const forecastSelector = forecastSeries.length
-    ? chartControlCluster(
-        "Forecast",
-        reportChartSelector("report-forecast-years", "reportForecastYears", String(normalizedReportForecastYears()), reportForecastOptions(), "Forecast period"),
-      )
-    : "";
+  const viewSelector = compactChartPeriodControl({
+    action: "net-worth-detail-mode",
+    dataKey: "netWorthDetailMode",
+    selectedValue: detailMode,
+    options: netWorthDetailModeOptions(),
+    ariaLabel: "Net worth chart view",
+  });
+  const historySelector = compactChartPeriodControl({
+    action: "report-net-worth-window",
+    dataKey: "reportNetWorthWindow",
+    selectedValue: String(historyWindow),
+    options: netWorthHistoryOptions(),
+    ariaLabel: "Historical period",
+  });
+  const forecastSelector = compactChartPeriodControl({
+    action: "report-forecast-years",
+    dataKey: "reportForecastYears",
+    selectedValue: String(normalizedReportForecastYears()),
+    options: reportForecastOptions(),
+    ariaLabel: "Forecast period",
+  });
   if (!expanded) {
+    const compactPoints = hasTrend ? points.map((point) => ({
+      ...point,
+      label: point.month || point.label,
+    })) : chartPoints;
     return compactChartCard({
       chartId,
-      expandLabel: "Expand net worth history",
+      expandable: false,
       icon: "wallet",
+      className: "has-net-worth-controls",
       label: "Net Worth Over Time",
       value: formatWholeCurrency(last, "EUR"),
       meta: hasTrend ? `${signedWholeAmount(change, "EUR")} across ${formatNumber(points.length)} months` : "Needs at least two months",
-      chartPoints: hasTrend ? points.map((point) => ({
-        ...point,
-        label: point.month || point.label,
-      })) : [],
+      toolsHtml: showContext ? `${viewSelector}${historySelector}${forecastSelector}` : `${viewSelector}${historySelector}`,
       chart: {
         ariaLabel: "Net worth over time",
-        className: "actual",
-        ...netWorthChartDomain(points, historyWindow),
-      },
-      periodControl: {
-        action: "report-net-worth-window",
-        dataKey: "reportNetWorthWindow",
-        selectedValue: String(historyWindow),
-        options: netWorthHistoryOptions(),
-        ariaLabel: "Net worth history period",
+        html: reportLineChart(compactPoints, {
+          axisPoints: netWorthCombinedAxisPoints(compactPoints, extraSeries),
+          className: "chart-compact-standard report-net-worth-chart",
+          extraSeries,
+          height: 220,
+          markers: forecastAnnotations.markers,
+          padding: { top: 16, right: 10, bottom: 10, left: 10 },
+          regions: forecastAnnotations.regions,
+          showGrid: false,
+          showXAxis: false,
+          showYAxis: false,
+          tickCount: 3,
+          tooltipContext: { currentValue: last },
+          tooltipFormatter: reportNetWorthHistoryTooltip,
+          width: 1120,
+          ...netWorthChartDomain(domainPoints, historyWindow),
+        }),
       },
       metrics: hasTrend ? trendDeltaItems(points.map((point) => point.value)).slice(0, 3) : [],
       note: hasTrend
@@ -9683,10 +10254,11 @@ function reportNetWorthHistoryTooltip(point = {}, context = {}) {
   const currency = context.currency || "EUR";
   const value = numericValue(point.value);
   const currentValue = numericValue(context.currentValue);
+  const seriesLabel = context.series ? chartSeriesShortLabel(context.series) : "Net Worth";
   if (context.series?.id === "forecast") {
     return [
       monthLabel(point.label || ""),
-      `Forecast: ${formatWholeCurrency(value, currency)}`,
+      `${seriesLabel}: ${formatWholeCurrency(value, currency)}`,
       `${signedWholeAmount(value - currentValue, currency)} vs current net worth`,
       chartRetentionTooltipLine(point),
     ].filter(Boolean).join("\n");
@@ -9694,7 +10266,7 @@ function reportNetWorthHistoryTooltip(point = {}, context = {}) {
   const share = currentValue ? percentOf(value, currentValue) : 0;
   return [
     monthLabel(point.label || ""),
-    formatWholeCurrency(value, currency),
+    `${seriesLabel}: ${formatWholeCurrency(value, currency)}`,
     `${formatPercent(share)} of current net worth`,
     chartRetentionTooltipLine(point),
   ].filter(Boolean).join("\n");
@@ -9712,9 +10284,14 @@ function reportLineChart(points = [], options = {}) {
     extraSeries = [],
     height = 280,
     markers = [],
+    padding = null,
     regions = [],
-    showLastDot = true,
+    showEndLabels = false,
+    showGrid = true,
+    showLastDot = false,
     showPoints = false,
+    showXAxis = true,
+    showYAxis = true,
     tickCount = 5,
     tooltipContext = {},
     tooltipFormatter = standardChartTooltip,
@@ -9745,6 +10322,7 @@ function reportLineChart(points = [], options = {}) {
     })),
   ];
   const labelSourceLength = shouldAlignAxis ? axisLabels.length : points.length;
+  const shouldShowEndLabels = Boolean(showEndLabels);
   const chartOptions = {
     ariaLabel,
     className,
@@ -9752,11 +10330,15 @@ function reportLineChart(points = [], options = {}) {
     height,
     labelIndexes: standardChartLabelIndexes(labelSourceLength, labelCount),
     markers,
-    padding: { top: 18, right: 18, bottom: 38, left: 70 },
+    padding: padding || { top: 18, right: 18, bottom: 38, left: 70 },
     regions,
     series: chartSeries,
+    showEndLabels: shouldShowEndLabels,
+    showGrid,
     showLastDot,
     showPoints,
+    showXAxis,
+    showYAxis,
     tickCount,
     tooltipContext,
     tooltipFormatter,
@@ -9902,9 +10484,13 @@ function standardLineChart(options = {}) {
     markers = [],
     padding = { top: 18, right: 70, bottom: 38, left: 70 },
     regions = [],
+    showEndLabels = false,
+    showGrid = true,
     series = [],
     showLastDot = false,
     showPoints = false,
+    showXAxis = true,
+    showYAxis = true,
     tickCount = 5,
     tooltipContext = {},
     tooltipFormatter = standardChartTooltip,
@@ -9944,40 +10530,89 @@ function standardLineChart(options = {}) {
     value,
     y: yForValue(value),
   }));
-  const hoverTargets = longestPoints.map((anchorPoint, index) => {
-    const items = series
-      .map((item) => ({ series: item, point: (item.points || [])[index], points: item.points || [] }))
-      .filter((item) => item.point && chartHasValue(item.point.value));
-    if (!items.length) return "";
-    const anchor = items[0];
-    const x = xForIndex(index, longestPoints.length);
-    const y = yForValue(anchor.point.value);
-    const tooltip = items.length === 1
-      ? tooltipFormatter(anchor.point, {
-          baseValue: numericValue(anchor.points[0]?.value),
-          currency,
-          index,
-          previousPoint: anchor.points[index - 1],
-          series: anchor.series,
-          ...tooltipContext,
-        })
-      : standardGroupedChartTooltip(anchorPoint, items, { currency, ...tooltipContext });
-    const edgeClass = x < width * 0.18 ? "edge-left" : x > width * 0.82 ? "edge-right" : "";
-    return `
-      <span
-        class="report-chart-hit ${edgeClass}"
-        data-tooltip="${safe(tooltip)}"
-        style="left: ${(x / width * 100).toFixed(3)}%; top: ${(y / height * 100).toFixed(3)}%;"
-      ></span>
-    `;
+  const hoverTargets = series.flatMap((item) => {
+    const points = item.points || [];
+    return points.map((point, index) => {
+      if (!point || !chartHasValue(point.value)) return "";
+      const x = xForIndex(index, points.length);
+      const y = yForValue(point.value);
+      const tooltip = tooltipFormatter(point, {
+        baseValue: numericValue(points[0]?.value),
+        currency,
+        index,
+        previousPoint: points[index - 1],
+        series: item,
+        ...tooltipContext,
+      });
+      const edgeClass = x < width * 0.18 ? "edge-left" : x > width * 0.82 ? "edge-right" : "";
+      return `
+        <span
+          class="report-chart-hit ${edgeClass} ${safe(item.id || "")}"
+          data-tooltip="${safe(tooltip)}"
+          style="left: ${(x / width * 100).toFixed(3)}%; top: ${(y / height * 100).toFixed(3)}%;"
+        ></span>
+      `;
+    });
   }).join("");
+  const endLabels = showEndLabels ? (() => {
+    const labels = series
+      .filter((item) => item && item.lineVisible !== false)
+      .map((item) => {
+        const points = item.points || [];
+        let lastIndex = -1;
+        for (let index = points.length - 1; index >= 0; index -= 1) {
+          if (chartHasValue(points[index]?.value)) {
+            lastIndex = index;
+            break;
+          }
+        }
+        if (lastIndex < 0) return null;
+        const point = points[lastIndex];
+        return {
+          id: item.id || "",
+          text: chartSeriesShortLabel(item),
+          value: numericValue(point.value),
+          x: xForIndex(lastIndex, points.length),
+          y: yForValue(point.value),
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.y - right.y);
+    if (!labels.length) return [];
+    const minY = padding.top + 10;
+    const maxY = height - padding.bottom - 8;
+    const gap = 15;
+    labels.forEach((item, index) => {
+      const previous = labels[index - 1];
+      item.labelY = Math.max(minY, previous ? Math.max(item.y, previous.labelY + gap) : item.y);
+    });
+    const overflow = labels[labels.length - 1].labelY - maxY;
+    if (overflow > 0) {
+      for (let index = labels.length - 1; index >= 0; index -= 1) {
+        const next = labels[index + 1];
+        labels[index].labelY = Math.min(
+          next ? next.labelY - gap : maxY,
+          labels[index].labelY - overflow,
+        );
+      }
+      labels.forEach((item, index) => {
+        const previous = labels[index - 1];
+        item.labelY = Math.max(minY, previous ? Math.max(item.labelY, previous.labelY + gap) : item.labelY);
+      });
+    }
+    return labels.map((item) => ({
+      ...item,
+      labelY: Math.max(minY, Math.min(maxY, item.labelY)),
+      labelX: width - 6,
+    }));
+  })() : [];
 
   return `
     <div class="standard-line-chart ${safe(className)}" role="img" aria-label="${safe(ariaLabel)}">
       <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
         ${yTicks.map((tick) => `
-          <line class="report-chart-grid" x1="${padding.left}" y1="${tick.y.toFixed(2)}" x2="${width - padding.right}" y2="${tick.y.toFixed(2)}"></line>
-          <text class="report-chart-y" x="${padding.left - 12}" y="${(tick.y + 4).toFixed(2)}" text-anchor="end">${safe(yValueFormatter(tick.value))}</text>
+          ${showGrid ? `<line class="report-chart-grid" x1="${padding.left}" y1="${tick.y.toFixed(2)}" x2="${width - padding.right}" y2="${tick.y.toFixed(2)}"></line>` : ""}
+          ${showYAxis ? `<text class="report-chart-y" x="${padding.left - 12}" y="${(tick.y + 4).toFixed(2)}" text-anchor="end">${safe(yValueFormatter(tick.value))}</text>` : ""}
         `).join("")}
         ${regions.map((region) => {
           const startX = xForLabel(region.startLabel);
@@ -10046,11 +10681,14 @@ function standardLineChart(options = {}) {
             ${label ? `<text class="standard-chart-marker-label ${safe(marker.id || "")}" x="${textX.toFixed(2)}" y="${Math.max(10, padding.top - 6).toFixed(2)}" text-anchor="${anchor}">${label}</text>` : ""}
           `;
         }).join("")}
-        ${labelIndexes.map((index) => {
+        ${endLabels.map((item) => `
+          <text class="standard-chart-end-label ${safe(item.id)}" x="${item.labelX.toFixed(2)}" y="${item.labelY.toFixed(2)}" text-anchor="end" dominant-baseline="middle">${safe(item.text)}</text>
+        `).join("")}
+        ${showXAxis ? labelIndexes.map((index) => {
           const point = longestPoints[index];
           if (!point) return "";
           return `<text class="report-chart-x" x="${xForIndex(index, longestPoints.length).toFixed(2)}" y="${height - 10}" text-anchor="${index === 0 ? "start" : index === longestPoints.length - 1 ? "end" : "middle"}">${safe(xLabelFormatter(point.label))}</text>`;
-        }).join("")}
+        }).join("") : ""}
       </svg>
       <div class="report-chart-hover-layer" aria-hidden="true">
         ${hoverTargets}
@@ -10069,9 +10707,11 @@ function standardChartTooltip(point = {}, context = {}) {
   const changeLine = context.valueFormatter
     ? `${signedPercent(change)} vs first point`
     : `${signedWholeAmount(change, currency)} · ${signedPercent(changePercent)}`;
+  const seriesDetail = context.series?.detail || "";
   return [
     monthLabel(point.label || ""),
     `${context.series ? `${chartSeriesShortLabel(context.series)}: ` : ""}${formatter(value)}`,
+    seriesDetail,
     changeLine,
     chartRetentionTooltipLine(point),
   ].filter(Boolean).join("\n");
@@ -11836,24 +12476,6 @@ function metricDeltaHtml(items = []) {
   `;
 }
 
-function metricTextMeterHtml(progress, label = "", tone = "") {
-  if (state.privacyMode) return "";
-  const numeric = numericValue(progress, Number.NaN);
-  if (!Number.isFinite(numeric)) return "";
-  const bounded = clampValue(Math.abs(numeric), 0, 100);
-  if (bounded <= 0) return "";
-  const segments = 10;
-  const filled = Math.max(1, Math.round((bounded / 100) * segments));
-  const empty = Math.max(0, segments - filled);
-  const description = label || `${formatPercent(bounded)} progress`;
-  const toneClass = tone ? ` is-${tone}` : "";
-  return `
-    <span class="metric-text-meter${toneClass}" aria-label="${safe(description)}" title="${safe(description)}">
-      <span class="metric-text-meter-fill" aria-hidden="true">${"*".repeat(filled)}</span><span class="metric-text-meter-empty" aria-hidden="true">${".".repeat(empty)}</span>
-    </span>
-  `;
-}
-
 function microSparkline(values = [], seriesId = "") {
   if (state.privacyMode) return "";
   const numbers = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
@@ -12305,7 +12927,6 @@ function metricCard(label, value, meta = "", note = "", icon = "", options = {})
   ].filter(Boolean).join(" ");
   const sparkline = Array.isArray(options.sparkline) ? microSparkline(options.sparkline) : "";
   const deltas = metricDeltaHtml(options.delta || []);
-  const meter = metricTextMeterHtml(options.progress, options.progressLabel, options.progressTone);
   const hideControl = options.hideable && options.id
     ? `
       <button class="metric-card-hide" data-action="hide-dashboard-card" data-dashboard-card="${safe(options.id)}" type="button" aria-label="Hide" ${tooltipAttrs("Hide")}>
@@ -12321,7 +12942,6 @@ function metricCard(label, value, meta = "", note = "", icon = "", options = {})
         <span class="metric-card-label">${safe(label)}</span>
       </div>
       <strong class="${hasValue ? "" : "is-empty"}">${hasValue ? safe(value) : "&nbsp;"}</strong>
-      ${meter}
       ${meta ? `<small>${safe(meta)}</small>` : ""}
       ${sparkline}
       ${deltas}
@@ -12457,19 +13077,14 @@ function accountInsightsDashboard(data = {}) {
   const insights = data?.insights || {};
   const tables = data?.insight_tables || {};
   const netWorth = numericValue(insights.net_worth_eur);
-  const assets = numericValue(insights.assets_eur);
-  const liabilities = numericValue(insights.liabilities_eur);
-  const liquidCapital = numericValue(insights.liquid_capital_eur);
-  const liabilityShare = percentOf(liabilities, assets);
-  const liquidShare = percentOf(liquidCapital, netWorth);
   return metricLineDashboard([
     {
       title: "Core Position",
       html: metricLineItems([
         { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: `${formatNumber(insights.active_accounts || 0)} active accounts`, note: "Balance across active account registers.", icon: "wallet" },
-        { label: "Assets", value: formatWholeCurrency(assets, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp" },
-        { label: "Liabilities", value: formatWholeCurrency(liabilities, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard", progress: liabilityShare, progressLabel: `${formatPercent(liabilityShare)} of active assets` },
-        { label: "Liquid Capital", value: formatWholeCurrency(liquidCapital, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet", progress: liquidShare, progressLabel: `${formatPercent(liquidShare)} of net worth` },
+        { label: "Assets", value: formatWholeCurrency(insights.assets_eur || 0, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp" },
+        { label: "Liabilities", value: formatWholeCurrency(insights.liabilities_eur || 0, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard" },
+        { label: "Liquid Capital", value: formatWholeCurrency(insights.liquid_capital_eur || 0, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet" },
       ]),
     },
     { title: "Account Type Mix", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
@@ -12494,8 +13109,6 @@ function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, 
       meta: [formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
       note: `${formatPercent(share)} of net worth by ${noteLabel}.`,
       icon: insightIconFor(row[nameKey] || row.name || noteLabel, iconContext),
-      progress: share,
-      progressLabel: `${formatPercent(share)} of net worth`,
     };
   }));
 }
@@ -12504,36 +13117,26 @@ function topAccountsMetricLines(rows = []) {
   return metricLineItems((rows || [])
     .filter((row) => Number(row.amount_eur || 0) > 0)
     .slice(0, 6)
-    .map((row) => {
-      const share = numericValue(row.pct_of_net);
-      return {
-        label: accountDisplayName(row),
-        value: formatWholeCurrency(row.amount_eur, "EUR"),
-        meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
-        note: `${formatPercent(share)} of net worth.`,
-        icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
-        progress: share,
-        progressLabel: `${formatPercent(share)} of net worth`,
-      };
-    }));
+    .map((row) => ({
+      label: accountDisplayName(row),
+      value: formatWholeCurrency(row.amount_eur, "EUR"),
+      meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
+      note: `${formatPercent(row.pct_of_net || 0)} of net worth.`,
+      icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
+    })));
 }
 
 function accountAllocationMetricLines(rows = [], netWorth = 0, iconContext = "") {
   return metricLineItems((rows || [])
     .filter((row) => Number(row.eur || 0) > 0)
     .slice(0, 6)
-    .map((row) => {
-      const share = percentOf(row.eur, netWorth);
-      return {
-        label: labelize(row.name),
-        value: formatWholeCurrency(row.eur, "EUR"),
-        meta: nativeCurrencySummaryOrBlank(row.native_amounts),
-        note: `${formatPercent(share)} of net worth.`,
-        icon: insightIconFor(row.name, iconContext),
-        progress: share,
-        progressLabel: `${formatPercent(share)} of net worth`,
-      };
-    }));
+    .map((row) => ({
+      label: labelize(row.name),
+      value: formatWholeCurrency(row.eur, "EUR"),
+      meta: nativeCurrencySummaryOrBlank(row.native_amounts),
+      note: `${formatPercent(percentOf(row.eur, netWorth))} of net worth.`,
+      icon: insightIconFor(row.name, iconContext),
+    })));
 }
 
 function accountCreditMetricLines(rows = []) {
@@ -12549,8 +13152,6 @@ function accountCreditMetricLines(rows = []) {
         meta: labelize(row.provider_id),
         note: `${formatPercent(available)} available · ${formatWholeCurrency(row.available_credit_native || 0, row.currency || "")} headroom.`,
         icon: "creditCard",
-        progress: used,
-        progressLabel: `${formatPercent(used)} credit used`,
       };
     }));
 }
@@ -12631,18 +13232,15 @@ function transactionInsightsDashboard(data = {}) {
   const income = numericValue(insights.current_month_income_eur);
   const expenses = numericValue(insights.current_month_expense_eur);
   const net = numericValue(insights.current_month_net_eur);
-  const totalRows = numericValue(insights.total);
-  const expenseShare = percentOf(expenses, income);
-  const netShare = percentOf(net, income);
-  const reviewShare = percentOf(insights.review_open, totalRows);
+  const targetModelSections = transactionTargetModelMetricSections(data);
   return metricLineDashboard([
     {
       title: "Core Flow",
       html: metricLineItems([
         { label: "Total Income", value: formatCurrency(income, "EUR"), meta: "selected period", note: `${formatNumber(insights.total || 0)} ledger rows included.`, icon: "trendUp" },
-        { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown", progress: expenseShare, progressLabel: `${formatPercent(expenseShare)} of income` },
-        { label: "Net Flow", value: signedAmount(net, "EUR"), meta: percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }), note: "Income minus expenses in project currency.", icon: net >= 0 ? "trendUp" : "trendDown", progress: Math.abs(netShare), progressLabel: `${signedPercent(netShare)} of income` },
-        { label: "Review", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target", progress: reviewShare, progressLabel: `${formatPercent(reviewShare)} of rows in review` },
+        { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown" },
+        { label: "Net Flow", value: signedAmount(net, "EUR"), meta: percentOfIncomeNote(net, income, { signed: true, fallback: `${formatNumber(insights.total || 0)} rows` }), note: "Income minus expenses in project currency.", icon: net >= 0 ? "trendUp" : "trendDown" },
+        { label: "Review", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target" },
       ]),
     },
     {
@@ -12652,10 +13250,28 @@ function transactionInsightsDashboard(data = {}) {
         transactionHeatmapMetric("Spending Activity", insights.spending_heatmap, "expense"),
       ]),
     },
+    ...targetModelSections,
     { title: "Category Spend", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
     { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
     { title: "Income Sources", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
   ], "Transaction metrics");
+}
+
+function transactionTargetModelMetricSections(data = {}) {
+  const insights = data?.insights || {};
+  const planning = planningPayloadFromTransactions(insights);
+  const targets = applyYearlyTargetOverridesToMonthlyTargets(
+    planning.monthly_targets || [],
+    planning.yearly_targets || [],
+  );
+  const selection = monthlyTargetPeriodSelection(targets, planning.summary || {});
+  if (!selection.available) return [];
+  const selectedTargets = applyMonthlyTargetOverrides(selection.rows);
+  return [
+    { title: "Income Category Model", html: monthlyTargetIncomeCategoryMetricLines(selectedTargets) },
+    { title: "Expense Category Model", html: monthlyTargetCategoryMetricLines(selectedTargets) },
+    { title: "Top Months Above Ceiling", html: monthlyTargetAboveCeilingMetricLines(selectedTargets) },
+  ].filter((section) => String(section.html || "").trim());
 }
 
 function transactionHeatmapMetric(label = "Activity", payload = {}, type = "expense") {
@@ -12671,41 +13287,29 @@ function transactionHeatmapMetric(label = "Activity", payload = {}, type = "expe
     meta: `${formatNumber(activeItems.length)} active ${unit}`,
     note: peak ? `Peak ${peakLabel} · ${formatCurrency(peak.amount_eur || 0, "EUR")}.` : "No period activity recorded.",
     icon: type === "income" ? "trendUp" : "trendDown",
-    progress: percentOf(activeItems.length, items.length),
-    progressLabel: `${formatPercent(percentOf(activeItems.length, items.length))} active ${unit}`,
   };
 }
 
 function transactionCategorySpendMetricLines(rows = []) {
   const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
-  return metricLineItems((rows || []).slice(0, 6).map((row) => {
-    const share = percentOf(row.amount_eur, total);
-    return {
-      label: taxonomyLabel(row.category || "expense"),
-      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-      meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-      note: `${formatPercent(share)} of selected-period category spend.`,
-      icon: insightIconFor(row.category, "category"),
-      progress: share,
-      progressLabel: `${formatPercent(share)} of category spend`,
-    };
-  }));
+  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
+    label: taxonomyLabel(row.category || "expense"),
+    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period category spend.`,
+    icon: insightIconFor(row.category, "category"),
+  })));
 }
 
 function transactionIncomeSourceMetricLines(rows = []) {
   const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
-  return metricLineItems((rows || []).slice(0, 6).map((row) => {
-    const share = percentOf(row.amount_eur, total);
-    return {
-      label: row.name || "Income",
-      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-      meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-      note: `${formatPercent(share)} of selected-period income.`,
-      icon: insightIconFor(row.name || "income", "income"),
-      progress: share,
-      progressLabel: `${formatPercent(share)} of income`,
-    };
-  }));
+  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
+    label: row.name || "Income",
+    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period income.`,
+    icon: insightIconFor(row.name || "income", "income"),
+  })));
 }
 
 function transactionCurrencyFlowMetricLines(rows = []) {
@@ -12718,8 +13322,6 @@ function transactionCurrencyFlowMetricLines(rows = []) {
       meta: `${signedWholeAmount(row.net_native || 0, row.currency || "EUR")} native · ${formatPlural(row.count || 0, "row")}`,
       note: `${formatWholeCurrency(row.income_eur || 0, "EUR")} income · ${formatWholeCurrency(row.expense_eur || 0, "EUR")} expense · ${formatPercent(percentOf(Math.abs(net), total))} of currency movement.`,
       icon: "currency",
-      progress: percentOf(Math.abs(net), total),
-      progressLabel: `${formatPercent(percentOf(Math.abs(net), total))} of currency movement`,
     };
   }));
 }
@@ -12754,14 +13356,6 @@ function transactionMonthlyTargetsDashboard(data = {}) {
   const actualRetainedRatio = totalActualIncome ? percentOf(actualRetained, totalActualIncome) : null;
   const incomeDetail = monthlyTargetIncomeMetricDetail(selection.detail, totalActualIncome, totalIncome, selectedTargets);
   const isFilteredMonth = selection.mode === "month";
-  const showAggregatePanels = !isFilteredMonth && selectedTargets.length > 1;
-  const aggregatePanels = showAggregatePanels
-    ? `
-      ${panel("Income Category Model", monthlyTargetIncomeCategoryModel(selectedTargets))}
-      ${panel("Expense Category Model", monthlyTargetCategoryModel(selectedTargets))}
-      ${panel("Top Months Above Ceiling", monthlyTargetAboveCeiling(selectedTargets))}
-    `
-    : "";
   const targetDetailPanel = isFilteredMonth
     ? monthlyTargetSingleMonthDetails(selectedTargets[0])
     : panel(selection.title, monthlyTargetsTable(selectedTargets), "full");
@@ -12774,8 +13368,7 @@ function transactionMonthlyTargetsDashboard(data = {}) {
       ${transactionMetric("Retention Gap", retentionGap === null ? "-" : signedWholeAmount(retentionGap, "EUR"), monthlyTargetRetentionGapMetricDetail(comparableRows.length))}
       ${transactionMetric("Expense Variance", expenseVariance === null ? "-" : signedWholeAmount(expenseVariance, "EUR"), expenseVariance === null ? "not recorded yet" : expenseVarianceDetail(expenseVariance))}
     </section>
-    <section class="monthly-target-grid${showAggregatePanels ? "" : " monthly-target-grid-single"}${isFilteredMonth ? " monthly-target-grid-detail" : ""}">
-      ${aggregatePanels}
+    <section class="monthly-target-grid monthly-target-grid-single${isFilteredMonth ? " monthly-target-grid-detail" : ""}">
       ${targetDetailPanel}
     </section>
   `;
@@ -13046,7 +13639,6 @@ function monthlyTargetTableRow(row = {}, includeDetails = false) {
       <td>
         <span class="target-period-cell">
           <span class="table-main">${safe(monthLabel(row.month))}</span>
-          ${monthlyTargetProgressBar(row)}
         </span>
       </td>
       <td class="align-right">${targetAmountCell(row.income_target_eur, "EUR", monthlyTargetIncomeCellDetail(row))}</td>
@@ -13245,23 +13837,6 @@ function monthlyTargetCategoryProgressBar(category = {}, mode = "expense") {
   });
 }
 
-function monthlyTargetProgressBar(row = {}) {
-  return targetProgressBar({
-    target: row.expense_ceiling_eur,
-    actual: row.actual_expense_eur,
-    actualAvailable: monthlyTargetActualsAreDue(row),
-    className: "is-expense is-compact",
-  });
-}
-
-function yearlyTargetProgressBar(row = {}) {
-  return targetProgressBar({
-    target: row.expense_ceiling_eur,
-    actual: row.actual_expenses_eur,
-    className: "is-expense is-compact",
-  });
-}
-
 function targetProgressBar({ target = 0, actual = 0, actualAvailable = true, className = "" } = {}) {
   const targetValue = Math.max(0, numericValue(target));
   const actualValue = actualAvailable ? Math.max(0, numericValue(actual)) : 0;
@@ -13456,6 +14031,62 @@ function monthlyTargetCategoryTags(categories = [], mode = "expense") {
       `).join("")}
     </span>
   `;
+}
+
+function monthlyTargetIncomeCategoryMetricLines(rows = []) {
+  const values = monthlyTargetAggregateCategoryValues(rows, "income");
+  const totalTarget = values.reduce((sum, row) => sum + numericValue(row.target), 0);
+  return metricLineItems(values.map((row) => ({
+    label: taxonomyLabel(row.category),
+    value: formatWholeCurrency(row.target, "EUR"),
+    meta: `${formatWholeCurrency(row.actual, "EUR")} actual income`,
+    note: `${formatPercent(percentOf(row.target, totalTarget))} of income category model.`,
+    icon: insightIconFor(row.category, "category"),
+  })));
+}
+
+function monthlyTargetCategoryMetricLines(rows = []) {
+  const values = monthlyTargetAggregateCategoryValues(rows, "expense");
+  const totalTarget = values.reduce((sum, row) => sum + numericValue(row.target), 0);
+  return metricLineItems(values.map((row) => ({
+    label: taxonomyLabel(row.category),
+    value: formatWholeCurrency(row.target, "EUR"),
+    meta: `${formatWholeCurrency(row.actual, "EUR")} actual spend`,
+    note: `${formatPercent(percentOf(row.target, totalTarget))} of expense category model.`,
+    icon: insightIconFor(row.category, "category"),
+  })));
+}
+
+function monthlyTargetAggregateCategoryValues(rows = [], mode = "expense") {
+  const totals = new Map();
+  rows.forEach((row) => {
+    const categories = mode === "income" ? monthlyTargetIncomeCategories(row) : (row.categories || []);
+    categories.forEach((category) => {
+      const key = category.category || (mode === "income" ? "income" : "uncategorized");
+      const existing = totals.get(key) || { category: key, target: 0, actual: 0 };
+      existing.target += numericValue(category.target_eur);
+      existing.actual += numericValue(category.actual_eur);
+      totals.set(key, existing);
+    });
+  });
+  return Array.from(totals.values())
+    .sort((a, b) => numericValue(b.target) - numericValue(a.target))
+    .slice(0, 6);
+}
+
+function monthlyTargetAboveCeilingMetricLines(rows = []) {
+  const values = rows
+    .filter((row) => numericValue(row.structural_overspending_eur) > 0)
+    .sort((a, b) => numericValue(b.structural_overspending_eur) - numericValue(a.structural_overspending_eur))
+    .slice(0, 6);
+  const totalOverspending = rows.reduce((sum, row) => sum + numericValue(row.structural_overspending_eur), 0);
+  return metricLineItems(values.map((row) => ({
+    label: monthLabel(row.month),
+    value: formatWholeCurrency(row.structural_overspending_eur, "EUR"),
+    meta: `${formatWholeCurrency(row.actual_expense_eur || 0, "EUR")} actual spend`,
+    note: `${formatPercent(percentOf(row.structural_overspending_eur, totalOverspending))} of above-ceiling spend.`,
+    icon: "trendDown",
+  })));
 }
 
 function monthlyTargetIncomeCategoryModel(rows = []) {
@@ -14339,7 +14970,7 @@ function accountTable(rows, data) {
         </thead>
         <tbody>
           ${rows.length ? rows.map((row) => `
-            <tr class="clickable-row ${state.selectedAccountId === row.account_id ? "is-selected" : ""}" data-action="open-account" data-account-id="${safe(row.account_id)}" tabindex="0">
+            <tr class="clickable-row ${state.selectedAccountId === row.account_id ? "is-selected" : ""} ${tableRecordRowClasses(row)}" data-action="open-account" data-account-id="${safe(row.account_id)}" tabindex="0">
               <td class="check-cell account-check-cell">
                 <input
                   data-account-select
@@ -14353,8 +14984,8 @@ function accountTable(rows, data) {
                 <span class="instrument-cell">
                   ${accountTypeMark(row)}
                   <span>
-                    <span class="table-main">${quickFilterControl(row.account_reference || row.account_id)}</span>
-                    <span class="table-sub">${quickFilterControl(row.account_id, row.account_id, { field: "account_id" })}</span>
+                    ${accountReferenceCell(row)}
+                    ${accountRowBadges(row)}
                   </span>
                 </span>
               </td>
@@ -14380,6 +15011,27 @@ function accountTable(rows, data) {
       </div>
     </footer>
   `;
+}
+
+function accountReferenceCell(row = {}) {
+  const reference = String(row.account_reference || "").trim();
+  const hasReference = Boolean(reference && !accountReferenceLooksLikeStatus(reference, row));
+  const label = hasReference ? reference : row.account_id || "Account";
+  const field = hasReference ? "account_reference" : "account_id";
+  const subline = hasReference ? "" : [labelize(row.provider_id), currencyText(row.account_currency)].filter(Boolean).join(" · ");
+  return `
+    <span class="table-main">${quickFilterControl(label, label, { field })}</span>
+    ${subline ? `<span class="table-sub">${safe(subline)}</span>` : ""}
+  `;
+}
+
+function accountRowBadges(row = {}) {
+  const badges = [];
+  const ledger = String(row.ledger_status || "").trim().toLowerCase();
+  const review = String(row.review_status || "").trim().toLowerCase();
+  if (reviewNeedsAttention(review)) badges.push(tableBadge("Review", "warning"));
+  if (ledger === "deleted") badges.push(tableBadge("Deleted", "danger"));
+  return badges.length ? `<span class="table-badge-row">${badges.join("")}</span>` : "";
 }
 
 function accountTypeMark(row) {
@@ -14764,17 +15416,14 @@ function tradeInsightsDashboard(data = {}) {
   const marketValue = currencyRowsTotal(insights.market_value_by_currency);
   const realized = currencyRowsTotal(insights.realized_pl_by_currency);
   const unrealized = currencyRowsTotal(insights.unrealized_pl_by_currency);
-  const activePositions = numericValue(insights.active_positions);
-  const closedPositions = numericValue(insights.closed_positions);
-  const totalPositions = activePositions + closedPositions;
   return metricLineDashboard([
     {
       title: "Core Position",
       html: metricLineItems([
-        { label: "Active Positions", value: formatNumber(activePositions), meta: `${formatNumber(closedPositions)} closed`, note: "Open versus closed trade records.", icon: "pie", progress: percentOf(activePositions, totalPositions), progressLabel: `${formatPercent(percentOf(activePositions, totalPositions))} active positions` },
+        { label: "Active Positions", value: formatNumber(insights.active_positions || 0), meta: `${formatNumber(insights.closed_positions || 0)} closed`, note: "Open versus closed trade records.", icon: "pie" },
         { label: "Market Value", value: formatWholeCurrency(marketValue, "EUR"), meta: "active positions", note: "Current active market exposure converted to project currency.", icon: "wallet" },
-        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown", progress: Math.abs(numericValue(insights.realized_pl_pct)), progressLabel: `${signedPercent(insights.realized_pl_pct)} realized return` },
-        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown", progress: Math.abs(numericValue(insights.unrealized_pl_pct)), progressLabel: `${signedPercent(insights.unrealized_pl_pct)} unrealized return` },
+        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown" },
+        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown" },
       ]),
     },
     { title: "Month Performance", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
@@ -14801,8 +15450,6 @@ function tradePerformanceMetricLines(rows = [], key = "period") {
       meta: detail,
       note: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement.`,
       icon: pl >= 0 ? "trendUp" : "trendDown",
-      progress: percentOf(Math.abs(pl), total),
-      progressLabel: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement`,
     };
   }));
 }
@@ -14826,15 +15473,12 @@ function tradePositionWatchlistMetricLines(data = {}) {
   const largestExposure = byMarketValue[0];
   if (largestExposure) {
     const value = Math.abs(numericValue(largestExposure.current_market_value_native));
-    const share = percentOf(value, marketTotal);
     items.push({
       label: "Largest Exposure",
       value: formatWholeCurrency(value, largestExposure.trade_currency || "EUR"),
       meta: tradePositionLabel(largestExposure),
-      note: `${formatPercent(share)} of active market value.`,
+      note: `${formatPercent(percentOf(value, marketTotal))} of active market value.`,
       icon: "pie",
-      progress: share,
-      progressLabel: `${formatPercent(share)} of active market value`,
     });
   }
 
@@ -14848,8 +15492,6 @@ function tradePositionWatchlistMetricLines(data = {}) {
       meta: tradePositionLabel(worstReturn),
       note: `${signedWholeAmount(worstReturn.unrealized_pl_native || 0, worstReturn.trade_currency || "EUR")} unrealized.`,
       icon: numericValue(worstReturn.unrealized_pl_pct) < 0 ? "trendDown" : "trendUp",
-      progress: Math.abs(numericValue(worstReturn.unrealized_pl_pct)),
-      progressLabel: `${signedPercent(worstReturn.unrealized_pl_pct || 0)} unrealized return`,
     });
   }
   if (bestReturn && bestReturn !== worstReturn) {
@@ -14859,8 +15501,6 @@ function tradePositionWatchlistMetricLines(data = {}) {
       meta: tradePositionLabel(bestReturn),
       note: `${signedWholeAmount(bestReturn.unrealized_pl_native || 0, bestReturn.trade_currency || "EUR")} unrealized.`,
       icon: numericValue(bestReturn.unrealized_pl_pct) >= 0 ? "trendUp" : "trendDown",
-      progress: Math.abs(numericValue(bestReturn.unrealized_pl_pct)),
-      progressLabel: `${signedPercent(bestReturn.unrealized_pl_pct || 0)} unrealized return`,
     });
   }
 
@@ -14876,8 +15516,6 @@ function tradePositionWatchlistMetricLines(data = {}) {
         `limit ${formatNumber(staleDays)} days`,
       ].filter(Boolean).join(" · "),
       icon: "calendar",
-      progress: percentOf(stalePositions, activeRows.length),
-      progressLabel: `${formatPercent(percentOf(stalePositions, activeRows.length))} stale positions`,
     });
   }
 
@@ -15141,7 +15779,7 @@ function tradeTable(rows, data) {
   const end = data ? Math.min(data.offset + data.limit, data.total) : 0;
   const canGoBack = data && data.offset > 0;
   const canGoForward = data && data.offset + data.limit < data.total;
-  const columnCount = 14;
+  const columnCount = 8;
   const allVisibleSelected = rows.length > 0 && rows.every((row) => state.selectedTrades.has(row.trade_id));
 
   return `
@@ -15151,23 +15789,17 @@ function tradeTable(rows, data) {
           <tr>
             <th class="check-cell trade-check-cell"><input data-select-trade-page type="checkbox" ${allVisibleSelected ? "checked" : ""} aria-label="Select visible trades" /></th>
             <th class="statement-cell">Source</th>
-            <th class="trade-instrument-col">${tradeSortHeader("Symbol", "symbol")}</th>
-            <th class="trade-asset-col">Asset</th>
-            <th class="trade-provider-col">${tradeSortHeader("Provider", "provider")}</th>
-            <th class="trade-type-col">Type</th>
-            <th class="trade-quantity-col align-right">Qty</th>
-            <th class="trade-date-col">${tradeSortHeader("Entry Date", "entry_date")}</th>
-            <th class="trade-money-col align-right">Cost Basis / Entry</th>
-            <th class="trade-date-col">${tradeSortHeader("Price As Of", "price_as_of")}</th>
-            <th class="trade-money-col align-right">${tradeSortHeader("Market Value", "market_value")}</th>
-            <th class="trade-money-col align-right">${tradeSortHeader("Realized P/L", "realized_pl")}</th>
-            <th class="trade-money-col align-right">${tradeSortHeader("Unrealized P/L", "unrealized_pl")}</th>
-            <th class="trade-return-col align-right">Return %</th>
+            <th class="trade-instrument-col">${tradeSortHeader("Instrument", "symbol")}</th>
+            <th class="trade-portfolio-col">${tradeSortHeader("Portfolio", "provider")}</th>
+            <th class="trade-date-col">${tradeSortHeader("Entry", "entry_date")}</th>
+            <th class="trade-money-col align-right">Cost</th>
+            <th class="trade-money-col align-right">${tradeSortHeader("Value", "market_value")}</th>
+            <th class="trade-performance-col align-right">${tradeSortHeader("P/L", "pl")}</th>
           </tr>
         </thead>
         <tbody>
           ${rows.length ? rows.map((row) => `
-            <tr class="clickable-row ${state.selectedTradeId === row.trade_id ? "is-selected" : ""}" data-action="open-trade" data-trade-id="${safe(row.trade_id)}" tabindex="0">
+            <tr class="clickable-row ${state.selectedTradeId === row.trade_id ? "is-selected" : ""} ${tableRecordRowClasses(row)}" data-action="open-trade" data-trade-id="${safe(row.trade_id)}" tabindex="0">
               <td class="check-cell trade-check-cell">
                 <input
                   data-trade-select
@@ -15178,25 +15810,12 @@ function tradeTable(rows, data) {
                 />
               </td>
               <td class="statement-cell">${statementCell(row)}</td>
-              <td class="trade-instrument-col">${tradeInstrumentCell(row)}</td>
-	              <td class="trade-asset-col">
-	                <span class="table-main">${quickFilterControl(row.asset_name || "-", row.asset_name || "-", { field: "asset_name" })}</span>
-	                <span class="table-sub">${tradePortfolioReference(row)}</span>
-	              </td>
-              <td class="trade-provider-col">${quickFilterControl(row.provider_id, labelize(row.provider_id), { field: "provider_id" })}</td>
-              <td class="trade-type-col">${quickFilterControl(row.instrument_type, labelize(row.instrument_type), { field: "instrument_type" })}</td>
-              <td class="trade-quantity-col align-right">${formatQuantity(row.quantity)}</td>
-              <td class="trade-date-col">
-                <span class="table-main">${quickFilterControl(row.entry_date, formatDisplayDate(row.entry_date), { field: "entry_date" })}</span>
-              </td>
+              <td class="trade-instrument-col portfolio-instrument-cell">${tradeInstrumentCell(row)}</td>
+              <td class="trade-portfolio-col portfolio-book-cell">${tradePortfolioCell(row)}</td>
+              <td class="trade-date-col">${tradeEntryCell(row)}</td>
               <td class="trade-money-col align-right">${tradeCostBasisCell(row)}</td>
-              <td class="trade-date-col">
-                <span class="table-main">${quickFilterControl(row.price_as_of || row.exit_date || row.entry_date, formatDisplayDate(row.price_as_of || row.exit_date || row.entry_date), { field: row.price_as_of ? "price_as_of" : row.exit_date ? "exit_date" : "entry_date" })}</span>
-              </td>
-              <td class="trade-money-col align-right">${formatTradeMoney(row.current_market_value_native, row.trade_currency)}</td>
-              <td class="trade-money-col align-right ${signedClass(row.realized_pl_native)}">${tradePlCell(row.realized_pl_native, row.realized_pl_pct, row.trade_currency)}</td>
-              <td class="trade-money-col align-right ${signedClass(row.unrealized_pl_native)}">${tradePlCell(row.unrealized_pl_native, row.unrealized_pl_pct, row.trade_currency)}</td>
-              <td class="trade-return-col align-right ${signedClass(tradeReturnPct(row))}">${signedPercent(tradeReturnPct(row))}</td>
+              <td class="trade-money-col align-right">${tradeValueCell(row)}</td>
+              <td class="trade-performance-col align-right">${tradePerformanceCell(row)}</td>
             </tr>
           `).join("") : emptyRow(columnCount)}
         </tbody>
@@ -15224,11 +15843,49 @@ function tradePortfolioReference(row = {}) {
 }
 
 function tradeInstrumentCell(row) {
+  const symbol = String(row.symbol || "").trim().toUpperCase();
+  const tradeId = String(row.trade_id || "").trim();
+  const assetName = String(row.asset_name || "").trim();
+  const primary = symbol || tradeId || "-";
+  const primaryField = symbol ? "symbol" : "trade_id";
+  const secondary = assetName || (symbol && tradeId ? tradeId : "");
+  const badges = tradeRowBadges(row);
   return `
-    <span class="trade-symbol-cell">
-      <span class="table-main">${quickFilterControl(row.symbol || row.trade_id, row.symbol || row.trade_id, { field: row.symbol ? "symbol" : "trade_id" })}</span>
-      <span class="table-sub trade-subline">${quickFilterHtml(row.position_status, tradeStatusInline(row), { field: "position_status" })}<span>${safe(row.trade_id || "")}</span></span>
-    </span>
+    <span class="table-main">${quickFilterControl(primary, primary, { field: primaryField })}</span>
+    ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === tradeId ? "trade_id" : "asset_name" })}</span>` : ""}
+    ${badges ? `<span class="table-badge-row">${badges}</span>` : ""}
+  `;
+}
+
+function tradePortfolioCell(row = {}) {
+  const portfolio = tradePortfolioReference(row);
+  const provider = row.provider_id
+    ? quickFilterControl(row.provider_id, labelize(row.provider_id), { field: "provider_id" })
+    : "";
+  const type = row.instrument_type
+    ? quickFilterControl(row.instrument_type, labelize(row.instrument_type), { field: "instrument_type" })
+    : "";
+  const status = quickFilterHtml(row.position_status, tradeStatusInline(row), { field: "position_status" });
+  const main = [portfolio, provider].filter((item) => item && item !== "-").join(" · ") || provider || portfolio || "-";
+  const subline = [type, status].filter(Boolean).join(" · ");
+  return `
+    <span class="table-main">${main}</span>
+    ${subline ? `<span class="table-sub trade-subline">${subline}</span>` : ""}
+  `;
+}
+
+function tradeEntryCell(row = {}) {
+  const entryDate = String(row.entry_date || "").trim();
+  const quantity = numericValue(row.quantity);
+  const entryPrice = numericValue(row.entry_price);
+  const detail = quantity && entryPrice
+    ? `${formatQuantity(quantity)} units @ ${formatTradePrice(entryPrice, row.trade_currency)}`
+    : quantity
+      ? `${formatQuantity(quantity)} units`
+      : "";
+  return `
+    <span class="table-main">${entryDate ? quickFilterControl(entryDate, formatDisplayDate(entryDate), { field: "entry_date" }) : "-"}</span>
+    ${detail ? `<span class="table-sub">${safe(detail)}</span>` : ""}
   `;
 }
 
@@ -15236,12 +15893,28 @@ function tradeCostBasisCell(row = {}) {
   const quantity = numericValue(row.quantity);
   const entryPrice = numericValue(row.entry_price);
   const costBasis = quantity * entryPrice;
-  const detail = quantity && entryPrice
-    ? `${formatQuantity(quantity)} units @ ${formatTradePrice(entryPrice, row.trade_currency)}`
-    : "entry price";
+  return `<span class="table-main">${costBasis ? formatTradeMoney(costBasis, row.trade_currency) : "-"}</span>`;
+}
+
+function tradeValueCell(row = {}) {
+  const asOfDate = String(row.price_as_of || row.exit_date || "").trim();
+  const asOfField = row.price_as_of ? "price_as_of" : "exit_date";
+  const asOfLabel = row.price_as_of ? "price" : "exit";
   return `
-    <span class="table-main">${costBasis ? formatTradeMoney(costBasis, row.trade_currency) : "-"}</span>
-    <span class="table-sub">${safe(detail)}</span>
+    <span class="table-main">${formatTradeMoney(row.current_market_value_native, row.trade_currency)}</span>
+    ${asOfDate ? `<span class="table-sub">${quickFilterControl(asOfDate, `${formatDisplayDate(asOfDate)} ${asOfLabel}`, { field: asOfField })}</span>` : ""}
+  `;
+}
+
+function tradePerformanceCell(row = {}) {
+  const active = String(row.position_status || "").toLowerCase() === "active";
+  const amount = active ? row.unrealized_pl_native : row.realized_pl_native;
+  const pct = active ? row.unrealized_pl_pct : row.realized_pl_pct;
+  const pctValue = numericValue(pct);
+  const label = active ? "unrealized" : "realized";
+  return `
+    <span class="table-main ${signedClass(amount)}">${tradePlCell(amount, pct, row.trade_currency)}</span>
+    <span class="table-sub">${pctValue ? `${safe(signedPercent(pctValue))} ${label}` : safe(label)}</span>
   `;
 }
 
@@ -15356,7 +16029,7 @@ function transactionTable(rows, data) {
             const primaryDate = transactionPrimaryDate(row);
             const postedDateSubline = transactionPostedDateSubline(row);
             return `
-              <tr class="clickable-row ${state.selectedTransactionId === row.transaction_id ? "is-selected" : ""}" data-action="open-transaction" data-transaction-id="${safe(row.transaction_id)}" tabindex="0">
+              <tr class="clickable-row ${state.selectedTransactionId === row.transaction_id ? "is-selected" : ""} ${tableRecordRowClasses(row)}" data-action="open-transaction" data-transaction-id="${safe(row.transaction_id)}" tabindex="0">
               <td class="check-cell">
                 <input
                   data-transaction-select
@@ -15583,11 +16256,13 @@ function transactionDescriptionCell(row = {}) {
   const secondary = [row.counterparty_name, id]
     .map((value) => String(value || "").trim())
     .find((value) => value && value !== primary);
+  const badges = transactionRowBadges(row);
   const deletedAtLine = transactionDeletedAtLine(row);
   return `
     <span class="table-main">${quickFilterControl(primary, primary, { field: primary === id ? "transaction_id" : "" })}</span>
     ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === id ? "transaction_id" : "" })}</span>` : ""}
     ${deletedAtLine ? `<span class="table-sub">${safe(deletedAtLine)}</span>` : ""}
+    ${badges ? `<span class="table-badge-row">${badges}</span>` : ""}
   `;
 }
 
@@ -15966,21 +16641,56 @@ function tradeDetailActions(row, isEditing) {
   `;
 }
 
+function drawerFieldsByKeys(keys = [], fields = [], renderer, row) {
+  const labels = new Map(fields);
+  return keys
+    .map((key) => (labels.has(key) ? renderer(key, labels.get(key), row) : ""))
+    .filter(Boolean)
+    .join("");
+}
+
+function drawerFormSection(title, body = "") {
+  const content = Array.isArray(body) ? body.filter(Boolean).join("") : body;
+  if (!content) return "";
+  return `
+    <section class="drawer-form-section">
+      <div class="drawer-form-section-title">${safe(title)}</div>
+      <div class="drawer-form-section-grid">
+        ${content}
+      </div>
+    </section>
+  `;
+}
+
+function drawerSectionFromKeys(title, keys, fields, renderer, row) {
+  return drawerFormSection(title, drawerFieldsByKeys(keys, fields, renderer, row));
+}
+
+function drawerFormActions(cancelAction) {
+  return `
+    <div class="drawer-actions">
+      <span class="drawer-dirty-status" data-drawer-dirty-status aria-live="polite">Unsaved changes</span>
+      <button class="small-button drawer-secondary-action" data-action="${safe(cancelAction)}" type="button">
+        <span data-icon="x"></span>
+        <span>Cancel</span>
+      </button>
+      <button class="small-button primary-button drawer-save-button" type="submit">
+        <span data-icon="check"></span>
+        <span>Save Changes</span>
+      </button>
+    </div>
+  `;
+}
+
 function accountEditForm(row) {
   return `
     <form class="drawer-form account-edit-form" data-account-edit-form data-account-id="${safe(row.account_id)}">
-      ${accountFields.map(([key, label]) => accountFieldInput(key, label, row)).join("")}
+      ${drawerSectionFromKeys("Account", ["account_id", "provider_id", "account_reference"], accountFields, accountFieldInput, row)}
+      ${drawerSectionFromKeys("Classification", ["account_status", "capital_bucket", "account_type", "country_code", "account_currency"], accountFields, accountFieldInput, row)}
+      ${drawerSectionFromKeys("Balances", ["balance_native", "credit_limit_native", "available_credit_native"], accountFields, accountFieldInput, row)}
+      ${drawerSectionFromKeys("Review", ["ledger_status", "review_status", "notes"], accountFields, accountFieldInput, row)}
       ${state.accountActionError ? `<p class="drawer-error">${safe(state.accountActionError)}</p>` : ""}
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-account-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-account-edit")}
     </form>
   `;
 }
@@ -15994,7 +16704,7 @@ function accountFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        ${countryCodeInputHtml(key, value)}
+        ${countryChoiceInputHtml(key, value)}
       </label>
     `;
   }
@@ -16014,9 +16724,7 @@ function accountFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <select name="${safe(key)}" autocomplete="off">
-          ${selectOptionsHtml(selectOptions, value, key)}
-        </select>
+        ${drawerChoiceInputHtml(key, selectOptions, value, key)}
       </label>
     `;
   }
@@ -16075,8 +16783,6 @@ function accountNumericFields() {
 
 function accountWideFields() {
   return new Set([
-    "account_id",
-    "account_reference",
     "notes",
   ]);
 }
@@ -16084,18 +16790,12 @@ function accountWideFields() {
 function tradeEditForm(row) {
   return `
     <form class="drawer-form trade-edit-form" data-trade-edit-form data-trade-id="${safe(row.trade_id)}">
-      ${tradeFields.map(([key, label]) => tradeFieldInput(key, label, row)).join("")}
+      ${drawerSectionFromKeys("Trade", ["trade_id", "account_id", "portfolio_id", "provider_id"], tradeFields, tradeFieldInput, row)}
+      ${drawerSectionFromKeys("Instrument", ["symbol", "asset_name", "instrument_type", "trade_currency"], tradeFields, tradeFieldInput, row)}
+      ${drawerSectionFromKeys("Position", ["quantity", "entry_date", "entry_price", "exit_date", "exit_price", "current_price", "price_as_of", "fees_native"], tradeFields, tradeFieldInput, row)}
+      ${drawerSectionFromKeys("Review", ["ledger_status", "review_status", "notes"], tradeFields, tradeFieldInput, row)}
       ${state.tradeActionError ? `<p class="drawer-error">${safe(state.tradeActionError)}</p>` : ""}
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-trade-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-trade-edit")}
     </form>
   `;
 }
@@ -16121,9 +16821,7 @@ function tradeFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <select name="${safe(key)}" autocomplete="off">
-          ${selectOptionsHtml(selectOptions, value, key)}
-        </select>
+        ${drawerChoiceInputHtml(key, selectOptions, value, key)}
       </label>
     `;
   }
@@ -16169,7 +16867,6 @@ function tradeNumericFields() {
 
 function tradeWideFields() {
   return new Set([
-    "trade_id",
     "asset_name",
     "notes",
   ]);
@@ -16178,18 +16875,12 @@ function tradeWideFields() {
 function transactionEditForm(row) {
   return `
     <form class="drawer-form transaction-edit-form" data-transaction-edit-form data-transaction-id="${safe(row.transaction_id)}">
-      ${transactionFields.map(([key, label]) => transactionFieldInput(key, label, row)).join("")}
+      ${drawerSectionFromKeys("Transaction", ["transaction_id", "source_system", "transaction_date", "posted_date"], transactionFields, transactionFieldInput, row)}
+      ${drawerSectionFromKeys("Classification", ["transaction_class", "transfer_scope", "category_id", "subcategory_id", "counterparty_name", "country_code"], transactionFields, transactionFieldInput, row)}
+      ${drawerSectionFromKeys("Amounts", ["statement_currency", "statement_amount", "sanitized_statement_amount", "amount_usd_converted", "amount_eur_converted"], transactionFields, transactionFieldInput, row)}
+      ${drawerSectionFromKeys("Review", ["imported_transaction", "ledger_status", "review_status", "memo"], transactionFields, transactionFieldInput, row)}
       ${state.transactionActionError ? `<p class="drawer-error">${safe(state.transactionActionError)}</p>` : ""}
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-transaction-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-transaction-edit")}
     </form>
   `;
 }
@@ -16202,28 +16893,16 @@ function transactionFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        ${countryCodeInputHtml(key, value)}
+        ${countryChoiceInputHtml(key, value)}
       </label>
     `;
   }
   if (comboOptions) {
-    const listId = `transaction-${safe(row.transaction_id)}-${safe(key)}-options`;
-    const inputValue = comboInputValue(value, key);
+    const allowCustomTaxonomy = key === "category_id" || key === "subcategory_id";
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <input
-          name="${safe(key)}"
-          type="text"
-          value="${safe(inputValue)}"
-          list="${listId}"
-          data-transaction-combo
-          ${transactionSelectDataAttribute(key)}
-          autocomplete="off"
-        />
-        <datalist id="${listId}">
-          ${datalistOptionsHtml(comboOptions, key)}
-        </datalist>
+        ${drawerChoiceInputHtml(key, comboOptions, value, key, ` data-transaction-combo${transactionSelectDataAttribute(key)}`, { allowCustom: allowCustomTaxonomy })}
       </label>
     `;
   }
@@ -16232,9 +16911,7 @@ function transactionFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <select name="${safe(key)}"${transactionSelectDataAttribute(key)} autocomplete="off">
-          ${selectOptionsHtml(selectOptions, value, key)}
-        </select>
+        ${drawerChoiceInputHtml(key, selectOptions, value, key, transactionSelectDataAttribute(key))}
       </label>
     `;
   }
@@ -16297,22 +16974,379 @@ function selectOptionsHtml(options, selectedValue, key) {
   ].join("");
 }
 
-function countryCodeInputHtml(key, value = "") {
-  const inputValue = countryCodeFromInput(value) || String(value ?? "").trim().toUpperCase();
+function drawerChoiceInputHtml(name, options = [], selectedValue = "", key = name, extraAttributes = "", settings = {}) {
+  const selected = String(selectedValue ?? "");
+  const rows = drawerChoiceRows(options, selected, key);
+  const selectedRow = rows.find((row) => row.value === selected) || rows[0];
+  const allowCustom = Boolean(settings.allowCustom);
   return `
-    <input
-      name="${safe(key)}"
-      type="text"
-      value="${safe(inputValue)}"
-      autocomplete="new-password"
-      autocapitalize="characters"
-      spellcheck="false"
-      inputmode="text"
-      maxlength="2"
-      pattern="[A-Za-z]{2}"
-      placeholder="RO"
-    />
+    <div class="drawer-choice" data-drawer-choice data-drawer-choice-key="${safe(key)}"${allowCustom ? " data-drawer-choice-allow-custom" : ""}>
+      <input name="${safe(name)}" type="hidden" value="${safe(selected)}"${extraAttributes} />
+      <button class="drawer-choice-button" type="button" data-drawer-choice-toggle aria-haspopup="listbox" aria-expanded="false">
+        <span>${safe(selectedRow?.label || "Select")}</span>
+      </button>
+      <div class="drawer-choice-menu">
+        <div class="drawer-choice-search-shell">
+          <input
+            class="drawer-choice-search"
+            data-drawer-choice-search
+            type="text"
+            value=""
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="Type to search"
+            aria-label="Search ${safe(labelize(name))}"
+          />
+        </div>
+        <div class="drawer-choice-options" role="listbox">
+          ${drawerChoiceOptionsHtml(rows, selected)}
+        </div>
+      </div>
+    </div>
   `;
+}
+
+function drawerChoiceRows(options = [], selectedValue = "", key = "") {
+  const selected = String(selectedValue ?? "");
+  return [{ value: "", label: "None" }, ...withSelectedOption(options, selected).map((option) => ({
+    value: optionValue(option),
+    label: optionLabel(option, key),
+  }))];
+}
+
+function drawerChoiceOptionsHtml(rows = [], selected = "") {
+  return rows.map((row) => `
+    <button
+      class="drawer-choice-option ${row.value === selected ? "is-selected" : ""}"
+      type="button"
+      role="option"
+      aria-selected="${row.value === selected ? "true" : "false"}"
+      data-drawer-choice-option
+      data-choice-value="${safe(row.value)}"
+      data-choice-label="${safe(row.label)}"
+    >
+      ${safe(row.label)}
+    </button>
+  `).join("");
+}
+
+function drawerChoiceCustomOptionHtml(value = "", key = "") {
+  const canonical = canonicalTaxonomyValue(value);
+  if (!canonical) return "";
+  const label = taxonomyLabel(canonical);
+  return `
+    <button
+      class="drawer-choice-option drawer-choice-custom-option is-custom"
+      type="button"
+      role="option"
+      aria-selected="false"
+      data-drawer-choice-option
+      data-drawer-choice-custom-option
+      data-choice-value="${safe(canonical)}"
+      data-choice-label="${safe(label)}"
+    >
+      Add "${safe(label)}"
+    </button>
+  `;
+}
+
+function closeDrawerChoices(root = document) {
+  root.querySelectorAll("[data-drawer-choice].is-open").forEach((choice) => {
+    choice.classList.remove("is-open", "is-above");
+    choice.style.removeProperty("--drawer-choice-menu-max-height");
+    resetDrawerChoiceSearch(choice);
+    const toggle = choice.querySelector("[data-drawer-choice-toggle]");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleDrawerChoice(toggle) {
+  const choice = toggle.closest("[data-drawer-choice]");
+  if (!choice) return;
+  const wasOpen = choice.classList.contains("is-open");
+  closeDrawerChoices();
+  if (wasOpen) return;
+  openDrawerChoice(choice);
+}
+
+function openDrawerChoice(choice) {
+  const toggle = choice.querySelector("[data-drawer-choice-toggle]");
+  resetDrawerChoiceSearch(choice);
+  choice.classList.add("is-open");
+  if (toggle) toggle.setAttribute("aria-expanded", "true");
+  activateDrawerChoiceOption(choice, drawerChoiceSelectedOption(choice) || drawerChoiceOptions(choice, { visibleOnly: true })[0]);
+  positionDrawerChoice(choice);
+  choice.querySelector("[data-drawer-choice-search]")?.focus({ preventScroll: true });
+}
+
+function positionDrawerChoice(choice) {
+  const body = choice.closest(".details-body");
+  const panel = choice.closest(".details-panel");
+  const actions = panel?.querySelector(".drawer-actions");
+  const choiceRect = choice.getBoundingClientRect();
+  const bodyRect = body?.getBoundingClientRect() || { top: 0, bottom: window.innerHeight };
+  const actionsRect = actions?.getBoundingClientRect();
+  const bottomLimit = actionsRect ? Math.min(bodyRect.bottom, actionsRect.top - 8) : bodyRect.bottom;
+  const spaceBelow = bottomLimit - choiceRect.bottom;
+  const spaceAbove = choiceRect.top - bodyRect.top;
+  const preferAbove = spaceBelow < 180 && spaceAbove > spaceBelow;
+  const maxHeight = Math.max(128, Math.min(260, (preferAbove ? spaceAbove : spaceBelow) - 8));
+  choice.classList.toggle("is-above", preferAbove);
+  choice.style.setProperty("--drawer-choice-menu-max-height", `${maxHeight}px`);
+}
+
+function selectDrawerChoiceOption(option) {
+  if (!option) return;
+  const choice = option.closest("[data-drawer-choice]");
+  if (!choice) return;
+  const input = choice.querySelector("input[type='hidden']");
+  const toggle = choice.querySelector("[data-drawer-choice-toggle]");
+  const toggleLabel = toggle?.querySelector("span");
+  const value = option.dataset.choiceValue || "";
+  const label = option.dataset.choiceLabel || option.textContent || "Select";
+  if (input) {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  if (toggleLabel) toggleLabel.textContent = label;
+  choice.querySelectorAll("[data-drawer-choice-option]").forEach((item) => {
+    const selected = item === option;
+    item.classList.toggle("is-selected", selected);
+    item.classList.toggle("is-active", selected);
+    item.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  closeDrawerChoices(choice.parentElement || document);
+  toggle?.focus();
+}
+
+function handleDrawerChoiceKeydown(event, choice) {
+  const key = event.key || "";
+  const isSearchInput = event.target instanceof Element && event.target.matches("[data-drawer-choice-search]");
+  if (key === "Tab") {
+    closeDrawerChoices(choice.parentElement || document);
+    return false;
+  }
+  if (key === "Escape") {
+    event.preventDefault();
+    closeDrawerChoices(choice.parentElement || document);
+    choice.querySelector("[data-drawer-choice-toggle]")?.focus();
+    return true;
+  }
+  if (key === "Enter" || key === " ") {
+    if (isSearchInput && key === " ") return false;
+    event.preventDefault();
+    if (!choice.classList.contains("is-open")) {
+      openDrawerChoice(choice);
+      return true;
+    }
+    selectDrawerChoiceOption(drawerChoiceActiveOption(choice) || drawerChoiceSelectedOption(choice) || drawerChoiceOptions(choice, { visibleOnly: true })[0]);
+    return true;
+  }
+  if (key === "ArrowDown" || key === "ArrowUp") {
+    event.preventDefault();
+    if (!choice.classList.contains("is-open")) openDrawerChoice(choice);
+    moveDrawerChoiceActiveOption(choice, key === "ArrowDown" ? 1 : -1);
+    return true;
+  }
+  if (key === "Home" || key === "End") {
+    if (isSearchInput) return false;
+    event.preventDefault();
+    if (!choice.classList.contains("is-open")) openDrawerChoice(choice);
+    const options = drawerChoiceOptions(choice, { visibleOnly: true });
+    activateDrawerChoiceOption(choice, key === "Home" ? options[0] : options[options.length - 1]);
+    return true;
+  }
+  if (isSearchInput) return false;
+  if (isDrawerChoiceTypeaheadKey(event)) {
+    event.preventDefault();
+    const wasOpen = choice.classList.contains("is-open");
+    if (!wasOpen) {
+      typeaheadDrawerChoiceOption(choice, key, { scroll: false });
+      const active = drawerChoiceActiveOption(choice);
+      if (active) selectDrawerChoiceOption(active);
+      return true;
+    }
+    typeaheadDrawerChoiceOption(choice, key);
+    return true;
+  }
+  return false;
+}
+
+function drawerChoiceOptions(choice, settings = {}) {
+  const options = Array.from(choice.querySelectorAll("[data-drawer-choice-option]"));
+  return settings.visibleOnly ? options.filter((option) => !option.classList.contains("is-filtered-out")) : options;
+}
+
+function drawerChoiceSelectedOption(choice) {
+  return choice.querySelector("[data-drawer-choice-option].is-selected");
+}
+
+function drawerChoiceActiveOption(choice) {
+  return choice.querySelector("[data-drawer-choice-option].is-active");
+}
+
+function activateDrawerChoiceOption(choice, option, settings = {}) {
+  if (!option) return;
+  const shouldScroll = settings.scroll !== false && choice.classList.contains("is-open");
+  drawerChoiceOptions(choice).forEach((item) => {
+    item.classList.toggle("is-active", item === option);
+  });
+  if (shouldScroll) option.scrollIntoView({ block: "nearest" });
+}
+
+function moveDrawerChoiceActiveOption(choice, direction = 1) {
+  const options = drawerChoiceOptions(choice, { visibleOnly: true });
+  if (!options.length) return;
+  const current = drawerChoiceActiveOption(choice) || drawerChoiceSelectedOption(choice) || options[0];
+  const currentIndex = Math.max(0, options.indexOf(current));
+  const nextIndex = (currentIndex + direction + options.length) % options.length;
+  activateDrawerChoiceOption(choice, options[nextIndex]);
+}
+
+function resetDrawerChoiceSearch(choice) {
+  if (!choice) return;
+  const search = choice.querySelector("[data-drawer-choice-search]");
+  if (search) search.value = "";
+  choice.querySelector("[data-drawer-choice-custom-option]")?.remove();
+  choice.querySelectorAll("[data-drawer-choice-option]").forEach((option) => {
+    option.classList.remove("is-filtered-out");
+    option.removeAttribute("aria-hidden");
+  });
+}
+
+function filterDrawerChoiceOptions(choice, query = "") {
+  if (!choice) return;
+  const normalizedQuery = normalizeDrawerChoiceText(query);
+  const customOption = updateDrawerChoiceCustomOption(choice, query);
+  const options = drawerChoiceOptions(choice);
+  let firstVisible = null;
+  options.forEach((option) => {
+    const hidden = Boolean(normalizedQuery) && !drawerChoiceOptionMatches(option, normalizedQuery, "contains");
+    option.classList.toggle("is-filtered-out", hidden);
+    option.setAttribute("aria-hidden", hidden ? "true" : "false");
+    if (!hidden && !firstVisible) firstVisible = option;
+  });
+  const selectedOption = drawerChoiceSelectedOption(choice);
+  const customVisible = customOption && !customOption.classList.contains("is-filtered-out");
+  activateDrawerChoiceOption(
+    choice,
+    selectedOption?.classList.contains("is-filtered-out")
+      ? customVisible ? customOption : firstVisible
+      : selectedOption || firstVisible || customOption,
+  );
+  positionDrawerChoice(choice);
+}
+
+function updateDrawerChoiceCustomOption(choice, query = "") {
+  choice.querySelector("[data-drawer-choice-custom-option]")?.remove();
+  if (!choice.hasAttribute("data-drawer-choice-allow-custom")) return null;
+  const canonical = canonicalTaxonomyValue(query);
+  if (!canonical) return null;
+  const hasExactOption = drawerChoiceOptions(choice).some((option) => {
+    if (option.hasAttribute("data-drawer-choice-custom-option")) return false;
+    return canonicalTaxonomyValue(option.dataset.choiceValue || option.dataset.choiceLabel || option.textContent || "") === canonical;
+  });
+  if (hasExactOption) return null;
+  const optionsRoot = choice.querySelector(".drawer-choice-options");
+  if (!optionsRoot) return null;
+  optionsRoot.insertAdjacentHTML("beforeend", drawerChoiceCustomOptionHtml(canonical, choice.dataset.drawerChoiceKey || ""));
+  return choice.querySelector("[data-drawer-choice-custom-option]");
+}
+
+function isDrawerChoiceTypeaheadKey(event) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+  const key = event.key || "";
+  return key.length === 1 && !/^\s$/.test(key);
+}
+
+function typeaheadDrawerChoiceOption(choice, key, settings = {}) {
+  const now = Date.now();
+  const lastAt = Number(choice.dataset.drawerChoiceTypeaheadAt || 0);
+  const previous = now - lastAt < 800 ? choice.dataset.drawerChoiceTypeahead || "" : "";
+  const buffer = `${previous}${key}`.toLowerCase();
+  choice.dataset.drawerChoiceTypeahead = buffer;
+  choice.dataset.drawerChoiceTypeaheadAt = String(now);
+
+  const options = drawerChoiceOptions(choice);
+  if (!options.length) return;
+  const active = drawerChoiceActiveOption(choice) || drawerChoiceSelectedOption(choice);
+  const startIndex = active ? options.indexOf(active) : -1;
+  const repeatedSingleKey = buffer.length > 1 && [...buffer].every((character) => character === buffer[0]);
+  const search = repeatedSingleKey ? key.toLowerCase() : buffer;
+  const match = findDrawerChoiceTypeaheadMatch(options, search, repeatedSingleKey ? startIndex + 1 : 0)
+    || (repeatedSingleKey ? findDrawerChoiceTypeaheadMatch(options, search, 0, startIndex + 1) : null);
+  if (match) activateDrawerChoiceOption(choice, match, settings);
+  return match;
+}
+
+function findDrawerChoiceTypeaheadMatch(options = [], search = "", start = 0, end = options.length) {
+  const normalizedSearch = normalizeDrawerChoiceText(search);
+  if (!normalizedSearch) return null;
+  const searchable = options.slice(start, end);
+  return searchable.find((option) => drawerChoiceOptionMatches(option, normalizedSearch, "prefix"))
+    || searchable.find((option) => drawerChoiceOptionMatches(option, normalizedSearch, "contains"))
+    || null;
+}
+
+function drawerChoiceOptionMatches(option, search = "", mode = "prefix") {
+  const value = normalizeDrawerChoiceText(option.dataset.choiceValue || "");
+  const label = normalizeDrawerChoiceText(option.dataset.choiceLabel || option.textContent || "");
+  const words = label.split(" ").filter(Boolean);
+  if (mode === "prefix") {
+    return value.startsWith(search) || label.startsWith(search) || words.some((word) => word.startsWith(search));
+  }
+  return value.includes(search) || label.includes(search);
+}
+
+function normalizeDrawerChoiceText(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function drawerEditFormForElement(element) {
+  if (!(element instanceof Element)) return null;
+  return element.matches(drawerEditFormSelector)
+    ? element
+    : element.closest(drawerEditFormSelector);
+}
+
+function markDrawerEditFormDirty(element) {
+  const form = drawerEditFormForElement(element);
+  if (!form || form.classList.contains("is-saving")) return;
+  form.classList.add("is-dirty");
+  const status = form.querySelector("[data-drawer-dirty-status]");
+  if (status) status.textContent = "Unsaved changes";
+}
+
+function setDrawerFormSaving(form) {
+  if (!form) return;
+  form.classList.add("is-saving");
+  const status = form.querySelector("[data-drawer-dirty-status]");
+  if (status) status.textContent = "Saving...";
+  form.querySelectorAll("button, input, select").forEach((control) => {
+    if (control.matches("[data-action^='cancel-']")) return;
+    control.disabled = true;
+  });
+}
+
+function submitDrawerEditForm(form) {
+  if (!form || form.classList.contains("is-saving")) return;
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+    return;
+  }
+  form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
+function countryChoiceInputHtml(key, value = "") {
+  const selected = countryCodeFromInput(value) || normalizeCountryCode(value);
+  return drawerChoiceInputHtml(key, countryOptions(), selected, key);
 }
 
 function datalistOptionsHtml(options, key) {
@@ -16411,6 +17445,19 @@ function syncTransactionEditOptions(form, changedName) {
 }
 
 function replaceSelectOptions(select, options, selectedValue, key) {
+  const drawerChoice = select.closest("[data-drawer-choice]");
+  if (drawerChoice && select.type === "hidden") {
+    const rows = drawerChoiceRows(options, selectedValue, key);
+    const selected = String(selectedValue ?? "");
+    const selectedRow = rows.find((row) => row.value === selected) || rows[0];
+    const optionsRoot = drawerChoice.querySelector(".drawer-choice-options");
+    const toggleLabel = drawerChoice.querySelector("[data-drawer-choice-toggle] span");
+    if (optionsRoot) optionsRoot.innerHTML = drawerChoiceOptionsHtml(rows, selected);
+    if (toggleLabel) toggleLabel.textContent = selectedRow?.label || "Select";
+    select.value = selectedRow?.value || "";
+    resetDrawerChoiceSearch(drawerChoice);
+    return;
+  }
   if (select.tagName === "INPUT" && select.list) {
     select.list.innerHTML = datalistOptionsHtml(options, key);
   } else {
@@ -16531,7 +17578,6 @@ function isMainCurrency(currency) {
 
 function transactionWideFields() {
   return new Set([
-    "transaction_id",
     "counterparty_name",
     "memo",
   ]);
@@ -16749,7 +17795,7 @@ function portfolioInstrumentDetailsPanel(rows = []) {
     row.ticker && row.ticker !== "N/A" ? row.ticker : row.asset_name || "Portfolio Instrument",
     isEditing ? portfolioInstrumentEditForm(row) : `
       <dl>
-        ${detailItem("Portfolio", row.portfolio_name || displayPortfolioId(row.portfolio_id))}
+        ${detailItem("Portfolio", compactPortfolioName(row.portfolio_name || portfolioReferenceLabel(row.portfolio_id)))}
         ${detailItem("Provider", labelize(row.provider))}
         ${detailItem("Instrument", row.asset_name)}
         ${detailItem("Ticker", row.ticker)}
@@ -16801,19 +17847,13 @@ function portfolioInstrumentEditForm(row) {
   const id = portfolioInstrumentId(row);
   return `
     <form class="drawer-form portfolio-instrument-edit-form" data-portfolio-instrument-edit-form data-portfolio-instrument-id="${safe(id)}">
-      ${portfolioInstrumentFields.map(([key, label]) => portfolioInstrumentFieldInput(key, label, row)).join("")}
+      ${drawerSectionFromKeys("Instrument", ["portfolio_id", "portfolio_name", "provider", "asset_name", "ticker", "exchange", "isin"], portfolioInstrumentFields, portfolioInstrumentFieldInput, row)}
+      ${drawerSectionFromKeys("Classification", ["asset_bucket", "asset_class", "base_currency", "current_value_currency"], portfolioInstrumentFields, portfolioInstrumentFieldInput, row)}
+      ${drawerSectionFromKeys("Value", ["current_value_native", "current_value_eur", "target_allocation_pct"], portfolioInstrumentFields, portfolioInstrumentFieldInput, row)}
+      ${drawerSectionFromKeys("Assumptions", ["expected_cagr_pct", "expected_volatility_pct", "total_fees_pct", "achieved_pl_native", "achieved_return_pct", "fees_paid_native", "notes"], portfolioInstrumentFields, portfolioInstrumentFieldInput, row)}
       ${state.portfolioActionError ? `<p class="drawer-error">${safe(state.portfolioActionError)}</p>` : ""}
       <p class="drawer-note">Changes are saved to the portfolio strategy model and recalculate planning, forecast, and simulation views.</p>
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-portfolio-instrument-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-portfolio-instrument-edit")}
     </form>
   `;
 }
@@ -16887,23 +17927,17 @@ function exitStrategyPhaseDetailActions(row, isEditing) {
 function exitStrategyPhaseEditForm(row) {
   return `
     <form class="drawer-form exit-phase-edit-form" data-exit-phase-edit-form data-exit-phase-id="${safe(row.phase_id)}">
-      <label>
-        <span>Phase ID</span>
-        <input name="phase_id" type="text" value="${safe(displayPhaseId(row.phase_id))}" readonly autocomplete="off" />
-      </label>
-      ${exitPhaseFields.map(([key, label]) => exitStrategyPhaseFieldInput(key, label, row)).join("")}
+      ${drawerFormSection("Phase", `
+        <label>
+          <span>Phase ID</span>
+          <input class="is-readonly" name="phase_id" type="text" value="${safe(displayPhaseId(row.phase_id))}" readonly autocomplete="off" />
+        </label>
+        ${drawerFieldsByKeys(["phase_name"], exitPhaseFields, exitStrategyPhaseFieldInput, row)}
+      `)}
+      ${drawerSectionFromKeys("Window", ["start_date", "end_date"], exitPhaseFields, exitStrategyPhaseFieldInput, row)}
       ${state.exitPhaseActionError ? `<p class="drawer-error">${safe(state.exitPhaseActionError)}</p>` : ""}
       <p class="drawer-note">Monthly deployment stays linked to MIP rows. Phase and cumulative capital recalculate after save.</p>
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-exit-phase-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-exit-phase-edit")}
     </form>
   `;
 }
@@ -16925,7 +17959,7 @@ function portfolioMipDetailsPanel(rows = [], phases = []) {
   const isEditing = state.selectedPortfolioMipEditing;
   return detailPanel(
     isEditing ? "Edit Monthly Plan" : "Monthly Investment Plan",
-    row.portfolio_name || displayPortfolioId(row.portfolio_id) || "Portfolio",
+    compactPortfolioName(row.portfolio_name || portfolioReferenceLabel(row.portfolio_id)) || "P",
     isEditing ? portfolioMipEditForm(row, phases) : `
       <dl>
         ${detailItem("Portfolio ID", displayPortfolioId(row.portfolio_id))}
@@ -16961,20 +17995,14 @@ function portfolioMipEditForm(row, phases = []) {
   const phaseIds = portfolioPhaseIds(phases);
   return `
     <form class="drawer-form portfolio-mip-edit-form" data-portfolio-mip-edit-form data-portfolio-mip-id="${safe(id)}">
-      ${portfolioMipFields.map(([key, label]) => portfolioMipFieldInput(key, label, row)).join("")}
-      ${phaseIds.map((phaseId) => portfolioMipPhaseInput(phaseId, row)).join("")}
+      ${drawerSectionFromKeys("Plan", ["portfolio_id", "portfolio_name", "provider"], portfolioMipFields, portfolioMipFieldInput, row)}
+      ${drawerSectionFromKeys("Schedule", ["start_date", "mip_phase_end_date_target", "portfolio_exit_date"], portfolioMipFields, portfolioMipFieldInput, row)}
+      ${drawerSectionFromKeys("Contribution", ["contribution_type", "contribution_role"], portfolioMipFields, portfolioMipFieldInput, row)}
+      ${drawerFormSection("Deployment", phaseIds.map((phaseId) => portfolioMipPhaseInput(phaseId, row)).join(""))}
+      ${drawerSectionFromKeys("Notes", ["notes"], portfolioMipFields, portfolioMipFieldInput, row)}
       ${state.portfolioMipActionError ? `<p class="drawer-error">${safe(state.portfolioMipActionError)}</p>` : ""}
       <p class="drawer-note">Changes are saved to the portfolio strategy model and recalculate planning, forecast, and simulation views.</p>
-      <div class="drawer-actions">
-        <button class="small-button drawer-secondary-action" data-action="cancel-portfolio-mip-edit" type="button">
-          <span data-icon="x"></span>
-          <span>Cancel</span>
-        </button>
-        <button class="small-button primary-button drawer-save-button" type="submit">
-          <span data-icon="check"></span>
-          <span>Save Changes</span>
-        </button>
-      </div>
+      ${drawerFormActions("cancel-portfolio-mip-edit")}
     </form>
   `;
 }
@@ -17800,6 +18828,7 @@ async function saveTransaction(form) {
       delete values[name];
     });
   }
+  setDrawerFormSaving(form);
   state.transactionActionError = "";
   try {
     const result = await fetchJson(`/api/transactions/${encodeURIComponent(transactionId)}`, {
@@ -17823,6 +18852,7 @@ async function saveAccount(form) {
   if (Object.prototype.hasOwnProperty.call(values, "country_code")) {
     values.country_code = countryCodeFromInput(values.country_code);
   }
+  setDrawerFormSaving(form);
   state.accountActionError = "";
   try {
     const result = await fetchJson(`/api/accounts/${encodeURIComponent(accountId)}`, {
@@ -17865,6 +18895,7 @@ async function saveProfile(form) {
 async function saveTrade(form) {
   const tradeId = form.dataset.tradeId || state.selectedTradeId;
   const values = Object.fromEntries(new FormData(form).entries());
+  setDrawerFormSaving(form);
   state.tradeActionError = "";
   try {
     const result = await fetchJson(`/api/trades/${encodeURIComponent(tradeId)}`, {
@@ -17886,6 +18917,7 @@ async function savePortfolioInstrument(form) {
   const id = form.dataset.portfolioInstrumentId || state.selectedPortfolioInstrumentId;
   if (!id) return;
   const values = normalizePortfolioInstrumentFormValues(Object.fromEntries(new FormData(form).entries()));
+  setDrawerFormSaving(form);
   state.portfolioActionError = "";
   try {
     const result = await fetchJson(`/api/portfolio/instruments/${encodeURIComponent(id)}`, {
@@ -17941,6 +18973,7 @@ async function savePortfolioMip(form) {
     _portfolio_mip_id: id,
     _is_custom: Boolean(state.portfolioMipOverrides[id]?._is_custom),
   }, phases);
+  setDrawerFormSaving(form);
   state.portfolioMipActionError = "";
   try {
     const result = await savePortfolioMipPayload(id, values);
@@ -17997,6 +19030,7 @@ async function saveExitPhase(form) {
   if (!id) return;
   const values = Object.fromEntries(new FormData(form).entries());
   values.phase_id = storedPhaseId(values.phase_id);
+  setDrawerFormSaving(form);
   state.exitPhaseActionError = "";
   try {
     const result = await fetchJson(`/api/portfolio/phases/${encodeURIComponent(id)}`, {
@@ -18127,7 +19161,7 @@ async function deletePortfolioMip(portfolioMipIdValue) {
   const id = portfolioMipIdValue || state.selectedPortfolioMipId;
   if (!id) return;
   const row = currentPortfolioMipRows().find((item) => portfolioMipId(item) === id);
-  const label = row?.portfolio_name || row?.portfolio_id || id;
+  const label = compactPortfolioName(row?.portfolio_name || portfolioReferenceLabel(row?.portfolio_id)) || id;
   const confirmed = window.confirm(`Delete ${label} from the monthly investment plan?`);
   if (!confirmed) return;
 
@@ -18769,7 +19803,7 @@ function updateTradeSort(field) {
   } else {
     state.tradeSort = {
       field,
-      direction: ["market_value", "realized_pl", "unrealized_pl", "activity_date", "exit_date", "price_as_of"].includes(field) ? "desc" : "asc",
+      direction: ["market_value", "realized_pl", "unrealized_pl", "pl", "activity_date", "exit_date", "price_as_of"].includes(field) ? "desc" : "asc",
     };
   }
   state.tradeOffset = 0;

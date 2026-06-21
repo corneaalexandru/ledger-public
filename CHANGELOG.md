@@ -2,9 +2,13 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-21
+
+- Added the shared topbar text-size control and moved the monthly target category/month model blocks into Transactions > Metrics with the Overview-style line format.
+- Removed the compact asterisk progress meters from Metrics rows and refreshed the static asset cache so the text-only metrics layout is restored.
+
 ## 2026-06-20
 
-- Added compact text progress meters to Metrics rows where a score, share, ratio, utilization, exposure, or movement percentage is available.
 - Mirrored the shared Ledger UI, health-indicator, theme, and static cache updates into Ledger Public.
 - Added deleted-date traceability display for transactions, accounts, and trades, including visible fallbacks when older deleted rows have no recorded timestamp.
 - Fixed dark/Navy form field contrast in searchable combo boxes, category/subcategory inputs, and select option lists.
