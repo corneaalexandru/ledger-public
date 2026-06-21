@@ -80,9 +80,9 @@
   --treemap-fg-on-7: #101418;
   --treemap-fg-on-8: #101418;
   --treemap-muted-on-dark: rgba(55, 64, 73, 0.68);
-  --section-gap: 28px;
-  --metric-section-gap: 20px;
-  --table-section-gap: 16px;
+  --section-gap: 22px;
+  --metric-section-gap: 16px;
+  --table-section-gap: 0px;
   --table-header-gap: 10px;
   --table-row-height: 60px;
   --overview-deep-gap: 48px;
@@ -6129,11 +6129,11 @@ button.metric-card {
 }
 
 .transaction-metrics + .panel {
-  margin-top: var(--metric-section-gap);
+  margin-top: 0;
 }
 
 .transaction-metrics + .panel.table-panel {
-  margin-top: var(--table-section-gap);
+  margin-top: 0;
 }
 
 .transaction-metrics.monthly-target-metrics {
