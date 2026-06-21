@@ -218,6 +218,73 @@ html[data-theme="navy"] {
   --treemap-muted-on-dark: rgba(7, 17, 31, 0.7);
 }
 
+html[data-theme="navy-translucent"] {
+  color-scheme: dark;
+  --bg: #06111f;
+  --surface: rgba(10, 23, 40, 0.54);
+  --surface-2: rgba(16, 34, 58, 0.48);
+  --surface-3: rgba(33, 59, 94, 0.48);
+  --line: rgba(109, 142, 192, 0.32);
+  --line-soft: rgba(109, 142, 192, 0.22);
+  --line-subtle: rgba(109, 142, 192, 0.15);
+  --line-faint: rgba(109, 142, 192, 0.1);
+  --line-strong: rgba(179, 203, 238, 0.38);
+  --control-line: rgba(128, 161, 211, 0.28);
+  --text: #edf5ff;
+  --muted: #a8b7cc;
+  --faint: #788aa5;
+  --strong: #ffffff;
+  --inverse: #06101c;
+  --shadow: rgba(1, 8, 20, 0.36);
+  --control-bg: rgba(255, 255, 255, 0.055);
+  --details-shadow: rgba(1, 8, 20, 0.48);
+  --accent: #6bd8ba;
+  --income-positive: #6bd8ba;
+  --accent-2: #8fc0ff;
+  --warning: #e9c077;
+  --danger: #f0837b;
+  --negative-subtle: #d5dfec;
+  --target-progress-planned: rgba(52, 75, 105, 0.78);
+  --target-progress-achieved: #dce8f4;
+  --target-progress-over: #d45b52;
+  --heat-0: rgba(13, 27, 45, 0.78);
+  --heat-1: rgba(19, 38, 62, 0.78);
+  --heat-2: rgba(27, 52, 82, 0.78);
+  --heat-3: rgba(41, 77, 117, 0.82);
+  --heat-4: #52759d;
+  --heat-5: #e8f2ff;
+  --heat-text: #edf5ff;
+  --heat-4-text: #ffffff;
+  --heat-5-text: #06101c;
+  --heat-income-outline: rgba(107, 216, 186, 0.34);
+  --chart-band: rgba(143, 192, 255, 0.13);
+  --treemap-shade-1: #e9f0f8;
+  --treemap-shade-2: #dbe7f3;
+  --treemap-shade-3: #ccdeee;
+  --treemap-shade-4: #bdd4e8;
+  --treemap-shade-5: #acc8df;
+  --treemap-shade-6: #9abbd5;
+  --treemap-shade-7: #89adca;
+  --treemap-shade-8: #789fbe;
+  --treemap-separator: rgba(11, 23, 40, 0.18);
+  --treemap-separator-strong: rgba(11, 23, 40, 0.28);
+  --treemap-depth-target: #f4f8fc;
+  --treemap-fg-on-1: #07111f;
+  --treemap-fg-on-2: #07111f;
+  --treemap-fg-on-3: #07111f;
+  --treemap-fg-on-4: #07111f;
+  --treemap-fg-on-5: #07111f;
+  --treemap-fg-on-6: #07111f;
+  --treemap-fg-on-7: #07111f;
+  --treemap-fg-on-8: #07111f;
+  --treemap-muted-on-dark: rgba(7, 17, 31, 0.7);
+  --translucent-sheet: rgba(6, 17, 31, 0.62);
+  --translucent-panel: rgba(9, 22, 39, 0.36);
+  --translucent-control: rgba(17, 35, 60, 0.42);
+  --translucent-highlight: rgba(58, 98, 146, 0.38);
+  --translucent-blur: 26px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -237,6 +304,117 @@ body {
     sans-serif;
   font-size: var(--ledger-font-body);
   letter-spacing: 0;
+}
+
+html[data-theme="navy-translucent"] {
+  background:
+    radial-gradient(circle at 4% 8%, rgba(32, 80, 132, 0.46), transparent 30rem),
+    radial-gradient(circle at 96% 12%, rgba(35, 69, 112, 0.3), transparent 32rem),
+    radial-gradient(circle at 84% 96%, rgba(21, 63, 111, 0.42), transparent 36rem),
+    linear-gradient(145deg, #071527 0%, #030914 50%, #071729 100%);
+}
+
+html[data-theme="navy-translucent"] body {
+  background: transparent;
+}
+
+html[data-theme="navy-translucent"] .app-shell {
+  background:
+    linear-gradient(90deg, rgba(19, 54, 93, 0.28), transparent 19rem),
+    radial-gradient(circle at 76% 16%, rgba(35, 75, 120, 0.2), transparent 24rem);
+}
+
+html[data-theme="navy-translucent"] .sidebar,
+html[data-theme="navy-translucent"] .topbar,
+html[data-theme="navy-translucent"] .details-panel,
+html[data-theme="navy-translucent"] .details-panel header,
+html[data-theme="navy-translucent"] .minimal-table th,
+html[data-theme="navy-translucent"] .drawer-actions {
+  background: var(--translucent-sheet);
+  -webkit-backdrop-filter: blur(var(--translucent-blur)) saturate(132%);
+  backdrop-filter: blur(var(--translucent-blur)) saturate(132%);
+}
+
+html[data-theme="navy-translucent"] .sidebar {
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.035);
+}
+
+html[data-theme="navy-translucent"] .topbar {
+  box-shadow: 0 18px 52px rgba(1, 8, 20, 0.16);
+}
+
+html[data-theme="navy-translucent"] .search,
+html[data-theme="navy-translucent"] .filter-chip,
+html[data-theme="navy-translucent"] .clear-filter-button,
+html[data-theme="navy-translucent"] .control-button,
+html[data-theme="navy-translucent"] .font-scale-button,
+html[data-theme="navy-translucent"] .period-mode-cycle-button,
+html[data-theme="navy-translucent"] .period-trigger,
+html[data-theme="navy-translucent"] .small-button,
+html[data-theme="navy-translucent"] .settings-select,
+html[data-theme="navy-translucent"] .settings-card-value input,
+html[data-theme="navy-translucent"] .settings-card-value select,
+html[data-theme="navy-translucent"] .settings-input-card input,
+html[data-theme="navy-translucent"] .settings-input-card select,
+html[data-theme="navy-translucent"] .drawer-form select,
+html[data-theme="navy-translucent"] .drawer-form input,
+html[data-theme="navy-translucent"] .drawer-choice-button,
+html[data-theme="navy-translucent"] .drawer-choice-menu,
+html[data-theme="navy-translucent"] .drawer-choice-search-shell,
+html[data-theme="navy-translucent"] .drawer-choice-search {
+  background: var(--translucent-control);
+  -webkit-backdrop-filter: blur(18px) saturate(128%);
+  backdrop-filter: blur(18px) saturate(128%);
+}
+
+html[data-theme="navy-translucent"] .search:focus-within,
+html[data-theme="navy-translucent"] .filter-chip:hover,
+html[data-theme="navy-translucent"] .clear-filter-button:hover,
+html[data-theme="navy-translucent"] .control-button:hover,
+html[data-theme="navy-translucent"] .font-scale-button:hover:not(:disabled),
+html[data-theme="navy-translucent"] .font-scale-button.is-active,
+html[data-theme="navy-translucent"] .period-mode-cycle-button:hover,
+html[data-theme="navy-translucent"] .period-trigger:hover,
+html[data-theme="navy-translucent"] .period-trigger.is-active,
+html[data-theme="navy-translucent"] .small-button:hover,
+html[data-theme="navy-translucent"] .drawer-choice-option:hover,
+html[data-theme="navy-translucent"] .drawer-choice-option:focus-visible,
+html[data-theme="navy-translucent"] .drawer-choice-option.is-active {
+  background: var(--translucent-highlight);
+}
+
+html[data-theme="navy-translucent"] .nav-item:hover,
+html[data-theme="navy-translucent"] .nav-item.is-active,
+html[data-theme="navy-translucent"] .sidebar-action:hover,
+html[data-theme="navy-translucent"] .sidebar-action.is-active {
+  background: rgba(55, 91, 138, 0.42);
+}
+
+html[data-theme="navy-translucent"] .panel,
+html[data-theme="navy-translucent"] .metric-card,
+html[data-theme="navy-translucent"] .compact-chart-panel,
+html[data-theme="navy-translucent"] .period-all-panel,
+html[data-theme="navy-translucent"] .statement-preview,
+html[data-theme="navy-translucent"] .statement-frame {
+  background: var(--translucent-panel);
+  -webkit-backdrop-filter: blur(16px) saturate(122%);
+  backdrop-filter: blur(16px) saturate(122%);
+}
+
+html[data-theme="navy-translucent"] .panel,
+html[data-theme="navy-translucent"] .metric-card {
+  border-color: var(--line-subtle);
+}
+
+html[data-theme="navy-translucent"] .panel.table-panel,
+html[data-theme="navy-translucent"] .planning-target-grid .panel.full,
+html[data-theme="navy-translucent"] .monthly-target-grid .panel.full,
+html[data-theme="navy-translucent"] .register-metrics-section .panel,
+html[data-theme="navy-translucent"] .settings-line-grid .metric-card,
+html[data-theme="navy-translucent"] .transaction-metrics .metric-card {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .hero-value,
