@@ -13109,7 +13109,8 @@ function transactionInsightsDashboard(data = {}) {
       ]),
     },
     { title: "Where Money Comes From", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
-    { title: "Where Money Goes", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
+    { title: "Where Money Goes: Categories", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
+    { title: "Where Money Goes: Subcategories", html: transactionSubcategorySpendMetricLines(insights.subcategory_spend || []) },
     { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
     {
       title: "Key Trends",
@@ -13169,8 +13170,30 @@ function transactionCategorySpendMetricLines(rows = []) {
     meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
     note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period category spend.`,
     icon: insightIconFor(row.category, "category"),
-    options: metricActionOptions("filter-category", { category: row.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(row.category || "expense")} transactions`),
+    options: metricActionOptions("filter-transactions", { category: row.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(row.category || "expense")} transactions`),
   })));
+}
+
+function transactionSubcategorySpendMetricLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const subcategory = row.subcategory || "";
+    const subcategoryLabel = subcategory === "uncategorized" ? "Uncategorized" : taxonomyLabel(subcategory || "subcategory");
+    const parentLabel = taxonomyLabel(row.category || "expense");
+    const filterAttrs = {
+      category: row.category || "",
+      "transaction-class": "expense",
+    };
+    if (subcategory && subcategory !== "uncategorized") filterAttrs.subcategory = subcategory;
+    return {
+      label: subcategoryLabel,
+      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+      meta: [parentLabel, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period subcategory spend.`,
+      icon: insightIconFor(subcategory || row.category, "category"),
+      options: metricActionOptions("filter-transactions", filterAttrs, `Show ${subcategoryLabel} transactions`),
+    };
+  }));
 }
 
 function transactionIncomeSourceMetricLines(rows = []) {
