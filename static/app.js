@@ -4645,7 +4645,7 @@ function renderPlanning() {
 
   const data = state.overview;
   if (!data) return loadingState("Loading planning");
-  if (!["targets", "exit", "mip"].includes(state.planningView)) {
+  if (!["targets", "metrics", "exit", "mip"].includes(state.planningView)) {
     state.planningView = "targets";
   }
 
@@ -4665,17 +4665,20 @@ function planningDashboard(data = {}) {
   return `
     ${state.planningView === "targets"
       ? planningTargetsDashboard(planning)
-      : state.planningView === "exit"
-        ? planningExitStrategyDashboard(data.portfolio || {}, planning)
-        : state.planningView === "mip"
-          ? planningMonthlyInvestmentDashboard(data.portfolio || {})
-          : planningTargetsDashboard(planning)}
+      : state.planningView === "metrics"
+        ? planningMetricsDashboard(planning)
+        : state.planningView === "exit"
+          ? planningExitStrategyDashboard(data.portfolio || {}, planning)
+          : state.planningView === "mip"
+            ? planningMonthlyInvestmentDashboard(data.portfolio || {})
+            : planningTargetsDashboard(planning)}
   `;
 }
 
 function planningTabs() {
   const tabs = [
     { id: "targets", label: "Targets" },
+    { id: "metrics", label: "Metrics" },
     { id: "exit", label: "Exit Strategy" },
     { id: "mip", label: "Monthly Plan" },
   ];
@@ -5007,6 +5010,16 @@ function chartSparklineId(chartId = "", label = "") {
 
 function planningTargetsDashboard(planning = {}) {
   const rows = planningTargetRows(planning);
+  return `
+    <section class="planning-target-grid">
+      ${panel("Planning Rules", yearlyTargetsTable(rows), "full")}
+    </section>
+    ${yearlyTargetDetailsPanel(rows)}
+  `;
+}
+
+function planningMetricsDashboard(planning = {}) {
+  const rows = planningTargetRows(planning);
   const summary = yearlyTargetsSummary(rows, planning.summary || {});
   return `
     <section class="transaction-metrics planning-target-metrics">
@@ -5016,10 +5029,6 @@ function planningTargetsDashboard(planning = {}) {
       ${transactionMetric("Expense Ratio", formatPercent(summary.actual_expense_pct || 0), "actual spending / income baseline", metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions"))}
     </section>
     ${planningComplianceDiagnosticsDashboard(planning)}
-    <section class="planning-target-grid">
-      ${panel("Planning Rules", yearlyTargetsTable(rows), "full")}
-    </section>
-    ${yearlyTargetDetailsPanel(rows)}
   `;
 }
 
