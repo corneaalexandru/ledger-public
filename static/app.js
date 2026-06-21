@@ -520,12 +520,8 @@ function updateIntelligenceThreshold(control) {
   });
   persistIntelligenceThresholds();
   if (state.view === "trades") {
-    if (state.tradeView === "returns") {
-      state.portfolioReturns = null;
-      loadPortfolioReturns();
-    } else {
-      loadTrades();
-    }
+    state.portfolioReturns = null;
+    loadTrades();
   } else {
     render();
   }
@@ -2022,12 +2018,8 @@ function bindEvents() {
       state.intelligenceThresholds = defaultIntelligenceThresholds();
       persistIntelligenceThresholds();
       if (state.view === "trades") {
-        if (state.tradeView === "returns") {
-          state.portfolioReturns = null;
-          loadPortfolioReturns();
-        } else {
-          loadTrades();
-        }
+        state.portfolioReturns = null;
+        loadTrades();
       } else {
         render();
       }
@@ -2252,20 +2244,6 @@ function bindEvents() {
       state.tradeActionError = "";
       if (!state.trades) {
         loadTrades();
-      } else {
-        render();
-      }
-    }
-    if (action.dataset.action === "trade-returns-tab") {
-      state.tradeView = "returns";
-      state.tradeOffset = 0;
-      state.expandedChartId = "";
-      state.selectedTrades.clear();
-      state.selectedTradeId = "";
-      state.selectedTradeEditing = false;
-      state.tradeActionError = "";
-      if (!state.portfolioReturns) {
-        loadPortfolioReturns();
       } else {
         render();
       }
@@ -2826,13 +2804,7 @@ function runSearchForCurrentView() {
     return;
   }
   if (state.view === "trades") {
-    if (state.tradeView === "returns") {
-      state.portfolioReturns = null;
-      state.error.portfolioReturns = "";
-      loadPortfolioReturns();
-    } else {
-      loadTrades();
-    }
+    loadTrades();
     return;
   }
   if (state.view === "portfolio") {
@@ -4585,22 +4557,7 @@ function renderTransactions() {
 }
 
 function renderTrades() {
-  if (state.tradeView === "returns") {
-    const returnsData = state.portfolioReturns || state.trades || {
-      insights: {},
-      summary: {},
-      insight_tables: {},
-      rows: [],
-    };
-    return `
-      <section class="transactions-head">
-        <h1>Trades</h1>
-      </section>
-      ${tradeTabs()}
-      ${portfolioReturnsDashboard({}, returnsData)}
-    `;
-  }
-
+  if (state.tradeView === "returns") state.tradeView = "insights";
   if (state.loading.trades && !state.trades) return loadingState("Loading trades");
   if (state.error.trades && !state.trades) return errorState("Trades", state.error.trades);
   const data = state.trades;
@@ -5456,32 +5413,6 @@ function portfolioPerformanceDashboard(portfolio = {}) {
   `;
 }
 
-function portfolioReturnsDashboard(portfolio = {}, data = {}) {
-  if (state.loading.portfolioReturns && !state.portfolioReturns) {
-    return loadingState("Loading trade returns");
-  }
-  if (state.error.portfolioReturns && !state.portfolioReturns) {
-    return errorState("Trade returns", state.error.portfolioReturns);
-  }
-  const insights = portfolioReturnsInsights(data);
-  const tables = portfolioReturnsTables(data);
-  const summary = portfolioReturnsSummary(insights, portfolio);
-  return `
-    ${portfolioReturnsActions()}
-    <section class="transaction-metrics portfolio-return-metrics">
-      ${transactionMetric("Total P/L", signedWholeAmount(summary.total_pl_eur || 0, "EUR"), `${signedPercent(summary.total_return_pct || 0)} on trade capital`, metricActionOptions("filter-trades", {}, "Show trades"))}
-      ${transactionMetric("Realized P/L", signedWholeAmount(summary.realized_pl_eur || 0, "EUR"), `${signedPercent(summary.realized_pl_pct || 0)} closed return`, metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades"))}
-      ${transactionMetric("Unrealized P/L", signedWholeAmount(summary.unrealized_pl_eur || 0, "EUR"), `${signedPercent(summary.unrealized_pl_pct || 0)} active return`, metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades"))}
-      ${transactionMetric("Active Market Value", formatWholeCurrency(summary.market_value_eur || 0, "EUR"), `${formatNumber(summary.active_positions || 0)} active positions`, metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure"))}
-    </section>
-    <section class="insight-panel-grid portfolio-return-grid">
-      ${panel("Active Exposure", portfolioReturnsActiveExposureBars(data))}
-      ${panel("Cost & Fees", portfolioReturnsCapitalBars(data))}
-      ${panel("Year Performance", tradePerformanceBars(tables.performance_by_year || [], "period"))}
-    </section>
-  `;
-}
-
 function portfolioReturnsActions() {
   const refreshingPrices = Boolean(state.tradePriceRefresh?.loading);
   return `
@@ -5537,24 +5468,6 @@ function portfolioPerformanceExpandedChart(portfolio = {}) {
   return "";
 }
 
-function portfolioReturnsExpandedChart(portfolio = {}, data = {}) {
-  const chartId = state.expandedChartId || "";
-  if (!chartId || state.view !== "trades" || state.tradeView !== "returns") return "";
-  if (chartId === "portfolio-return-timeline") {
-    return expandedChartShell(
-      "Realized P/L Over Time",
-      portfolioReturnTimelineChart(data, { chartId, expanded: true }),
-    );
-  }
-  if (chartId === "portfolio-return-monthly") {
-    return expandedChartShell(
-      "Monthly Realized P/L",
-      portfolioReturnMonthlyChart(data, { chartId, expanded: true }),
-    );
-  }
-  return "";
-}
-
 function portfolioReturnsInsights(data = {}) {
   return data?.insights || data?.summary || {};
 }
@@ -5580,159 +5493,6 @@ function portfolioReturnsSummary(insights = {}, portfolio = {}) {
     unrealized_pl_pct: numericValue(insights.unrealized_pl_pct),
     total_return_pct: totalCost ? moneyRound(percentOf(realized + unrealized, totalCost)) : 0,
   };
-}
-
-function portfolioReturnsActiveExposureBars(data = {}) {
-  const insights = portfolioReturnsInsights(data);
-  const activeRows = (data?.rows || []).filter((row) => String(row.position_status || "").toLowerCase() === "active");
-  const buckets = new Map();
-  activeRows.forEach((row) => {
-    const marketValue = Math.abs(numericValue(row.current_market_value_native));
-    if (!marketValue) return;
-    const symbol = row.symbol || "";
-    const label = symbol || row.asset_name || row.trade_id || "Position";
-    const portfolioId = row.portfolio_id || "";
-    const providerId = row.provider_id || "";
-    const currency = row.trade_currency || "EUR";
-    const key = [label, portfolioId, providerId, currency].join("|");
-    const bucket = buckets.get(key) || {
-      symbol,
-      label,
-      portfolioId,
-      providerId,
-      currency,
-      marketValue: 0,
-      unrealized: 0,
-      rows: 0,
-    };
-    bucket.marketValue += marketValue;
-    bucket.unrealized += numericValue(row.unrealized_pl_native);
-    bucket.rows += 1;
-    buckets.set(key, bucket);
-  });
-  const exposureRows = Array.from(buckets.values()).sort((a, b) => b.marketValue - a.marketValue);
-  const marketTotal = currencyRowsTotal(insights.market_value_by_currency)
-    || exposureRows.reduce((sum, row) => sum + Math.abs(numericValue(row.marketValue)), 0);
-  return insightBars(
-    exposureRows.map((row) => {
-      const costBasis = row.marketValue - row.unrealized;
-      const returnPct = costBasis ? percentOf(row.unrealized, costBasis) : 0;
-      const details = [
-        row.providerId || "",
-        displayPortfolioId(row.portfolioId),
-        `${signedWholeAmount(row.unrealized, row.currency)} unrealized`,
-        signedPercent(returnPct),
-      ].filter(Boolean);
-      const attrs = ['data-position-status="active"'];
-      if (row.symbol) attrs.push(`data-symbol="${safe(row.symbol)}"`);
-      return {
-        label: row.label,
-        value: formatWholeCurrency(row.marketValue, row.currency),
-        detail: details.join(" · "),
-        icon: row.unrealized >= 0 ? "trendUp" : "trendDown",
-        share: percentOf(row.marketValue, marketTotal),
-        action: "filter-trades",
-        dataAttrs: attrs.join(" "),
-      };
-    }),
-    "No active exposure available.",
-  );
-}
-
-function portfolioReturnsCompositionBars(data = {}) {
-  const insights = portfolioReturnsInsights(data);
-  const summary = portfolioReturnsSummary(insights);
-  const activeCost = numericValue(insights.active_cost_basis_eur);
-  const closedCost = numericValue(insights.closed_cost_basis_eur);
-  const totalFees = portfolioReturnsFeeTotal(data);
-  const total = [
-    summary.realized_pl_eur,
-    summary.unrealized_pl_eur,
-    summary.market_value_eur,
-    totalFees,
-  ].reduce((sum, value) => sum + Math.abs(numericValue(value)), 0);
-  const items = [
-    {
-      label: "Realized P/L",
-      value: signedWholeAmount(summary.realized_pl_eur, "EUR"),
-      detail: `${formatWholeCurrency(closedCost, "EUR")} closed cost · ${signedPercent(summary.realized_pl_pct)} closed return`,
-      icon: summary.realized_pl_eur >= 0 ? "trendUp" : "trendDown",
-      share: percentOf(Math.abs(summary.realized_pl_eur), total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="closed"',
-    },
-    {
-      label: "Unrealized P/L",
-      value: signedWholeAmount(summary.unrealized_pl_eur, "EUR"),
-      detail: `${formatWholeCurrency(activeCost, "EUR")} active cost · ${signedPercent(summary.unrealized_pl_pct)} active return`,
-      icon: summary.unrealized_pl_eur >= 0 ? "trendUp" : "trendDown",
-      share: percentOf(Math.abs(summary.unrealized_pl_eur), total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="active"',
-    },
-    {
-      label: "Active Market Value",
-      value: formatWholeCurrency(summary.market_value_eur, "EUR"),
-      detail: `${formatNumber(summary.active_positions || 0)} active positions`,
-      icon: "wallet",
-      share: percentOf(summary.market_value_eur, total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="active"',
-    },
-    {
-      label: "Fees Paid",
-      value: signedWholeAmount(-totalFees, "EUR"),
-      detail: "reported trade fees",
-      icon: "receipt",
-      share: percentOf(totalFees, total),
-    },
-  ].filter((item) => Math.abs(numericValue(item.share)) || item.label === "Fees Paid");
-  return insightBars(items, "No return composition available.");
-}
-
-function portfolioReturnsCapitalBars(data = {}) {
-  const insights = portfolioReturnsInsights(data);
-  const summary = portfolioReturnsSummary(insights);
-  const activeCost = numericValue(insights.active_cost_basis_eur);
-  const closedCost = numericValue(insights.closed_cost_basis_eur);
-  const totalFees = portfolioReturnsFeeTotal(data);
-  const total = Math.abs(activeCost) + Math.abs(closedCost) + Math.abs(summary.market_value_eur) + Math.abs(totalFees);
-  return insightBars([
-    {
-      label: "Closed Cost",
-      value: formatWholeCurrency(closedCost, "EUR"),
-      detail: `${signedPercent(summary.realized_pl_pct || 0)} realized return`,
-      icon: "receipt",
-      share: percentOf(closedCost, total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="closed"',
-    },
-    {
-      label: "Active Cost",
-      value: formatWholeCurrency(activeCost, "EUR"),
-      detail: `${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
-      icon: "wallet",
-      share: percentOf(activeCost, total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="active"',
-    },
-    {
-      label: "Active Market Value",
-      value: formatWholeCurrency(summary.market_value_eur, "EUR"),
-      detail: `${formatNumber(summary.active_positions || 0)} active positions`,
-      icon: "trendUp",
-      share: percentOf(summary.market_value_eur, total),
-      action: "filter-trades",
-      dataAttrs: 'data-position-status="active"',
-    },
-    {
-      label: "Fees Paid",
-      value: signedWholeAmount(-totalFees, "EUR"),
-      detail: "reported trade fees",
-      icon: "receipt",
-      share: percentOf(totalFees, total),
-    },
-  ], "No cost basis available.");
 }
 
 function portfolioReturnsFeeTotal(data = {}) {
@@ -15389,11 +15149,6 @@ function tradeTabs() {
         data-action="trade-insights-tab"
         type="button"
       >Metrics</button>
-      <button
-        class="${state.tradeView === "returns" ? "is-active" : ""}"
-        data-action="trade-returns-tab"
-        type="button"
-      >Returns</button>
       ${otherTabs
         .map((tab) => tradeTabButton(tab))
         .join("")}
@@ -15541,23 +15296,113 @@ function tradeTreemapValue(row = {}) {
 function tradeInsightsDashboard(data = {}) {
   const insights = data?.insights || data?.summary || {};
   const tables = data?.insight_tables || {};
-  const marketValue = currencyRowsTotal(insights.market_value_by_currency);
-  const realized = currencyRowsTotal(insights.realized_pl_by_currency);
-  const unrealized = currencyRowsTotal(insights.unrealized_pl_by_currency);
-  return metricLineDashboard([
+  const summary = portfolioReturnsSummary(insights);
+  return `
+    ${portfolioReturnsActions()}
+    ${metricLineDashboard([
     {
       title: "Trading Summary",
       html: metricLineItems([
         { label: "Active Positions", value: formatNumber(insights.active_positions || 0), meta: `${formatNumber(insights.closed_positions || 0)} closed`, note: "Open versus closed trade records.", icon: "pie", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades") },
-        { label: "Market Value", value: formatWholeCurrency(marketValue, "EUR"), meta: "active positions", note: "Current active market exposure converted to project currency.", icon: "wallet", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure") },
-        { label: "Realized P/L", value: signedWholeAmount(realized, "EUR"), meta: `${signedPercent(insights.realized_pl_pct)} return`, note: "Closed-position profit and loss.", icon: realized >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades") },
-        { label: "Unrealized P/L", value: signedWholeAmount(unrealized, "EUR"), meta: `${signedPercent(insights.unrealized_pl_pct)} return`, note: "Open-position profit and loss.", icon: unrealized >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades") },
+        { label: "Total P/L", value: signedWholeAmount(summary.total_pl_eur || 0, "EUR"), meta: `${signedPercent(summary.total_return_pct || 0)} on trade capital`, note: "Realized plus unrealized profit and loss.", icon: summary.total_pl_eur >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", {}, "Show trades") },
+        { label: "Realized P/L", value: signedWholeAmount(summary.realized_pl_eur || 0, "EUR"), meta: `${signedPercent(summary.realized_pl_pct || 0)} closed return`, note: "Closed-position profit and loss.", icon: summary.realized_pl_eur >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades") },
+        { label: "Unrealized P/L", value: signedWholeAmount(summary.unrealized_pl_eur || 0, "EUR"), meta: `${signedPercent(summary.unrealized_pl_pct || 0)} active return`, note: "Open-position profit and loss.", icon: summary.unrealized_pl_eur >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades") },
+        { label: "Active Market Value", value: formatWholeCurrency(summary.market_value_eur || 0, "EUR"), meta: `${formatNumber(summary.active_positions || 0)} active positions`, note: "Current active market exposure converted to project currency.", icon: "wallet", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure") },
       ]),
     },
+    { title: "Active Exposure", html: tradeReturnActiveExposureMetricLines(data) },
+    { title: "Cost & Fees", html: tradeReturnCapitalMetricLines(data) },
+    { title: "Year Performance", html: tradePerformanceMetricLines(tables.performance_by_year || [], "period") },
     { title: "P/L Movement: Months", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
     { title: "P/L Movement: Instruments", html: tradePerformanceMetricLines(tables.instrument_performance || [], "instrument") },
     { title: "Exposure & Watchlist", html: tradePositionWatchlistMetricLines(data) },
-  ], "Trade metrics");
+  ], "Trade metrics")}
+  `;
+}
+
+function tradeReturnActiveExposureMetricLines(data = {}) {
+  const insights = portfolioReturnsInsights(data);
+  const activeRows = (data?.rows || []).filter((row) => String(row.position_status || "").toLowerCase() === "active");
+  const buckets = new Map();
+  activeRows.forEach((row) => {
+    const marketValue = Math.abs(numericValue(row.current_market_value_native));
+    if (!marketValue) return;
+    const symbol = row.symbol || "";
+    const label = symbol || row.asset_name || row.trade_id || "Position";
+    const portfolioId = row.portfolio_id || "";
+    const providerId = row.provider_id || "";
+    const currency = row.trade_currency || "EUR";
+    const key = [label, portfolioId, providerId, currency].join("|");
+    const bucket = buckets.get(key) || {
+      symbol,
+      label,
+      portfolioId,
+      providerId,
+      currency,
+      marketValue: 0,
+      unrealized: 0,
+    };
+    bucket.marketValue += marketValue;
+    bucket.unrealized += numericValue(row.unrealized_pl_native);
+    buckets.set(key, bucket);
+  });
+  const exposureRows = Array.from(buckets.values()).sort((a, b) => b.marketValue - a.marketValue);
+  const marketTotal = currencyRowsTotal(insights.market_value_by_currency)
+    || exposureRows.reduce((sum, row) => sum + Math.abs(numericValue(row.marketValue)), 0);
+  return metricLineItems(exposureRows.slice(0, 6).map((row) => {
+    const costBasis = row.marketValue - row.unrealized;
+    const returnPct = costBasis ? percentOf(row.unrealized, costBasis) : 0;
+    return {
+      label: row.label,
+      value: formatWholeCurrency(row.marketValue, row.currency),
+      meta: [row.providerId || "", displayPortfolioId(row.portfolioId), `${signedWholeAmount(row.unrealized, row.currency)} unrealized`, signedPercent(returnPct)].filter(Boolean).join(" · "),
+      note: `${formatPercent(percentOf(row.marketValue, marketTotal))} of active market value.`,
+      icon: row.unrealized >= 0 ? "trendUp" : "trendDown",
+      options: metricActionOptions("filter-trades", { "position-status": "active", symbol: row.symbol || "" }, `Show ${row.label} active trades`),
+    };
+  }));
+}
+
+function tradeReturnCapitalMetricLines(data = {}) {
+  const insights = portfolioReturnsInsights(data);
+  const summary = portfolioReturnsSummary(insights);
+  const activeCost = numericValue(insights.active_cost_basis_eur);
+  const closedCost = numericValue(insights.closed_cost_basis_eur);
+  const totalFees = portfolioReturnsFeeTotal(data);
+  const total = Math.abs(activeCost) + Math.abs(closedCost) + Math.abs(summary.market_value_eur) + Math.abs(totalFees);
+  return metricLineItems([
+    {
+      label: "Closed Cost",
+      value: formatWholeCurrency(closedCost, "EUR"),
+      meta: `${signedPercent(summary.realized_pl_pct || 0)} realized return`,
+      note: `${formatPercent(percentOf(closedCost, total))} of return capital view.`,
+      icon: "receipt",
+      options: metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades"),
+    },
+    {
+      label: "Active Cost",
+      value: formatWholeCurrency(activeCost, "EUR"),
+      meta: `${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
+      note: `${formatPercent(percentOf(activeCost, total))} of return capital view.`,
+      icon: "wallet",
+      options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades"),
+    },
+    {
+      label: "Active Market Value",
+      value: formatWholeCurrency(summary.market_value_eur, "EUR"),
+      meta: `${formatNumber(summary.active_positions || 0)} active positions`,
+      note: `${formatPercent(percentOf(summary.market_value_eur, total))} of return capital view.`,
+      icon: "trendUp",
+      options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure"),
+    },
+    {
+      label: "Fees Paid",
+      value: signedWholeAmount(-totalFees, "EUR"),
+      meta: "reported trade fees",
+      note: `${formatPercent(percentOf(totalFees, total))} of return capital view.`,
+      icon: "receipt",
+    },
+  ]);
 }
 
 function tradePerformanceMetricLines(rows = [], key = "period") {
@@ -18196,11 +18041,8 @@ async function loadDataForView() {
   if (state.view === "transactions") await loadTransactions();
   if (state.view === "statementImport") await loadStatementImport();
   if (state.view === "trades") {
-    if (state.tradeView === "returns") {
-      if (!state.portfolioReturns) await loadPortfolioReturns();
-    } else {
-      await loadTrades();
-    }
+    if (state.tradeView === "returns") state.tradeView = "insights";
+    await loadTrades();
   }
 }
 
@@ -18701,11 +18543,8 @@ async function refreshTradePrices() {
     markOverviewStale();
     state.portfolioReturns = null;
     if (state.view === "trades") {
-      if (state.tradeView === "returns") {
-        await loadPortfolioReturns();
-      } else {
-        await loadTrades();
-      }
+      if (state.tradeView === "returns") state.tradeView = "insights";
+      await loadTrades();
     } else if (state.view === "portfolio") {
       await loadOverview();
     } else {
