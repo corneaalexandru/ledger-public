@@ -17181,6 +17181,12 @@ function closeDrawerDatePickers(root = document, except = null) {
     if (except && field === except) return;
     field.classList.remove("is-open", "is-above");
     field.style.removeProperty("--drawer-date-picker-max-height");
+    const picker = field.querySelector("[data-date-picker]");
+    if (picker) {
+      ["top", "right", "bottom", "left", "width", "max-height"].forEach((property) => {
+        picker.style.removeProperty(property);
+      });
+    }
     field.querySelector("[data-date-picker-toggle]")?.setAttribute("aria-expanded", "false");
   });
 }
@@ -17299,20 +17305,37 @@ function drawerDatePickerInitialMonth(field) {
 function positionDrawerDatePicker(field) {
   const picker = field?.querySelector("[data-date-picker]");
   if (!field || !picker) return;
-  const body = field.closest(".details-body");
   const panel = field.closest(".details-panel");
-  const actions = panel?.querySelector(".drawer-actions");
+  const panelRect = panel?.getBoundingClientRect();
   const fieldRect = field.getBoundingClientRect();
-  const bodyRect = body?.getBoundingClientRect() || { top: 0, bottom: window.innerHeight };
-  const actionsRect = actions?.getBoundingClientRect();
-  const bottomLimit = actionsRect ? Math.min(bodyRect.bottom, actionsRect.top - 8) : bodyRect.bottom;
-  const spaceBelow = bottomLimit - fieldRect.bottom;
-  const spaceAbove = fieldRect.top - bodyRect.top;
-  const pickerHeight = picker.offsetHeight || 292;
-  const preferAbove = spaceBelow < pickerHeight + 8 && spaceAbove > spaceBelow;
-  const available = Math.max(180, Math.min(320, (preferAbove ? spaceAbove : spaceBelow) - 8));
+  const viewportMargin = 12;
+  const fieldGap = 6;
+  const panelLeft = panelRect ? panelRect.left + viewportMargin : viewportMargin;
+  const panelRight = panelRect ? panelRect.right - viewportMargin : window.innerWidth - viewportMargin;
+  const width = Math.max(220, Math.min(276, panelRight - panelLeft, window.innerWidth - (viewportMargin * 2)));
+  const naturalHeight = Math.min(
+    picker.scrollHeight || picker.offsetHeight || 320,
+    320,
+    Math.max(180, window.innerHeight - (viewportMargin * 2)),
+  );
+  const spaceBelow = window.innerHeight - fieldRect.bottom - fieldGap - viewportMargin;
+  const spaceAbove = fieldRect.top - fieldGap - viewportMargin;
+  const preferAbove = spaceAbove >= naturalHeight && spaceAbove > spaceBelow;
+  const top = preferAbove
+    ? fieldRect.top - naturalHeight - fieldGap
+    : spaceBelow >= naturalHeight
+      ? fieldRect.bottom + fieldGap
+      : clampNumber(fieldRect.top - Math.round(naturalHeight / 2), viewportMargin, window.innerHeight - naturalHeight - viewportMargin);
+  const left = clampNumber(fieldRect.right - width, panelLeft, Math.max(panelLeft, window.innerWidth - width - viewportMargin));
   field.classList.toggle("is-above", preferAbove);
-  field.style.setProperty("--drawer-date-picker-max-height", `${available}px`);
+  picker.style.setProperty("width", `${Math.round(width)}px`);
+  picker.style.setProperty("left", `${Math.round(left)}px`);
+  picker.style.setProperty("top", `${Math.round(top)}px`);
+  picker.style.setProperty("max-height", `${Math.round(naturalHeight)}px`);
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(Number(value) || 0, min), Math.max(min, max));
 }
 
 function normalizedIsoDate(value, fallback = currentDateKey()) {

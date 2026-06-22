@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-22
 
+- Fixed drawer date picker placement so low date fields keep the calendar header visible instead of clipping inside the drawer body.
 - Restored app-styled date pickers across transaction, trade, portfolio plan, and exit-phase edit forms while keeping ISO text entry and avoiding native calendar clipping.
 - Added transaction activity/native-currency totals for not-accountable filtered slices and preserved compatible Transaction filters when switching register tabs or refining cards.
 - Renamed the Metrics tabs to Statement, moved Planning target diagnostics into Transactions > Statement, removed Planning > Metrics, and added account country breakdowns to Accounts > Statement.
