@@ -193,7 +193,7 @@ const state = {
     field: "balance",
     direction: "desc",
   },
-  accountView: "register",
+  accountView: "insights",
   selectedAccounts: new Set(),
   selectedAccountId: "",
   selectedAccountEditing: false,
@@ -205,7 +205,7 @@ const state = {
     field: "transaction_date",
     direction: "desc",
   },
-  transactionView: "register",
+  transactionView: "insights",
   selectedTransactions: new Set(),
   selectedTransactionId: "",
   selectedTransactionEditing: false,
@@ -221,7 +221,7 @@ const state = {
     field: "activity_date",
     direction: "desc",
   },
-  tradeView: "register",
+  tradeView: "insights",
   selectedTrades: new Set(),
   selectedTradeId: "",
   selectedTradeEditing: false,
@@ -1217,7 +1217,11 @@ function bindEvents() {
   elements.navList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
     if (!button) return;
-    state.view = button.dataset.view;
+    const nextView = button.dataset.view;
+    state.view = nextView;
+    if (nextView === "accounts") state.accountView = "insights";
+    if (nextView === "transactions") state.transactionView = "insights";
+    if (nextView === "trades") state.tradeView = "insights";
     state.accountOffset = 0;
     state.selectedAccounts.clear();
     state.selectedAccountId = "";
@@ -14439,12 +14443,12 @@ function accountTabs() {
   const [allTab, ...otherTabs] = values;
   return `
     <nav class="transaction-tabs register-tabs" aria-label="Accounts register filters">
-      ${accountTabButton(allTab)}
       <button
         class="${state.accountView === "insights" ? "is-active" : ""}"
         data-action="account-insights-tab"
         type="button"
       >Statement</button>
+      ${accountTabButton(allTab)}
       ${otherTabs
         .map((tab) => `
           ${accountTabButton(tab)}
@@ -15131,13 +15135,13 @@ function transactionTabs(classes = [], insights = {}) {
   `;
   return `
     <nav class="transaction-tabs transaction-class-tabs" aria-label="Transaction classes">
-      ${transactionTabButton("", labels)}
       <button
         class="${state.transactionView === "insights" ? "is-active" : ""}"
         data-action="transaction-insights-tab"
         type="button"
       >Statement</button>
       ${targetTab}
+      ${transactionTabButton("", labels)}
       ${values
         .map((value) => transactionTabButton(value, labels))
         .join("")}
@@ -15347,12 +15351,12 @@ function tradeTabs() {
   const [allTab, ...otherTabs] = values;
   return `
     <nav class="transaction-tabs trade-tabs" aria-label="Trades register filters">
-      ${tradeTabButton(allTab)}
       <button
         class="${state.tradeView === "insights" ? "is-active" : ""}"
         data-action="trade-insights-tab"
         type="button"
       >Statement</button>
+      ${tradeTabButton(allTab)}
       ${otherTabs
         .map((tab) => tradeTabButton(tab))
         .join("")}
