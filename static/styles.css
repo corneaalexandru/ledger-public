@@ -4717,13 +4717,13 @@ kbd {
 
 .planning-target-table .target-period-cell,
 .monthly-target-table .target-period-cell {
-  display: block;
+  display: grid;
   min-width: 0;
 }
 
 .yearly-target-table th:first-child,
 .yearly-target-table td:first-child {
-  width: 96px;
+  width: 200px;
 }
 
 .minimal-table-wrap.statement-import-table-wrap {

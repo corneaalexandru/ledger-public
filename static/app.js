@@ -5113,6 +5113,7 @@ function yearlyTargetsTable(rows = []) {
               <td>
                 <span class="target-period-cell">
                   <span class="table-main">${safe(row.year)}</span>
+                  ${yearlyTargetPeriodProgressBar(row)}
                 </span>
               </td>
               <td class="align-right">
@@ -13594,6 +13595,7 @@ function monthlyTargetTableRow(row = {}, includeDetails = false) {
       <td>
         <span class="target-period-cell">
           <span class="table-main">${safe(monthLabel(row.month))}</span>
+          ${monthlyTargetPeriodProgressBar(row)}
         </span>
       </td>
       <td class="align-right">${targetAmountCell(row.income_target_eur, "EUR", monthlyTargetIncomeCellDetail(row))}</td>
@@ -13614,6 +13616,23 @@ function monthlyTargetTableRow(row = {}, includeDetails = false) {
     </tr>
     ${includeDetails ? monthlyTargetCategoryDetailRows(row) : ""}
   `;
+}
+
+function yearlyTargetPeriodProgressBar(row = {}) {
+  return targetProgressBar({
+    target: row.expense_ceiling_eur,
+    actual: row.actual_expenses_eur,
+    className: "is-expense is-compact",
+  });
+}
+
+function monthlyTargetPeriodProgressBar(row = {}) {
+  return targetProgressBar({
+    target: row.expense_ceiling_eur,
+    actual: row.actual_expense_eur,
+    actualAvailable: monthlyTargetActualsAreDue(row),
+    className: "is-expense is-compact",
+  });
 }
 
 function monthlyTargetIncomeCellDetail(row = {}) {
