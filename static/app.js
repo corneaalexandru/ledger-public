@@ -16925,12 +16925,15 @@ function tradeFieldInput(key, label, row) {
     `;
   }
 
-  const type = key.endsWith("_date") || key === "price_as_of" ? "date" : tradeNumericFields().has(key) ? "number" : "text";
+  const isDateField = key.endsWith("_date") || key === "price_as_of";
+  const type = isDateField ? "text" : tradeNumericFields().has(key) ? "number" : "text";
   const step = type === "number" ? " step=\"any\"" : "";
   return `
     <label${className}>
       <span>${safe(label)}</span>
-      <input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off" />
+      ${isDateField
+        ? drawerDateInputHtml(key, value)
+        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off" />`}
     </label>
   `;
 }
@@ -17015,7 +17018,8 @@ function transactionFieldInput(key, label, row) {
     `;
   }
 
-  const type = key.endsWith("_date") ? "date" : transactionNumericFields().has(key) ? "number" : "text";
+  const isDateField = key.endsWith("_date");
+  const type = isDateField ? "text" : transactionNumericFields().has(key) ? "number" : "text";
   const step = type === "number" ? " step=\"any\"" : "";
   const isDerivedFx = transactionDerivedFxFields().has(key);
   const isSanitizedAmount = key === "sanitized_statement_amount";
@@ -17030,9 +17034,15 @@ function transactionFieldInput(key, label, row) {
   return `
     <label${className}>
       <span>${safe(label)}</span>
-      <input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off"${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}" />
+      ${isDateField
+        ? drawerDateInputHtml(key, value, `${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}"`)
+        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off"${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}" />`}
     </label>
   `;
+}
+
+function drawerDateInputHtml(name, value = "", extraAttributes = "") {
+  return `<input name="${safe(name)}" type="text" inputmode="numeric" pattern="\\d{4}-\\d{2}-\\d{2}" placeholder="YYYY-MM-DD" value="${safe(value ?? "")}" autocomplete="off" data-date-text-field${extraAttributes} />`;
 }
 
 function transactionComboOptions(key, row = {}) {
@@ -18042,11 +18052,13 @@ function exitStrategyPhaseEditForm(row) {
 }
 
 function exitStrategyPhaseFieldInput(key, label, row) {
-  const type = key.endsWith("_date") ? "date" : "text";
+  const isDateField = key.endsWith("_date");
   return `
     <label>
       <span>${safe(label)}</span>
-      <input name="${safe(key)}" type="${type}" value="${safe(row[key] ?? "")}" autocomplete="off" />
+      ${isDateField
+        ? drawerDateInputHtml(key, row[key])
+        : `<input name="${safe(key)}" type="text" value="${safe(row[key] ?? "")}" autocomplete="off" />`}
     </label>
   `;
 }
@@ -18107,13 +18119,15 @@ function portfolioMipEditForm(row, phases = []) {
 }
 
 function portfolioMipFieldInput(key, label, row) {
-  const type = key.includes("date") ? "date" : "text";
+  const isDateField = key.includes("date");
   const className = key === "notes" ? " class=\"field-wide\"" : "";
   const value = key === "portfolio_id" ? displayPortfolioId(row[key]) : row[key];
   return `
     <label${className}>
       <span>${safe(label)}</span>
-      <input name="${safe(key)}" type="${type}" value="${safe(value ?? "")}" autocomplete="off" />
+      ${isDateField
+        ? drawerDateInputHtml(key, value)
+        : `<input name="${safe(key)}" type="text" value="${safe(value ?? "")}" autocomplete="off" />`}
     </label>
   `;
 }
