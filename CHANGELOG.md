@@ -2,6 +2,10 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-22
+
+- Renamed the Metrics tabs to Statement, moved Planning target diagnostics into Transactions > Statement, removed Planning > Metrics, and added account country breakdowns to Accounts > Statement.
+
 ## 2026-06-21
 
 - Tightened shared register metric-card spacing so the cards sit evenly between tabs and the following section headings.

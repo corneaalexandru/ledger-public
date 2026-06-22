@@ -3958,7 +3958,7 @@ function renderOverview() {
 
 function overviewTabs() {
   const tabs = [
-    { id: "insights", label: "Metrics" },
+    { id: "insights", label: "Statement" },
     { id: "charts", label: "Charts" },
   ];
   return `
@@ -3999,7 +3999,7 @@ function overviewInsightsDashboard(insightCards = [], accounts = {}, transaction
 
 function overviewContinuousInsightSection(cards = []) {
   const sections = overviewGroupedInsightSections(cards);
-  return settingsLineSections(sections, "overview-line-grid overview-continuous-list", "Overview metrics");
+  return settingsLineSections(sections, "overview-line-grid overview-continuous-list", "Overview statement");
 }
 
 function overviewHeadlineInsightCards(cards = []) {
@@ -4645,7 +4645,7 @@ function renderPlanning() {
 
   const data = state.overview;
   if (!data) return loadingState("Loading planning");
-  if (!["targets", "metrics", "exit", "mip"].includes(state.planningView)) {
+  if (!["targets", "exit", "mip"].includes(state.planningView)) {
     state.planningView = "targets";
   }
 
@@ -4665,9 +4665,7 @@ function planningDashboard(data = {}) {
   return `
     ${state.planningView === "targets"
       ? planningTargetsDashboard(planning)
-      : state.planningView === "metrics"
-        ? planningMetricsDashboard(planning)
-        : state.planningView === "exit"
+      : state.planningView === "exit"
           ? planningExitStrategyDashboard(data.portfolio || {}, planning)
           : state.planningView === "mip"
             ? planningMonthlyInvestmentDashboard(data.portfolio || {})
@@ -4678,7 +4676,6 @@ function planningDashboard(data = {}) {
 function planningTabs() {
   const tabs = [
     { id: "targets", label: "Targets" },
-    { id: "metrics", label: "Metrics" },
     { id: "exit", label: "Exit Strategy" },
     { id: "mip", label: "Monthly Plan" },
   ];
@@ -4802,10 +4799,10 @@ function printPageName() {
 }
 
 function printViewName() {
-  if (state.view === "overview") return state.overviewView === "charts" ? "Charts" : "Metrics";
-  if (state.view === "accounts") return labelize(state.accountView || "accounts");
-  if (state.view === "transactions") return labelize(state.transactionView || "transactions");
-  if (state.view === "trades") return labelize(state.tradeView || "trades");
+  if (state.view === "overview") return state.overviewView === "charts" ? "Charts" : "Statement";
+  if (state.view === "accounts") return state.accountView === "insights" ? "Statement" : labelize(state.accountView || "accounts");
+  if (state.view === "transactions") return state.transactionView === "insights" ? "Statement" : labelize(state.transactionView || "transactions");
+  if (state.view === "trades") return state.tradeView === "insights" ? "Statement" : labelize(state.tradeView || "trades");
   if (state.view === "portfolio") return labelize(state.portfolioView || "portfolio");
   if (state.view === "planning") return labelize(state.planningView || "planning");
   return "";
@@ -5016,26 +5013,6 @@ function planningTargetsDashboard(planning = {}) {
     </section>
     ${yearlyTargetDetailsPanel(rows)}
   `;
-}
-
-function planningMetricsDashboard(planning = {}) {
-  const rows = planningTargetRows(planning);
-  const summary = yearlyTargetsSummary(rows, planning.summary || {});
-  return `
-    <section class="transaction-metrics planning-target-metrics">
-      ${transactionMetric("Capital Retention Target", formatWholeCurrency(summary.target_savings_eur || 0, "EUR"), `${formatPercent(summary.target_savings_pct || 0)} of income baseline`)}
-      ${transactionMetric("Actual Capital Retention", signedWholeAmount(summary.actual_savings_eur || 0, "EUR"), `${signedPercent(summary.actual_savings_pct || 0)} of income baseline`, metricActionOptions("filter-transactions", {}, "Show transactions for capital retention"))}
-      ${transactionMetric("Expense Variance", signedWholeAmount(summary.expense_variance_eur || 0, "EUR"), expenseVarianceDetail(summary.expense_variance_eur || 0), metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions"))}
-      ${transactionMetric("Expense Ratio", formatPercent(summary.actual_expense_pct || 0), "actual spending / income baseline", metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions"))}
-    </section>
-    ${planningComplianceDiagnosticsDashboard(planning)}
-  `;
-}
-
-function planningComplianceDiagnosticsDashboard(planning = {}) {
-  const sections = planningTargetModelMetricSections(planning);
-  if (!sections.length) return "";
-  return metricLineDashboard(sections, "Planning compliance diagnostics");
 }
 
 function planningTargetRows(planning = {}) {
@@ -12929,11 +12906,12 @@ function accountInsightsDashboard(data = {}) {
     },
     { title: "Structure Breakdown: Account Type", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
     { title: "Structure Breakdown: Provider", html: accountBreakdownMetricLines(tables.provider_breakdown || [], "provider_id", netWorth, "provider", "provider") },
+    { title: "Structure Breakdown: Country", html: accountBreakdownMetricLines(tables.country_breakdown || [], "country_code", netWorth, "country", "country") },
     { title: "Structure Breakdown: Capital Bucket", html: accountAllocationMetricLines(insights.by_bucket || [], netWorth, "allocation") },
     { title: "Structure Breakdown: Currency Exposure", html: accountAllocationMetricLines(insights.by_currency || [], netWorth, "currency") },
     { title: "Top Holdings", html: topAccountsMetricLines(insights.top_accounts || []) },
     { title: "Risk Signals: Credit Utilization", html: accountCreditMetricLines(tables.credit_cards || []) },
-  ], "Account metrics");
+  ], "Account statement");
 }
 
 function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, iconContext = "", noteLabel = "group") {
@@ -12952,13 +12930,16 @@ function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, 
       : percentOf(amount, netWorth);
     const native = nativeCurrencySummaryOrBlank(row.native_amounts);
     const filterValue = row[nameKey] || row.name || "";
+    const displayLabel = nameKey === "country_code"
+      ? countryOptionLabel(filterValue, countryName(filterValue) || countryDisplayName(filterValue))
+      : labelize(filterValue || noteLabel);
     return {
-      label: labelize(filterValue || noteLabel),
+      label: displayLabel,
       value: formatWholeCurrency(amount, "EUR"),
       meta: [formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
       note: `${formatPercent(share)} of net worth by ${noteLabel}.`,
       icon: insightIconFor(filterValue || noteLabel, iconContext),
-      options: filterField ? metricActionOptions("filter-accounts", { [filterField]: filterValue }, `Show accounts for ${labelize(filterValue || noteLabel)}`) : {},
+      options: filterField ? metricActionOptions("filter-accounts", { [filterField]: filterValue }, `Show accounts for ${displayLabel}`) : {},
     };
   }));
 }
@@ -13128,7 +13109,8 @@ function transactionInsightsDashboard(data = {}) {
         transactionHeatmapMetric("Spending Activity", insights.spending_heatmap, "expense"),
       ]),
     },
-  ], "Cash flow metrics");
+    ...transactionPlanningStatementSections(data),
+  ], "Cash flow statement");
 }
 
 function transactionMetricPeriodLabel() {
@@ -13148,6 +13130,55 @@ function planningTargetModelMetricSections(planning = {}) {
     { title: "Planning Rules: Expense Ceiling Model", html: monthlyTargetCategoryMetricLines(selectedTargets) },
     { title: "Compliance Diagnostics: Target Breach Months", html: monthlyTargetAboveCeilingMetricLines(selectedTargets) },
   ].filter((section) => String(section.html || "").trim());
+}
+
+function transactionPlanningStatementSections(data = {}) {
+  const planning = planningPayloadFromTransactions(data?.insights || {});
+  const targetRows = planningTargetRows(planning);
+  const summary = yearlyTargetsSummary(targetRows, planning.summary || {});
+  const sections = [];
+  if (targetRows.length) {
+    sections.push({
+      title: "Planning Target Summary",
+      html: metricLineItems([
+        {
+          label: "Capital Retention Target",
+          value: formatWholeCurrency(summary.target_savings_eur || 0, "EUR"),
+          meta: `${formatPercent(summary.target_savings_pct || 0)} of income baseline`,
+          note: "Planned retained capital from the target model.",
+          icon: "target",
+        },
+        {
+          label: "Actual Capital Retention",
+          value: signedWholeAmount(summary.actual_savings_eur || 0, "EUR"),
+          meta: `${signedPercent(summary.actual_savings_pct || 0)} of income baseline`,
+          note: "Recorded retained capital against the target model.",
+          icon: summary.actual_savings_eur >= 0 ? "trendUp" : "trendDown",
+          options: metricActionOptions("filter-transactions", {}, "Show transactions for capital retention"),
+        },
+        {
+          label: "Expense Variance",
+          value: signedWholeAmount(summary.expense_variance_eur || 0, "EUR"),
+          meta: expenseVarianceDetail(summary.expense_variance_eur || 0),
+          note: "Actual spending relative to the expense ceiling.",
+          icon: summary.expense_variance_eur >= 0 ? "trendUp" : "trendDown",
+          options: metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions"),
+        },
+        {
+          label: "Expense Ratio",
+          value: formatPercent(summary.actual_expense_pct || 0),
+          meta: "actual spending / income baseline",
+          note: "Share of baseline income consumed by actual spending.",
+          icon: "pie",
+          options: metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions"),
+        },
+      ]),
+    });
+  }
+  return [
+    ...sections,
+    ...planningTargetModelMetricSections(planning),
+  ];
 }
 
 function transactionHeatmapMetric(label = "Activity", payload = {}, type = "expense") {
@@ -13991,8 +14022,8 @@ function monthlyTargetAboveCeilingMetricLines(rows = []) {
   return metricLineItems(values.map((row) => ({
     label: monthLabel(row.month),
     value: formatWholeCurrency(row.structural_overspending_eur, "EUR"),
-    meta: `${formatWholeCurrency(row.actual_expense_eur || 0, "EUR")} actual spend`,
-    note: `${formatPercent(percentOf(row.structural_overspending_eur, totalOverspending))} of above-ceiling spend.`,
+    meta: `${formatPercent(percentOf(row.structural_overspending_eur, totalOverspending))} of above-ceiling spend · ${formatWholeCurrency(row.actual_expense_eur || 0, "EUR")} actual spend`,
+    note: "Target breach amount above the monthly ceiling.",
     icon: "trendDown",
     options: metricActionOptions("filter-monthly-target", { "monthly-target-month": row.month || "" }, `Open ${monthLabel(row.month)} target model`),
   })));
@@ -14316,7 +14347,7 @@ function accountTabs() {
         class="${state.accountView === "insights" ? "is-active" : ""}"
         data-action="account-insights-tab"
         type="button"
-      >Metrics</button>
+      >Statement</button>
       ${otherTabs
         .map((tab) => `
           ${accountTabButton(tab)}
@@ -15008,7 +15039,7 @@ function transactionTabs(classes = [], insights = {}) {
         class="${state.transactionView === "insights" ? "is-active" : ""}"
         data-action="transaction-insights-tab"
         type="button"
-      >Metrics</button>
+      >Statement</button>
       ${targetTab}
       ${values
         .map((value) => transactionTabButton(value, labels))
@@ -15180,7 +15211,7 @@ function tradeTabs() {
         class="${state.tradeView === "insights" ? "is-active" : ""}"
         data-action="trade-insights-tab"
         type="button"
-      >Metrics</button>
+      >Statement</button>
       ${otherTabs
         .map((tab) => tradeTabButton(tab))
         .join("")}
@@ -15348,7 +15379,7 @@ function tradeInsightsDashboard(data = {}) {
     { title: "P/L Movement: Months", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
     { title: "P/L Movement: Instruments", html: tradePerformanceMetricLines(tables.instrument_performance || [], "instrument") },
     { title: "Exposure & Watchlist", html: tradePositionWatchlistMetricLines(data) },
-  ], "Trade metrics")}
+  ], "Trade statement")}
   `;
 }
 

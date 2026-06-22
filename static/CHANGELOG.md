@@ -2,9 +2,14 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-22
+
+- Renamed the Metrics tabs to Statement, moved Planning target diagnostics into Transactions > Statement, removed Planning > Metrics, and added account country breakdowns to Accounts > Statement.
+
 ## 2026-06-21
 
-- Added the shared Navy Translucent theme mode with frosted navy shell controls and background treatment.
+- Tightened shared register metric-card spacing so the cards sit evenly between tabs and the following section headings.
+- Removed the Navy Translucent theme mode and kept theme cycling to Dark, Navy, and Light.
 - Made shared metric cards clickable where they can drill into a real filtered register or Portfolio/Transactions target subpage.
 - Added the shared topbar text-size control and moved the monthly target category/month model blocks into Transactions > Metrics with the Overview-style line format.
 - Removed the compact asterisk progress meters from Metrics rows and refreshed the static asset cache so the text-only metrics layout is restored.
