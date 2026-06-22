@@ -15904,9 +15904,11 @@ function tradeInstrumentCell(row) {
   const primaryField = symbol ? "symbol" : "trade_id";
   const secondary = assetName || (symbol && tradeId ? tradeId : "");
   const badges = tradeRowBadges(row);
+  const deletedAtLine = tradeDeletedAtLine(row);
   return `
     <span class="table-main">${quickFilterControl(primary, primary, { field: primaryField })}</span>
     ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === tradeId ? "trade_id" : "asset_name" })}</span>` : ""}
+    ${deletedAtLine ? `<span class="table-sub">${safe(deletedAtLine)}</span>` : ""}
     ${badges ? `<span class="table-badge-row">${badges}</span>` : ""}
   `;
 }
@@ -16289,6 +16291,12 @@ function transactionPostedDateSubline(row = {}) {
 
 function transactionDeletedAtLine(row = {}) {
   const deletedAtValue = transactionDeletedAtValue(row);
+  if (!deletedAtValue) return "";
+  return deletedAtValue === "Not recorded" ? "Deleted date not recorded" : `Deleted ${deletedAtValue}`;
+}
+
+function tradeDeletedAtLine(row = {}) {
+  const deletedAtValue = recordDeletedAtValue(row);
   if (!deletedAtValue) return "";
   return deletedAtValue === "Not recorded" ? "Deleted date not recorded" : `Deleted ${deletedAtValue}`;
 }
