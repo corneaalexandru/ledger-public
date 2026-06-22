@@ -2,6 +2,11 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-23
+
+- Moved Statement to the first tab position on pages that have a Statement subpage, and placed Transactions > Targets second after Statement.
+- Made Accounts, Transactions, and Trades open on the Statement subpage by default.
+
 ## 2026-06-22
 
 - Fixed drawer date picker placement so low date fields keep the calendar header visible instead of clipping inside the drawer body.
