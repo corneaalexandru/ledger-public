@@ -1213,15 +1213,20 @@ function renderPrivacyAction() {
   `;
 }
 
+function setStatementDefaultSubpage(view) {
+  if (view === "overview") state.overviewView = "insights";
+  if (view === "accounts") state.accountView = "insights";
+  if (view === "transactions") state.transactionView = "insights";
+  if (view === "trades") state.tradeView = "insights";
+}
+
 function bindEvents() {
   elements.navList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
     if (!button) return;
     const nextView = button.dataset.view;
     state.view = nextView;
-    if (nextView === "accounts") state.accountView = "insights";
-    if (nextView === "transactions") state.transactionView = "insights";
-    if (nextView === "trades") state.tradeView = "insights";
+    setStatementDefaultSubpage(nextView);
     state.accountOffset = 0;
     state.selectedAccounts.clear();
     state.selectedAccountId = "";
@@ -2934,7 +2939,7 @@ function applyStructuredQuickFilter(field, value) {
       return false;
     }
     state.transactionOffset = 0;
-    state.transactionView = "register";
+    state.transactionView = state.transactionView || "insights";
     state.selectedTransactions.clear();
     state.selectedTransactionId = "";
     resetStatementPanel();
@@ -3370,7 +3375,7 @@ function transactionSpecialTabAsFilter(value = "") {
 function reloadQuickFilterView(view) {
   if (view === "transactions") {
     state.transactionOffset = 0;
-    state.transactionView = "register";
+    state.transactionView = state.transactionView || "insights";
     state.selectedTransactions.clear();
     state.selectedTransactionId = "";
     state.selectedTransactionEditing = false;
@@ -3381,7 +3386,7 @@ function reloadQuickFilterView(view) {
   }
   if (view === "accounts") {
     state.accountOffset = 0;
-    state.accountView = "register";
+    state.accountView = state.accountView || "insights";
     state.selectedAccounts.clear();
     state.selectedAccountId = "";
     state.selectedAccountEditing = false;
@@ -3391,7 +3396,7 @@ function reloadQuickFilterView(view) {
   }
   if (view === "trades") {
     state.tradeOffset = 0;
-    state.tradeView = "register";
+    state.tradeView = state.tradeView || "insights";
     state.selectedTrades.clear();
     state.selectedTradeId = "";
     state.selectedTradeEditing = false;
@@ -4575,6 +4580,7 @@ function registerSearchHits(title, data = {}) {
 function renderAccounts() {
   if (state.loading.accounts && !state.accounts) return loadingState("Loading accounts");
   if (state.error.accounts && !state.accounts) return errorState("Accounts", state.error.accounts);
+  if (!state.accounts) return loadingState("Loading accounts");
 
   const data = state.accounts;
   const summary = data?.summary || {};
@@ -4605,6 +4611,7 @@ function renderAccounts() {
 function renderTransactions() {
   if (state.loading.transactions && !state.transactions) return loadingState("Loading transactions");
   if (state.error.transactions && !state.transactions) return errorState("Transactions", state.error.transactions);
+  if (!state.transactions) return loadingState("Loading transactions");
 
   const data = state.transactions;
   const summary = data?.summary || {};
@@ -4639,6 +4646,7 @@ function renderTrades() {
   if (state.tradeView === "returns") state.tradeView = "insights";
   if (state.loading.trades && !state.trades) return loadingState("Loading trades");
   if (state.error.trades && !state.trades) return errorState("Trades", state.error.trades);
+  if (!state.trades) return loadingState("Loading trades");
   const data = state.trades;
   const summary = data?.summary || {};
   const rows = data?.rows || [];
@@ -13153,7 +13161,7 @@ function transactionInsightsDashboard(data = {}) {
   const net = numericValue(summary.net_eur ?? insights.current_month_net_eur);
   const savingsRate = income ? percentOf(net, income) : 0;
   const periodLabel = transactionMetricPeriodLabel();
-  const includedRows = numericValue(summary.filtered ?? data.total ?? insights.total);
+  const includedRows = numericValue(summary.filtered ?? data?.total ?? insights.total);
   const topExpense = (insights.category_spend || [])[0] || {};
   return metricLineDashboard([
     {
@@ -20274,6 +20282,7 @@ function updateMonthlyTargetSort(field) {
 function openGlobalSearchSection(view) {
   if (!["accounts", "transactions", "trades"].includes(view)) return;
   state.view = view;
+  setStatementDefaultSubpage(view);
   state.accountOffset = 0;
   state.transactionOffset = 0;
   state.tradeOffset = 0;
@@ -20284,15 +20293,12 @@ function openGlobalSearchSection(view) {
   state.selectedTransactionEditing = false;
   state.selectedTradeEditing = false;
   if (view === "accounts") {
-    state.accountView = "register";
     state.accountFilters = defaultAccountFilters();
   }
   if (view === "transactions") {
-    state.transactionView = "register";
     state.transactionFilters = emptyTransactionFilters();
   }
   if (view === "trades") {
-    state.tradeView = "register";
     state.tradeFilters = defaultTradeFilters();
   }
   resetStatementPanel();
@@ -20561,7 +20567,6 @@ function applyPortfolioInsightFilter(dataset = {}) {
 function applyHeatmapFilter(dataset) {
   const range = heatmapDateRange(dataset.heatmapDate, dataset.heatmapGranularity);
   if (!range) return;
-  const stayInInsights = state.view === "transactions" && state.transactionView === "insights";
   syncPeriodFromHeatmap(dataset.heatmapDate, dataset.heatmapGranularity);
   state.view = "transactions";
   state.query = "";
@@ -20573,12 +20578,6 @@ function applyHeatmapFilter(dataset) {
   state.selectedTransactionEditing = false;
   state.transactionActionError = "";
   resetStatementPanel();
-  if (stayInInsights) {
-    state.transactionView = "insights";
-    state.transactionFilters = filtersForPeriod();
-    loadTransactions({ preserveScroll: true });
-    return;
-  }
   state.transactionView = "register";
   state.transactionFilters = emptyTransactionFilters({
     transaction_class: taxonomyFilterValue("transaction_class", dataset.transactionClass || ""),

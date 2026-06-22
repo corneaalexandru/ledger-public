@@ -6,6 +6,9 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 - Moved Statement to the first tab position on pages that have a Statement subpage, and placed Transactions > Targets second after Statement.
 - Made Accounts, Transactions, and Trades open on the Statement subpage by default.
+- Centralized Statement defaulting so Overview, Accounts, Transactions, and Trades return to Statement when opened from page-entry paths, while explicit Register and Targets tabs stay intentional.
+- Fixed the first-open Transactions page crash by guarding Statement renders before account, transaction, or trade data has loaded and by making the Transactions Statement row-count lookup null-safe.
+- Changed Statement metric drill-downs so account, transaction, category, heatmap, and trade links apply their filters and open the relevant register table instead of staying on Statement.
 
 ## 2026-06-22
 
