@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-22
 
+- Added transaction activity/native-currency totals for not-accountable filtered slices and preserved compatible Transaction filters when switching register tabs or refining cards.
 - Renamed the Metrics tabs to Statement, moved Planning target diagnostics into Transactions > Statement, removed Planning > Metrics, and added account country breakdowns to Accounts > Statement.
 
 ## 2026-06-21

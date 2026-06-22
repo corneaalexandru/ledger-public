@@ -2129,10 +2129,7 @@ function bindEvents() {
     if (action.dataset.action === "transaction-tab") {
       const transactionClass = action.dataset.transactionClass || "";
       state.transactionView = "register";
-      state.transactionFilters = {
-        ...filtersForPeriod(),
-        transaction_class: transactionClass,
-      };
+      state.transactionFilters = transactionFiltersForRegisterTab(transactionClass);
       state.transactionOffset = 0;
       state.selectedTransactions.clear();
       state.selectedTransactionId = "";
@@ -3301,6 +3298,28 @@ function transactionFiltersForCurrentPeriod(baseFilters = state.transactionFilte
     date_from: periodFilters.date_from,
     date_to: periodFilters.date_to,
   });
+}
+
+function transactionFiltersForRegisterTab(transactionClass = "") {
+  const targetClass = taxonomyFilterValue("transaction_class", transactionClass);
+  const nextFilters = transactionFiltersForCurrentPeriod(state.transactionFilters, { preserve: true });
+  const currentSpecialFilter = transactionSpecialTabAsFilter(nextFilters.transaction_class);
+  nextFilters.transaction_class = targetClass;
+  if (isSpecialTransactionTab(targetClass)) {
+    nextFilters.ledger_status = "";
+    nextFilters.review_status = "";
+  } else if (currentSpecialFilter.field && !nextFilters[currentSpecialFilter.field]) {
+    nextFilters[currentSpecialFilter.field] = currentSpecialFilter.value;
+  }
+  return nextFilters;
+}
+
+function transactionSpecialTabAsFilter(value = "") {
+  if (value === ACCOUNTABLE_TRANSACTION_TAB) return { field: "ledger_status", value: "accountable" };
+  if (value === NOT_ACCOUNTABLE_TRANSACTION_TAB) return { field: "ledger_status", value: "not_accountable" };
+  if (value === DELETED_TRANSACTION_TAB) return { field: "ledger_status", value: "deleted" };
+  if (value === REVIEW_REQUIRED_TAB) return { field: "review_status", value: "open" };
+  return { field: "", value: "" };
 }
 
 function reloadQuickFilterView(view) {
@@ -15142,6 +15161,22 @@ function accountableNote(notAccountableValue) {
   return `accountable · ${formatCurrency(notAccountable, "EUR")} not accountable`;
 }
 
+function nativeAmountsNote(rows = []) {
+  const native = nativeCurrencySummaryOrBlank(rows || []);
+  return native ? `${native} native` : "";
+}
+
+function ledgerBreakdownNote(accountableValue, notAccountableValue, nativeRows = [], fallback = "selected period") {
+  const accountable = numericValue(accountableValue);
+  const notAccountable = numericValue(notAccountableValue);
+  const notes = [];
+  if (accountable || notAccountable) notes.push(`${formatCurrency(accountable, "EUR")} accountable`);
+  if (notAccountable) notes.push(`${formatCurrency(notAccountable, "EUR")} not accountable`);
+  const native = nativeAmountsNote(nativeRows);
+  if (native) notes.push(native);
+  return notes.join(" · ") || fallback;
+}
+
 function percentOfIncomeNote(value, income, options = {}) {
   const incomeValue = numericValue(income);
   if (!incomeValue) return options.fallback || "selected period";
@@ -15156,12 +15191,21 @@ function combineMetricNotes(...notes) {
 
 function transactionMetrics(summary = {}, activeClass = "", data = {}) {
   const isNotAccountableTab = activeClass === NOT_ACCOUNTABLE_TRANSACTION_TAB;
+  const accountableIncome = numericValue(summary.income_eur);
+  const accountableExpenses = numericValue(summary.expense_eur);
+  const accountableTotal = numericValue(summary.total_eur);
+  const notAccountableIncome = numericValue(summary.not_accountable_income_eur);
+  const notAccountableExpenses = numericValue(summary.not_accountable_expense_eur);
+  const notAccountableTotal = numericValue(summary.not_accountable_total_eur);
+  const activityIncome = numericValue(summary.activity_income_eur, accountableIncome + notAccountableIncome);
+  const activityExpenses = numericValue(summary.activity_expense_eur, accountableExpenses + notAccountableExpenses);
+  const activityTotal = numericValue(summary.activity_total_eur, accountableTotal + notAccountableTotal);
   const income = numericValue(isNotAccountableTab ? summary.not_accountable_income_eur : summary.income_eur);
   const expenses = numericValue(isNotAccountableTab ? summary.not_accountable_expense_eur : summary.expense_eur);
   const net = isNotAccountableTab
     ? numericValue(summary.not_accountable_net_eur, income - expenses)
     : numericValue(summary.net_eur);
-  const total = numericValue(isNotAccountableTab ? summary.not_accountable_total_eur : summary.total_eur);
+  const total = numericValue(isNotAccountableTab ? summary.not_accountable_total_eur : summary.activity_total_eur, activityTotal);
   const transactionsMetric = transactionMetric(
     "Transactions",
     formatNumber(summary.filtered ?? 0),
@@ -15188,10 +15232,20 @@ function transactionMetrics(summary = {}, activeClass = "", data = {}) {
     ].join("");
   }
 
-  if (activeClass === ACCOUNTABLE_TRANSACTION_TAB || activeClass === NOT_ACCOUNTABLE_TRANSACTION_TAB) {
+  if (activeClass === NOT_ACCOUNTABLE_TRANSACTION_TAB) {
+    const nativeNote = nativeAmountsNote(summary.not_accountable_native_amounts);
     return [
-      transactionMetric("Total Income", formatCurrency(income, "EUR"), activeClass === ACCOUNTABLE_TRANSACTION_TAB ? "accountable" : "not accountable", metricActionOptions("filter-transactions", { ...(activeClass === ACCOUNTABLE_TRANSACTION_TAB ? { "ledger-status": "accountable" } : { "ledger-status": "not_accountable" }), "transaction-class": "income" }, "Show matching income transactions")),
-      transactionMetric("Total Expenses", formatCurrency(expenses, "EUR"), percentOfIncomeNote(expenses, income), metricActionOptions("filter-transactions", { ...(activeClass === ACCOUNTABLE_TRANSACTION_TAB ? { "ledger-status": "accountable" } : { "ledger-status": "not_accountable" }), "transaction-class": "expense" }, "Show matching expense transactions")),
+      transactionMetric("Not Accountable Total", formatCurrency(notAccountableTotal, "EUR"), combineMetricNotes(nativeNote, `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(NOT_ACCOUNTABLE_TRANSACTION_TAB, "Show not-accountable transactions")),
+      transactionMetric("Total Income", formatCurrency(notAccountableIncome, "EUR"), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "income" }, "Show not-accountable income transactions")),
+      transactionMetric("Total Expenses", formatCurrency(notAccountableExpenses, "EUR"), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "expense" }, "Show not-accountable expense transactions")),
+      transactionsMetric,
+    ].join("");
+  }
+
+  if (activeClass === ACCOUNTABLE_TRANSACTION_TAB) {
+    return [
+      transactionMetric("Total Income", formatCurrency(income, "EUR"), "accountable", metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "income" }, "Show matching income transactions")),
+      transactionMetric("Total Expenses", formatCurrency(expenses, "EUR"), percentOfIncomeNote(expenses, income), metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "expense" }, "Show matching expense transactions")),
       transactionMetric("Net Flow", signedAmount(net, "EUR"), combineMetricNotes(percentOfIncomeNote(net, income, { signed: true, fallback: "" }), `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(activeClass, "Show matching transactions")),
       transactionsMetric,
     ].join("");
@@ -15199,21 +15253,30 @@ function transactionMetrics(summary = {}, activeClass = "", data = {}) {
 
   if (activeClass === "income") {
     return [
-      transactionMetric("Total Income", formatCurrency(summary.income_eur || 0, "EUR"), accountableNote(summary.not_accountable_income_eur), transactionMetricFilterOptions("income", "Show income transactions")),
+      transactionMetric("Total Income", formatCurrency(activityIncome, "EUR"), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass === "expense") {
     return [
-      transactionMetric("Total Expenses", formatCurrency(summary.expense_eur || 0, "EUR"), accountableNote(summary.not_accountable_expense_eur), transactionMetricFilterOptions("expense", "Show expense transactions")),
+      transactionMetric("Total Expenses", formatCurrency(activityExpenses, "EUR"), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass) {
     return [
-      transactionMetric(`Total ${taxonomyLabel(activeClass)}`, formatCurrency(total, "EUR"), accountableNote(summary.not_accountable_total_eur), transactionMetricFilterOptions(activeClass, `Show ${taxonomyLabel(activeClass)} transactions`)),
+      transactionMetric(`Total ${taxonomyLabel(activeClass)}`, formatCurrency(total, "EUR"), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions(activeClass, `Show ${taxonomyLabel(activeClass)} transactions`)),
+      transactionsMetric,
+    ].join("");
+  }
+
+  if (activityTotal && !accountableIncome && !accountableExpenses && notAccountableTotal) {
+    return [
+      transactionMetric("Selected Activity", formatCurrency(activityTotal, "EUR"), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions("", "Show transactions for selected activity")),
+      transactionMetric("Total Income", formatCurrency(activityIncome, "EUR"), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
+      transactionMetric("Total Expenses", formatCurrency(activityExpenses, "EUR"), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
       transactionsMetric,
     ].join("");
   }
@@ -20143,25 +20206,33 @@ function applyAccountInsightFilter(dataset = {}) {
 
 function applyTransactionInsightFilter(dataset = {}) {
   const periodFilters = filtersForPeriod();
+  const shouldCompound = state.view === "transactions";
+  const nextFilters = shouldCompound
+    ? transactionFiltersForCurrentPeriod(state.transactionFilters, { preserve: true })
+    : emptyTransactionFilters(periodFilters);
+  const applyDatasetFilter = (datasetKey, filterKey, normalize = (value) => value) => {
+    if (!Object.prototype.hasOwnProperty.call(dataset, datasetKey)) return;
+    nextFilters[filterKey] = normalize(dataset[datasetKey] || "");
+  };
+  applyDatasetFilter("transactionClass", "transaction_class", (value) => taxonomyFilterValue("transaction_class", value));
+  applyDatasetFilter("transferScope", "transfer_scope");
+  applyDatasetFilter("ledgerStatus", "ledger_status");
+  applyDatasetFilter("reviewStatus", "review_status");
+  applyDatasetFilter("importedTransaction", "imported_transaction");
+  applyDatasetFilter("category", "category_id", (value) => taxonomyFilterValue("category_id", value));
+  applyDatasetFilter("subcategory", "subcategory_id", (value) => taxonomyFilterValue("subcategory_id", value));
+  applyDatasetFilter("incomeSource", "income_source");
+  applyDatasetFilter("countryCode", "country_code");
+  applyDatasetFilter("statementCurrency", "statement_currency");
+  applyDatasetFilter("dateFrom", "date_from");
+  applyDatasetFilter("dateTo", "date_to");
   state.view = "transactions";
   state.transactionView = "register";
-  state.query = "";
-  elements.search.value = "";
-  state.transactionFilters = {
-    ...periodFilters,
-    transaction_class: taxonomyFilterValue("transaction_class", dataset.transactionClass || ""),
-    transfer_scope: dataset.transferScope || "",
-    ledger_status: dataset.ledgerStatus || "",
-    review_status: dataset.reviewStatus || "",
-    imported_transaction: dataset.importedTransaction || "",
-    category_id: taxonomyFilterValue("category_id", dataset.category || ""),
-    subcategory_id: taxonomyFilterValue("subcategory_id", dataset.subcategory || ""),
-    income_source: dataset.incomeSource || "",
-    country_code: dataset.countryCode || "",
-    statement_currency: dataset.statementCurrency || "",
-    date_from: dataset.dateFrom || periodFilters.date_from,
-    date_to: dataset.dateTo || periodFilters.date_to,
-  };
+  if (!shouldCompound) {
+    state.query = "";
+    elements.search.value = "";
+  }
+  state.transactionFilters = nextFilters;
   state.transactionOffset = 0;
   state.selectedTransactions.clear();
   state.selectedTransactionId = "";
