@@ -1575,6 +1575,9 @@ function bindEvents() {
 
     markDrawerEditFormDirty(event.target);
 
+    const drawerDateInput = event.target.closest("[data-date-text-field]");
+    if (drawerDateInput) refreshDrawerDatePickerFromInput(drawerDateInput);
+
     const formattedNumberControl = event.target.closest("[data-format-number], [data-format-percent]");
     if (formattedNumberControl && !handleFormattedNumberInput(formattedNumberControl)) return;
 
@@ -1614,9 +1617,41 @@ function bindEvents() {
   });
 
   elements.pageStage.addEventListener("click", (event) => {
+    const drawerDateToggle = event.target.closest("[data-date-picker-toggle]");
+    if (drawerDateToggle) {
+      event.preventDefault();
+      closeDrawerChoices();
+      toggleDrawerDatePicker(drawerDateToggle.closest("[data-date-field]"));
+      return;
+    }
+
+    const drawerDateInput = event.target.closest("[data-date-text-field]");
+    if (drawerDateInput) {
+      closeDrawerChoices();
+      openDrawerDatePicker(drawerDateInput.closest("[data-date-field]"));
+      return;
+    }
+
+    const drawerDateMonthStep = event.target.closest("[data-date-picker-month-step]");
+    if (drawerDateMonthStep) {
+      event.preventDefault();
+      shiftDrawerDatePickerMonth(drawerDateMonthStep.closest("[data-date-field]"), Number(drawerDateMonthStep.dataset.datePickerMonthStep || 0));
+      return;
+    }
+
+    const drawerDateDay = event.target.closest("[data-date-picker-day]");
+    if (drawerDateDay) {
+      event.preventDefault();
+      selectDrawerDatePickerDay(drawerDateDay);
+      return;
+    }
+
+    if (!event.target.closest("[data-date-field]")) closeDrawerDatePickers();
+
     const drawerChoiceToggle = event.target.closest("[data-drawer-choice-toggle]");
     if (drawerChoiceToggle) {
       event.preventDefault();
+      closeDrawerDatePickers();
       toggleDrawerChoice(drawerChoiceToggle);
       return;
     }
@@ -2561,9 +2596,15 @@ function bindEvents() {
     if (drawerEditForm && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       closeDrawerChoices(drawerEditForm);
+      closeDrawerDatePickers(drawerEditForm);
       submitDrawerEditForm(drawerEditForm);
       return;
     }
+
+    const drawerDateField = event.target instanceof Element
+      ? event.target.closest("[data-date-field]")
+      : null;
+    if (drawerDateField && handleDrawerDatePickerKeydown(event, drawerDateField)) return;
 
     const drawerChoice = event.target instanceof Element
       ? event.target.closest("[data-drawer-choice]")
@@ -17105,7 +17146,196 @@ function transactionFieldInput(key, label, row) {
 }
 
 function drawerDateInputHtml(name, value = "", extraAttributes = "") {
-  return `<input name="${safe(name)}" type="text" inputmode="numeric" pattern="\\d{4}-\\d{2}-\\d{2}" placeholder="YYYY-MM-DD" value="${safe(value ?? "")}" autocomplete="off" data-date-text-field${extraAttributes} />`;
+  const disabled = /\sdisabled\b/.test(extraAttributes);
+  return `
+    <div class="drawer-date-field" data-date-field>
+      <input name="${safe(name)}" type="text" inputmode="numeric" pattern="\\d{4}-\\d{2}-\\d{2}" placeholder="YYYY-MM-DD" value="${safe(value ?? "")}" autocomplete="off" data-date-text-field${extraAttributes} />
+      <button class="drawer-date-picker-toggle" type="button" data-date-picker-toggle aria-haspopup="dialog" aria-expanded="false" aria-label="Open ${safe(labelize(name))} picker"${disabled ? " disabled" : ""}>
+        ${icons.calendar}
+      </button>
+      <div class="drawer-date-picker" data-date-picker role="dialog" aria-label="${safe(labelize(name))} picker"></div>
+    </div>
+  `;
+}
+
+function openDrawerDatePicker(field) {
+  if (!field) return;
+  closeDrawerDatePickers(document, field);
+  closeDrawerChoices();
+  field.dataset.datePickerMonth = drawerDatePickerInitialMonth(field);
+  renderDrawerDatePicker(field);
+  field.classList.add("is-open");
+  field.querySelector("[data-date-picker-toggle]")?.setAttribute("aria-expanded", "true");
+  positionDrawerDatePicker(field);
+}
+
+function toggleDrawerDatePicker(field) {
+  if (!field) return;
+  const wasOpen = field.classList.contains("is-open");
+  closeDrawerDatePickers();
+  if (!wasOpen) openDrawerDatePicker(field);
+}
+
+function closeDrawerDatePickers(root = document, except = null) {
+  root.querySelectorAll("[data-date-field].is-open").forEach((field) => {
+    if (except && field === except) return;
+    field.classList.remove("is-open", "is-above");
+    field.style.removeProperty("--drawer-date-picker-max-height");
+    field.querySelector("[data-date-picker-toggle]")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function refreshDrawerDatePickerFromInput(input) {
+  const field = input?.closest("[data-date-field]");
+  if (!field || !field.classList.contains("is-open")) return;
+  const normalized = normalizedIsoDate(input.value, "");
+  if (normalized) field.dataset.datePickerMonth = normalized.slice(0, 7);
+  renderDrawerDatePicker(field);
+  positionDrawerDatePicker(field);
+}
+
+function shiftDrawerDatePickerMonth(field, step = 0) {
+  if (!field) return;
+  const current = validMonthKey(field.dataset.datePickerMonth) ? field.dataset.datePickerMonth : drawerDatePickerInitialMonth(field);
+  field.dataset.datePickerMonth = shiftMonthKey(current, step);
+  renderDrawerDatePicker(field);
+  positionDrawerDatePicker(field);
+}
+
+function selectDrawerDatePickerDay(button) {
+  const field = button?.closest("[data-date-field]");
+  const input = field?.querySelector("[data-date-text-field]");
+  const value = normalizedIsoDate(button?.dataset.datePickerDay, "");
+  if (!field || !input || !value || input.disabled || input.readOnly) return;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  closeDrawerDatePickers(field.closest(".drawer-form") || document);
+  input.focus({ preventScroll: true });
+}
+
+function handleDrawerDatePickerKeydown(event, field) {
+  if (!field) return false;
+  const key = event.key || "";
+  const isOpen = field.classList.contains("is-open");
+  if (key === "Escape" && isOpen) {
+    event.preventDefault();
+    closeDrawerDatePickers(field.closest(".drawer-form") || document);
+    field.querySelector("[data-date-text-field]")?.focus({ preventScroll: true });
+    return true;
+  }
+  if (key === "Tab" && isOpen) {
+    closeDrawerDatePickers(field.closest(".drawer-form") || document);
+    return false;
+  }
+  if (key === "ArrowDown" && !isOpen && event.target?.matches?.("[data-date-text-field], [data-date-picker-toggle]")) {
+    event.preventDefault();
+    openDrawerDatePicker(field);
+    return true;
+  }
+  if (!isOpen) return false;
+  if (key === "PageUp" || key === "PageDown") {
+    event.preventDefault();
+    shiftDrawerDatePickerMonth(field, key === "PageUp" ? -1 : 1);
+    return true;
+  }
+  return false;
+}
+
+function renderDrawerDatePicker(field) {
+  const picker = field?.querySelector("[data-date-picker]");
+  if (!picker) return;
+  const input = field.querySelector("[data-date-text-field]");
+  const selectedDate = normalizedIsoDate(input?.value, "");
+  const monthKey = validMonthKey(field.dataset.datePickerMonth)
+    ? field.dataset.datePickerMonth
+    : drawerDatePickerInitialMonth(field);
+  const [year, month] = monthKey.split("-").map(Number);
+  const firstDate = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const leadingBlanks = (firstDate.getDay() + 6) % 7;
+  const today = currentDateKey();
+  const cells = [
+    ...Array.from({ length: leadingBlanks }, () => ""),
+    ...Array.from({ length: daysInMonth }, (_, index) => `${monthKey}-${String(index + 1).padStart(2, "0")}`),
+  ];
+  while (cells.length < 42) cells.push("");
+  picker.innerHTML = `
+    <div class="drawer-date-picker-head">
+      <button class="drawer-date-picker-nav" type="button" data-date-picker-month-step="-1" aria-label="Previous month">
+        ${icons.chevronLeft}
+      </button>
+      <strong>${safe(monthLabel(monthKey))}</strong>
+      <button class="drawer-date-picker-nav" type="button" data-date-picker-month-step="1" aria-label="Next month">
+        ${icons.chevronRight}
+      </button>
+    </div>
+    <div class="drawer-date-weekdays">${["M", "T", "W", "T", "F", "S", "S"].map((day) => `<span>${day}</span>`).join("")}</div>
+    <div class="drawer-date-day-grid">
+      ${cells.map((value) => {
+        if (!value) return `<span class="drawer-date-day-spacer"></span>`;
+        const day = String(Number(value.slice(8, 10)));
+        const isSelected = value === selectedDate;
+        const isToday = value === today;
+        return `
+          <button class="drawer-date-day ${isSelected ? "is-selected" : ""} ${isToday ? "is-today" : ""}" type="button" data-date-picker-day="${safe(value)}" aria-pressed="${isSelected ? "true" : "false"}">
+            ${day}
+          </button>
+        `;
+      }).join("")}
+    </div>
+    <div class="drawer-date-picker-footer">
+      <button class="drawer-date-today" type="button" data-date-picker-day="${safe(today)}">Today</button>
+    </div>
+  `;
+}
+
+function drawerDatePickerInitialMonth(field) {
+  const input = field?.querySelector("[data-date-text-field]");
+  const selected = normalizedIsoDate(input?.value, "");
+  return selected ? selected.slice(0, 7) : currentMonthKey();
+}
+
+function positionDrawerDatePicker(field) {
+  const picker = field?.querySelector("[data-date-picker]");
+  if (!field || !picker) return;
+  const body = field.closest(".details-body");
+  const panel = field.closest(".details-panel");
+  const actions = panel?.querySelector(".drawer-actions");
+  const fieldRect = field.getBoundingClientRect();
+  const bodyRect = body?.getBoundingClientRect() || { top: 0, bottom: window.innerHeight };
+  const actionsRect = actions?.getBoundingClientRect();
+  const bottomLimit = actionsRect ? Math.min(bodyRect.bottom, actionsRect.top - 8) : bodyRect.bottom;
+  const spaceBelow = bottomLimit - fieldRect.bottom;
+  const spaceAbove = fieldRect.top - bodyRect.top;
+  const pickerHeight = picker.offsetHeight || 292;
+  const preferAbove = spaceBelow < pickerHeight + 8 && spaceAbove > spaceBelow;
+  const available = Math.max(180, Math.min(320, (preferAbove ? spaceAbove : spaceBelow) - 8));
+  field.classList.toggle("is-above", preferAbove);
+  field.style.setProperty("--drawer-date-picker-max-height", `${available}px`);
+}
+
+function normalizedIsoDate(value, fallback = currentDateKey()) {
+  const raw = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fallback;
+  const [year, month, day] = raw.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== year
+    || date.getMonth() + 1 !== month
+    || date.getDate() !== day
+  ) {
+    return fallback;
+  }
+  return raw;
+}
+
+function validMonthKey(value) {
+  const raw = String(value || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(raw)) return false;
+  const [year, month] = raw.split("-").map(Number);
+  return Boolean(year && month >= 1 && month <= 12);
 }
 
 function transactionComboOptions(key, row = {}) {
