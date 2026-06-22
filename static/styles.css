@@ -2233,7 +2233,7 @@ kbd {
 }
 
 .settings-line-grid .metric-card small::before {
-  content: " — ";
+  content: " ";
 }
 
 .settings-line-grid .metric-card > em {
@@ -2241,7 +2241,7 @@ kbd {
 }
 
 .settings-line-grid .metric-card > em::before {
-  content: " ";
+  content: " — ";
 }
 
 .settings-line-grid .settings-card-actions {

@@ -3172,6 +3172,7 @@ function filterChipHtml(chip) {
 function quickFilterChipFieldLabel(view, field) {
   const label = quickFilterFieldLabel(view, field);
   if (field === "capital_bucket") return "Bucket";
+  if (field === "liquidity") return "Liquidity";
   if (field === "transaction_class") return "Type";
   return label;
 }
@@ -3209,6 +3210,7 @@ function quickFilterFieldLabel(view, field) {
     };
     if (labels[field]) return labels[field];
   }
+  if (view === "accounts" && field === "liquidity") return "Liquidity";
   const fields = view === "accounts"
     ? accountFields
     : view === "trades"
@@ -3226,6 +3228,10 @@ function quickFilterValueLabel(chip = {}) {
   if (chip.field === "year") return chip.value;
   if (chip.field === "category_id" || chip.field === "subcategory_id") return taxonomyLabel(chip.value);
   if (chip.field === "country_code") return chip.label || chip.value;
+  if (chip.field === "liquidity") {
+    if (chip.value === "liquid") return "Liquid Capital";
+    if (chip.value === "non_liquid") return "Non Liquid Capital";
+  }
   if (chip.field === "portfolio_id") return chip.label || portfolioReferenceLabel(chip.value);
   if (chip.field === "phase_id") return chip.label || displayPhaseId(chip.value);
   return chip.label || labelize(chip.value);
@@ -3236,7 +3242,7 @@ function quickFilterIcon(field) {
   if (field === "country_code") return "globe";
   if (field === "statement_currency" || field === "account_currency" || field === "trade_currency") return "currency";
   if (field === "category_id" || field === "subcategory_id" || field === "instrument_type" || field === "account_type") return "pie";
-  if (field === "source_system" || field === "provider_id" || field === "account_id" || field === "portfolio_id") return "wallet";
+  if (field === "source_system" || field === "provider_id" || field === "account_id" || field === "portfolio_id" || field === "liquidity") return "wallet";
   if (field === "provider" || field === "portfolio_name") return "wallet";
   return "filter";
 }
@@ -4104,6 +4110,12 @@ function overviewSupportingInsightLine(card = {}) {
 function overviewMetricActionOptions(card = {}) {
   const text = overviewInsightCardSearchText(card);
   if (!text.trim()) return {};
+  if (/(non[-\s]?liquid|non liquid capital)/.test(text)) {
+    return metricActionOptions("filter-accounts", { "account-status": "active", liquidity: "non_liquid" }, `Show accounts for ${card.label || "metric"}`);
+  }
+  if (/(cash runway|liquid capital|liquidity|reserve target|idle liquidity)/.test(text)) {
+    return metricActionOptions("filter-accounts", { "account-status": "active", liquidity: "liquid" }, `Show accounts for ${card.label || "metric"}`);
+  }
   if (/(credit utilization|credit headroom|credit limit|liabilit)/.test(text)) {
     return metricActionOptions("filter-accounts", { "account-type": "credit_card" }, `Show accounts for ${card.label || "metric"}`);
   }
@@ -4118,6 +4130,9 @@ function overviewMetricActionOptions(card = {}) {
   }
   if (/(portfolio|monthly plan\b)/.test(text)) {
     return metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, `Show portfolio funding for ${card.label || "metric"}`);
+  }
+  if (/investment share/.test(text)) {
+    return metricActionOptions("filter-accounts", { "account-status": "active", "capital-bucket": "investment" }, `Show accounts for ${card.label || "metric"}`);
   }
   if (/(liquid capital|cash runway|non liquid|net worth|capital concentration|provider concentration|largest account|investment share|capital)/.test(text)) {
     return metricActionOptions("filter-accounts", { "account-status": "active" }, `Show accounts for ${card.label || "metric"}`);
@@ -12894,14 +12909,17 @@ function accountInsightsDashboard(data = {}) {
   const insights = data?.insights || {};
   const tables = data?.insight_tables || {};
   const netWorth = numericValue(insights.net_worth_eur);
+  const assets = numericValue(insights.assets_eur);
+  const liabilities = numericValue(insights.liabilities_eur);
+  const liquidCapital = numericValue(insights.liquid_capital_eur);
   return metricLineDashboard([
     {
       title: "Balance Sheet Summary",
       html: metricLineItems([
-        { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: `${formatNumber(insights.active_accounts || 0)} active accounts`, note: "Balance across active account registers.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active" }, "Show active accounts") },
-        { label: "Assets", value: formatWholeCurrency(insights.assets_eur || 0, "EUR"), meta: "positive balances", note: "Gross active account value before liabilities.", icon: "trendUp", options: metricActionOptions("filter-accounts", { "balance-sign": "positive", "account-status": "active" }, "Show asset accounts") },
-        { label: "Liabilities", value: formatWholeCurrency(insights.liabilities_eur || 0, "EUR"), meta: "active liabilities", note: "Credit and negative-balance exposure.", icon: "creditCard", options: metricActionOptions("filter-accounts", { "balance-sign": "negative", "account-status": "active" }, "Show liability accounts") },
-        { label: "Liquid Capital", value: formatWholeCurrency(insights.liquid_capital_eur || 0, "EUR"), meta: "reserve + trading capital", note: "Accessible cash-like capital for near-term use.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active" }, "Show active accounts") },
+        { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: [`${formatPercent(netWorth ? 100 : 0)} of net worth`, `${formatNumber(insights.active_accounts || 0)} active accounts`].join(" · "), note: "Balance across active account registers.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active" }, "Show active accounts") },
+        { label: "Assets", value: formatWholeCurrency(assets, "EUR"), meta: [`${formatPercent(percentOf(assets, netWorth))} of net worth`, "positive balances"].join(" · "), note: "Gross active account value before liabilities.", icon: "trendUp", options: metricActionOptions("filter-accounts", { "balance-sign": "positive", "account-status": "active" }, "Show asset accounts") },
+        { label: "Liabilities", value: formatWholeCurrency(liabilities, "EUR"), meta: [`${formatPercent(percentOf(liabilities, netWorth))} of net worth`, "active liabilities"].join(" · "), note: "Credit and negative-balance exposure.", icon: "creditCard", options: metricActionOptions("filter-accounts", { "balance-sign": "negative", "account-status": "active" }, "Show liability accounts") },
+        { label: "Liquid Capital", value: formatWholeCurrency(liquidCapital, "EUR"), meta: [`${formatPercent(percentOf(liquidCapital, netWorth))} of net worth`, "reserve + trading capital"].join(" · "), note: "Accessible cash-like capital for near-term use.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active", liquidity: "liquid" }, "Show liquid capital accounts") },
       ]),
     },
     { title: "Structure Breakdown: Account Type", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
@@ -12936,10 +12954,10 @@ function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, 
     return {
       label: displayLabel,
       value: formatWholeCurrency(amount, "EUR"),
-      meta: [formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
-      note: `${formatPercent(share)} of net worth by ${noteLabel}.`,
+      meta: [`${formatPercent(share)} of net worth`, formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
+      note: `Active account value by ${noteLabel}.`,
       icon: insightIconFor(filterValue || noteLabel, iconContext),
-      options: filterField ? metricActionOptions("filter-accounts", { [filterField]: filterValue }, `Show accounts for ${displayLabel}`) : {},
+      options: filterField ? metricActionOptions("filter-accounts", { "account-status": "active", [filterField]: filterValue }, `Show accounts for ${displayLabel}`) : {},
     };
   }));
 }
@@ -12951,10 +12969,10 @@ function topAccountsMetricLines(rows = []) {
     .map((row) => ({
       label: accountDisplayName(row),
       value: formatWholeCurrency(row.amount_eur, "EUR"),
-      meta: [labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
-      note: `${formatPercent(row.pct_of_net || 0)} of net worth.`,
+      meta: [`${formatPercent(row.pct_of_net || 0)} of net worth`, labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
+      note: "Top active account by project value.",
       icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
-      options: metricActionOptions("filter-accounts", { "account-id": row.account_id || "" }, `Show ${accountDisplayName(row)}`),
+      options: metricActionOptions("filter-accounts", { "account-id": row.account_id || "", "account-status": "active" }, `Show ${accountDisplayName(row)}`),
     })));
 }
 
@@ -12966,10 +12984,10 @@ function accountAllocationMetricLines(rows = [], netWorth = 0, iconContext = "")
     .map((row) => ({
       label: labelize(row.name),
       value: formatWholeCurrency(row.eur, "EUR"),
-      meta: nativeCurrencySummaryOrBlank(row.native_amounts),
-      note: `${formatPercent(percentOf(row.eur, netWorth))} of net worth.`,
+      meta: [`${formatPercent(percentOf(row.eur, netWorth))} of net worth`, nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: `Active account value by ${iconContext === "currency" ? "currency" : "capital bucket"}.`,
       icon: insightIconFor(row.name, iconContext),
-      options: filterField ? metricActionOptions("filter-accounts", { [filterField]: row.name || "" }, `Show accounts for ${labelize(row.name)}`) : {},
+      options: filterField ? metricActionOptions("filter-accounts", { "account-status": "active", [filterField]: row.name || "" }, `Show accounts for ${labelize(row.name)}`) : {},
     })));
 }
 
@@ -12986,7 +13004,7 @@ function accountCreditMetricLines(rows = []) {
         meta: labelize(row.provider_id),
         note: `${formatPercent(available)} available · ${formatWholeCurrency(row.available_credit_native || 0, row.currency || "")} headroom.`,
         icon: "creditCard",
-        options: metricActionOptions("filter-accounts", { "account-id": row.account_id || "" }, `Show ${accountDisplayName(row)}`),
+        options: metricActionOptions("filter-accounts", { "account-id": row.account_id || "", "account-status": "active" }, `Show ${accountDisplayName(row)}`),
       };
     }));
 }
@@ -13207,8 +13225,8 @@ function transactionCategorySpendMetricLines(rows = []) {
   return metricLineItems((rows || []).slice(0, 6).map((row) => ({
     label: taxonomyLabel(row.category || "expense"),
     value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period category spend.`,
+    meta: [`${formatPercent(percentOf(row.amount_eur, total))} of category spend`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: "Selected-period accountable expense category.",
     icon: insightIconFor(row.category, "category"),
     options: metricActionOptions("filter-transactions", { category: row.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(row.category || "expense")} transactions`),
   })));
@@ -13228,8 +13246,8 @@ function transactionSubcategorySpendMetricLines(rows = []) {
     return {
       label: subcategoryLabel,
       value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-      meta: [parentLabel, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-      note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period subcategory spend.`,
+      meta: [`${formatPercent(percentOf(row.amount_eur, total))} of subcategory spend`, parentLabel, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: "Selected-period accountable expense subcategory.",
       icon: insightIconFor(subcategory || row.category, "category"),
       options: metricActionOptions("filter-transactions", filterAttrs, `Show ${subcategoryLabel} transactions`),
     };
@@ -13241,8 +13259,8 @@ function transactionIncomeSourceMetricLines(rows = []) {
   return metricLineItems((rows || []).slice(0, 6).map((row) => ({
     label: row.name || "Income",
     value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: `${formatPercent(percentOf(row.amount_eur, total))} of selected-period income.`,
+    meta: [`${formatPercent(percentOf(row.amount_eur, total))} of income`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: "Selected-period income source.",
     icon: insightIconFor(row.name || "income", "income"),
     options: metricActionOptions("filter-transactions", { "income-source": row.name || "", "transaction-class": "income" }, `Show ${labelize(row.name || "income")} income`),
   })));
@@ -13255,8 +13273,8 @@ function transactionCurrencyFlowMetricLines(rows = []) {
     return {
       label: row.currency || "-",
       value: signedWholeAmount(net, "EUR"),
-      meta: `${signedWholeAmount(row.net_native || 0, row.currency || "EUR")} native · ${formatPlural(row.count || 0, "row")}`,
-      note: `${formatWholeCurrency(row.income_eur || 0, "EUR")} income · ${formatWholeCurrency(row.expense_eur || 0, "EUR")} expense · ${formatPercent(percentOf(Math.abs(net), total))} of currency movement.`,
+      meta: `${formatPercent(percentOf(Math.abs(net), total))} of currency movement · ${signedWholeAmount(row.net_native || 0, row.currency || "EUR")} native · ${formatPlural(row.count || 0, "row")}`,
+      note: `${formatWholeCurrency(row.income_eur || 0, "EUR")} income · ${formatWholeCurrency(row.expense_eur || 0, "EUR")} expense.`,
       icon: "currency",
       options: metricActionOptions("filter-transactions", { "statement-currency": row.currency || "" }, `Show ${row.currency || "currency"} transactions`),
     };
@@ -13976,8 +13994,8 @@ function monthlyTargetIncomeCategoryMetricLines(rows = []) {
   return metricLineItems(values.map((row) => ({
     label: taxonomyLabel(row.category),
     value: formatWholeCurrency(row.target, "EUR"),
-    meta: `${formatWholeCurrency(row.actual, "EUR")} actual income`,
-    note: `${formatPercent(percentOf(row.target, totalTarget))} of income category model.`,
+    meta: `${formatPercent(percentOf(row.target, totalTarget))} of income model · ${formatWholeCurrency(row.actual, "EUR")} actual income`,
+    note: "Planning income baseline category.",
     icon: insightIconFor(row.category, "category"),
     options: metricActionOptions("filter-category", { category: row.category || "", "transaction-class": "income" }, `Show ${taxonomyLabel(row.category)} income transactions`),
   })));
@@ -13989,8 +14007,8 @@ function monthlyTargetCategoryMetricLines(rows = []) {
   return metricLineItems(values.map((row) => ({
     label: taxonomyLabel(row.category),
     value: formatWholeCurrency(row.target, "EUR"),
-    meta: `${formatWholeCurrency(row.actual, "EUR")} actual spend`,
-    note: `${formatPercent(percentOf(row.target, totalTarget))} of expense category model.`,
+    meta: `${formatPercent(percentOf(row.target, totalTarget))} of expense model · ${formatWholeCurrency(row.actual, "EUR")} actual spend`,
+    note: "Planning expense ceiling category.",
     icon: insightIconFor(row.category, "category"),
     options: metricActionOptions("filter-category", { category: row.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(row.category)} expense transactions`),
   })));
@@ -15418,8 +15436,8 @@ function tradeReturnActiveExposureMetricLines(data = {}) {
     return {
       label: row.label,
       value: formatWholeCurrency(row.marketValue, row.currency),
-      meta: [row.providerId || "", displayPortfolioId(row.portfolioId), `${signedWholeAmount(row.unrealized, row.currency)} unrealized`, signedPercent(returnPct)].filter(Boolean).join(" · "),
-      note: `${formatPercent(percentOf(row.marketValue, marketTotal))} of active market value.`,
+      meta: [`${formatPercent(percentOf(row.marketValue, marketTotal))} of active market value`, row.providerId || "", displayPortfolioId(row.portfolioId), `${signedWholeAmount(row.unrealized, row.currency)} unrealized`, signedPercent(returnPct)].filter(Boolean).join(" · "),
+      note: "Open-position market exposure.",
       icon: row.unrealized >= 0 ? "trendUp" : "trendDown",
       options: metricActionOptions("filter-trades", { "position-status": "active", symbol: row.symbol || "" }, `Show ${row.label} active trades`),
     };
@@ -15437,32 +15455,32 @@ function tradeReturnCapitalMetricLines(data = {}) {
     {
       label: "Closed Cost",
       value: formatWholeCurrency(closedCost, "EUR"),
-      meta: `${signedPercent(summary.realized_pl_pct || 0)} realized return`,
-      note: `${formatPercent(percentOf(closedCost, total))} of return capital view.`,
+      meta: `${formatPercent(percentOf(closedCost, total))} of return capital view · ${signedPercent(summary.realized_pl_pct || 0)} realized return`,
+      note: "Closed-position cost basis.",
       icon: "receipt",
       options: metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades"),
     },
     {
       label: "Active Cost",
       value: formatWholeCurrency(activeCost, "EUR"),
-      meta: `${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
-      note: `${formatPercent(percentOf(activeCost, total))} of return capital view.`,
+      meta: `${formatPercent(percentOf(activeCost, total))} of return capital view · ${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
+      note: "Open-position cost basis.",
       icon: "wallet",
       options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades"),
     },
     {
       label: "Active Market Value",
       value: formatWholeCurrency(summary.market_value_eur, "EUR"),
-      meta: `${formatNumber(summary.active_positions || 0)} active positions`,
-      note: `${formatPercent(percentOf(summary.market_value_eur, total))} of return capital view.`,
+      meta: `${formatPercent(percentOf(summary.market_value_eur, total))} of return capital view · ${formatNumber(summary.active_positions || 0)} active positions`,
+      note: "Current open-position market exposure.",
       icon: "trendUp",
       options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure"),
     },
     {
       label: "Fees Paid",
       value: signedWholeAmount(-totalFees, "EUR"),
-      meta: "reported trade fees",
-      note: `${formatPercent(percentOf(totalFees, total))} of return capital view.`,
+      meta: `${formatPercent(percentOf(totalFees, total))} of return capital view · reported trade fees`,
+      note: "Fees recorded on trade rows.",
       icon: "receipt",
     },
   ]);
@@ -15483,8 +15501,8 @@ function tradePerformanceMetricLines(rows = [], key = "period") {
     return {
       label,
       value: signedWholeAmount(pl, "EUR"),
-      meta: detail,
-      note: `${formatPercent(percentOf(Math.abs(pl), total))} of shown trade P/L movement.`,
+      meta: `${formatPercent(percentOf(Math.abs(pl), total))} of shown P/L movement · ${detail}`,
+      note: "Trade profit and loss movement.",
       icon: pl >= 0 ? "trendUp" : "trendDown",
       options: key === "instrument"
         ? metricActionOptions("filter-trades", {
@@ -15518,8 +15536,8 @@ function tradePositionWatchlistMetricLines(data = {}) {
     items.push({
       label: "Largest Exposure",
       value: formatWholeCurrency(value, largestExposure.trade_currency || "EUR"),
-      meta: tradePositionLabel(largestExposure),
-      note: `${formatPercent(percentOf(value, marketTotal))} of active market value.`,
+      meta: `${formatPercent(percentOf(value, marketTotal))} of active market value · ${tradePositionLabel(largestExposure)}`,
+      note: "Largest open-position exposure.",
       icon: "pie",
       options: tradeRowMetricOptions(largestExposure, "Show largest exposure"),
     });
@@ -20079,6 +20097,7 @@ function applyAccountInsightFilter(dataset = {}) {
     review_status: dataset.reviewStatus || "",
     ledger_status: dataset.ledgerStatus || "",
     balance_sign: dataset.balanceSign || "",
+    liquidity: dataset.liquidity || "",
   });
   state.accountOffset = 0;
   state.selectedAccounts.clear();
@@ -20240,6 +20259,7 @@ function defaultAccountFilters(overrides = {}) {
     review_status: "",
     ledger_status: "",
     balance_sign: "",
+    liquidity: "",
     ...overrides,
   };
 }
