@@ -4,6 +4,9 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Uppercased visible transaction/trade register IDs across the UI, formatted register names in Statements Import, and tightened the Net Worth hero scale for a calmer Overview ratio.
+- Kept table scrollbars from bleeding through open edit drawers and moved sticky drawer actions clear of the drawer scroll thumb.
+- Simplified global keyboard shortcuts: `/` focuses search, `P` cycles the reporting period, and `Esc` backs out of panels before clearing active search and filters.
 - Added Portfolio > Statement as the first/default Portfolio subpage and constrained statement attachment previews so long source text no longer widens the drawer.
 - Polished edit drawers for easier register entry: uppercase visible IDs, labeled account type/bucket choices, hidden non-credit account credit fields, hidden transaction helper amounts, and a reserved scrollbar lane.
 - Moved Statement to the first tab position on pages that have a Statement subpage, and placed Transactions > Targets second after Statement.

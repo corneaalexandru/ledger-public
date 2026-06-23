@@ -24,7 +24,7 @@ const FONT_SCALE_TOKENS = {
     metric: "19px",
     metricLarge: "22px",
     hero: "54px",
-    heroWide: "74px",
+    heroWide: "61px",
     periodHero: "21px",
     bullet: "16px",
   },
@@ -39,7 +39,7 @@ const FONT_SCALE_TOKENS = {
     metric: "20.5px",
     metricLarge: "23.5px",
     hero: "59px",
-    heroWide: "80px",
+    heroWide: "66px",
     periodHero: "22.5px",
     bullet: "17px",
   },
@@ -54,7 +54,7 @@ const FONT_SCALE_TOKENS = {
     metric: "22px",
     metricLarge: "25px",
     hero: "64px",
-    heroWide: "88px",
+    heroWide: "72px",
     periodHero: "24px",
     bullet: "18px",
   },
@@ -69,7 +69,7 @@ const FONT_SCALE_TOKENS = {
     metric: "24px",
     metricLarge: "27px",
     hero: "70px",
-    heroWide: "96px",
+    heroWide: "79px",
     periodHero: "26px",
     bullet: "19px",
   },
@@ -84,7 +84,7 @@ const FONT_SCALE_TOKENS = {
     metric: "26px",
     metricLarge: "29px",
     hero: "76px",
-    heroWide: "104px",
+    heroWide: "86px",
     periodHero: "28px",
     bullet: "20px",
   },
@@ -305,12 +305,7 @@ const state = {
     calendarYear: currentYear(),
     yearRangeStart: currentYear() - 5,
   },
-  quickFilters: {
-    accounts: {},
-    transactions: {},
-    trades: {},
-    portfolio: {},
-  },
+  quickFilters: defaultQuickFilters(),
 };
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, "all"];
@@ -1164,10 +1159,13 @@ function initPrivacyMode() {
 }
 
 function initKeyboardShortcutLabel() {
-  const label = isMacPlatform() ? "Cmd K" : "Ctrl K";
   document.querySelectorAll(".search kbd").forEach((node) => {
-    node.textContent = label;
+    node.textContent = "/";
   });
+}
+
+function clearFiltersShortcutLabel() {
+  return "Esc";
 }
 
 function isMacPlatform() {
@@ -2806,21 +2804,74 @@ function markOverviewStale() {
 }
 
 function handleCommandSearch(event) {
-  if (event.key === "Escape" && state.expandedChartId) {
-    state.expandedChartId = "";
-    renderPreservingScroll();
-    return;
-  }
   const key = String(event.key || "").toLowerCase();
-  if ((event.metaKey || event.ctrlKey) && event.altKey && (key === "p" || event.code === "KeyP")) {
+  if (handleEscapeShortcut(event)) return;
+  if (isPeriodShortcut(event, key)) {
     event.preventDefault();
     event.stopPropagation();
     cyclePeriodMode();
     return;
   }
-  if (!(event.metaKey || event.ctrlKey) || (key !== "k" && event.code !== "KeyK")) return;
+  if (!isSearchShortcut(event, key)) return;
   event.preventDefault();
   event.stopPropagation();
+  focusSearchShortcut();
+}
+
+function handleEscapeShortcut(event) {
+  if (event.key !== "Escape") return false;
+  if (state.expandedChartId) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.expandedChartId = "";
+    renderPreservingScroll();
+    return true;
+  }
+  if (escapeShouldStayLocal(event.target)) return false;
+  if (hasOpenDetailPanel()) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeOpenDetailPanel();
+    return true;
+  }
+  if (clearActiveFilters()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+  return false;
+}
+
+function escapeShouldStayLocal(target) {
+  return target instanceof Element
+    && Boolean(target.closest("[data-drawer-choice].is-open, [data-date-field].is-open"));
+}
+
+function isPeriodShortcut(event, normalizedKey = String(event.key || "").toLowerCase()) {
+  return normalizedKey === "p"
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.altKey
+    && !isEditableShortcutTarget(event.target);
+}
+
+function isSearchShortcut(event, normalizedKey = String(event.key || "").toLowerCase()) {
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && (normalizedKey === "k" || event.code === "KeyK")) return true;
+  return (normalizedKey === "/" || event.code === "Slash")
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.altKey
+    && !event.shiftKey
+    && !isEditableShortcutTarget(event.target);
+}
+
+function isEditableShortcutTarget(target) {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("[contenteditable='true']")) return true;
+  return target.matches("input, textarea, select");
+}
+
+function focusSearchShortcut() {
   elements.search.focus();
   elements.search.select();
   elements.search.closest(".search")?.classList.add("is-command-active");
@@ -2890,6 +2941,20 @@ function clearSearch() {
   state.globalSearch = null;
   state.error.globalSearch = "";
   runSearchForCurrentView();
+}
+
+function clearActiveFilters() {
+  const filterView = quickFilterRegisterView();
+  const hadSearch = Boolean(state.query.trim());
+  const clearedFilters = clearQuickFilterState(filterView);
+  if (!hadSearch && !clearedFilters) return false;
+  if (hadSearch) clearSearchStateOnly();
+  if (filterView) {
+    reloadQuickFilterView(filterView);
+  } else {
+    runSearchForCurrentView();
+  }
+  return true;
 }
 
 function applyQuickTableFilter(value, field = "", label = value) {
@@ -3110,7 +3175,7 @@ function renderActiveFilterChips() {
       data-action="clear-filter-chips"
       data-filter-view="${safe(view)}"
       type="button"
-      ${tooltipAttrs("Clear table filters")}
+      ${tooltipAttrs(`Clear table filters (${clearFiltersShortcutLabel()})`)}
     >
       <span data-icon="x"></span>
     </button>
@@ -3307,9 +3372,17 @@ function removeQuickFilterChip(field, view = state.view) {
 function clearQuickFilterChips(view = state.view) {
   const filterView = quickFilterRegisterView(view);
   if (!filterView) return;
-  activeQuickFilterChips(filterView).forEach((chip) => clearQuickFilterField(filterView, chip.field));
-  state.quickFilters[filterView] = {};
+  clearQuickFilterState(filterView);
   reloadQuickFilterView(filterView);
+}
+
+function clearQuickFilterState(view = state.view) {
+  const filterView = quickFilterRegisterView(view);
+  if (!filterView) return false;
+  const chips = activeQuickFilterChips(filterView);
+  chips.forEach((chip) => clearQuickFilterField(filterView, chip.field));
+  state.quickFilters[filterView] = {};
+  return Boolean(chips.length);
 }
 
 function clearQuickFilterField(view, field) {
@@ -3458,6 +3531,15 @@ function clearSearchStateOnly() {
   resetPortfolioDetailState();
   state.periodPanelOpen = false;
   state.dashboardCardMenuOpen = false;
+}
+
+function defaultQuickFilters() {
+  return {
+    accounts: {},
+    transactions: {},
+    trades: {},
+    portfolio: {},
+  };
 }
 
 function quickFilterControl(value, label = value, options = "") {
@@ -3819,7 +3901,7 @@ function periodModeIcon(mode) {
 }
 
 function periodModeShortcutLabel() {
-  return `${isMacPlatform() ? "Cmd Option P" : "Ctrl Alt P"}`;
+  return "P";
 }
 
 function periodTriggerLabel() {
@@ -4553,7 +4635,7 @@ function globalTransactionResults(rows = []) {
     <button class="global-result-row" data-action="open-global-result" data-view-target="transactions" data-result-id="${safe(row.transaction_id)}" type="button">
       <span class="global-result-icon" aria-hidden="true">${icons.receipt}</span>
       <span>
-        <strong>${safe(row.memo || row.counterparty_name || row.transaction_id)}</strong>
+        <strong>${safe(row.memo || row.counterparty_name || displayTransactionId(row.transaction_id))}</strong>
         <small>${safe([formatDisplayDate(transactionPrimaryDate(row)), taxonomyLabel(row.transaction_class), countryName(row.country_code)].filter(Boolean).join(" · "))}</small>
       </span>
       <em>${signedCurrency(row)}</em>
@@ -4566,7 +4648,7 @@ function globalTradeResults(rows = []) {
     <button class="global-result-row" data-action="open-global-result" data-view-target="trades" data-result-id="${safe(row.trade_id)}" type="button">
       ${instrumentMark(row)}
       <span>
-        <strong>${safe(row.symbol || row.trade_id)}</strong>
+        <strong>${safe(row.symbol || displayTradeId(row.trade_id))}</strong>
         <small>${safe([row.provider_id, labelize(row.instrument_type), row.trade_currency].filter(Boolean).join(" · "))}</small>
       </span>
       <em>${formatTradeMoney(row.current_market_value_native, row.trade_currency)}</em>
@@ -10979,7 +11061,7 @@ function statementImportTable(rows = [], isFiltered = false) {
               </td>
               <td>
                 <span class="table-main">${safe(statementImportTargetLabel(row))}</span>
-                <span class="table-sub">${safe(row.target_sheet_name || "")}</span>
+                <span class="table-sub">${safe(displayRegisterName(row.target_sheet_name))}</span>
               </td>
             </tr>
           `;
@@ -11079,12 +11161,14 @@ function statementImportTypeLabel(row = {}) {
 }
 
 function statementImportTargetLabel(row = {}) {
-  return row.target_identifier_value
+  const source = row.target_sheet_name || row.record_kind || "";
+  const target = row.target_identifier_value
     || row.proposed_record_id
     || row.duplicate_record_id
     || row.proposed_transaction_id
     || row.duplicate_transaction_id
     || "-";
+  return target === "-" ? target : displayRegisterRecordId(target, source);
 }
 
 function renderSettings() {
@@ -15513,7 +15597,7 @@ function tradeTreemapDashboard(data = {}) {
     .filter((row) => String(row.ledger_status || "").toLowerCase() !== "deleted")
     .map((row) => {
       const value = tradeTreemapValue(row);
-      const label = row.symbol || row.asset_name || row.trade_id || "Trade";
+      const label = row.symbol || row.asset_name || displayTradeId(row.trade_id) || "Trade";
       const group = row.portfolio_id ? portfolioReferenceLabel(row.portfolio_id) : labelize(row.instrument_type || row.provider_id || "unassigned");
       const dataAttrs = row.symbol
         ? `data-symbol="${safe(row.symbol || "")}" data-position-status="${safe(row.position_status || "")}"`
@@ -15622,7 +15706,7 @@ function tradeReturnActiveExposureMetricLines(data = {}) {
     const marketValue = Math.abs(numericValue(row.current_market_value_native));
     if (!marketValue) return;
     const symbol = row.symbol || "";
-    const label = symbol || row.asset_name || row.trade_id || "Position";
+    const label = symbol || row.asset_name || displayTradeId(row.trade_id) || "Position";
     const portfolioId = row.portfolio_id || "";
     const providerId = row.provider_id || "";
     const currency = row.trade_currency || "EUR";
@@ -15961,7 +16045,7 @@ function tradePositionWatchlistBars(data = {}) {
 }
 
 function tradePositionLabel(row = {}) {
-  return row.symbol || row.asset_name || row.trade_id || "Position";
+  return row.symbol || row.asset_name || displayTradeId(row.trade_id) || "Position";
 }
 
 function tradePositionFilterDataAttrs(row = {}) {
@@ -16091,7 +16175,7 @@ function tradeTable(rows, data) {
                   type="checkbox"
                   value="${safe(row.trade_id)}"
                   ${state.selectedTrades.has(row.trade_id) ? "checked" : ""}
-                  aria-label="Select ${safe(row.trade_id)}"
+                  aria-label="Select ${safe(displayTradeId(row.trade_id))}"
                 />
               </td>
               <td class="statement-cell">${statementCell(row)}</td>
@@ -16326,7 +16410,7 @@ function transactionTable(rows, data) {
                   type="checkbox"
                   value="${safe(row.transaction_id)}"
                   ${state.selectedTransactions.has(row.transaction_id) ? "checked" : ""}
-                  aria-label="Select ${safe(row.transaction_id)}"
+                  aria-label="Select ${safe(displayTransactionId(row.transaction_id))}"
                 />
               </td>
               <td class="statement-cell">${statementCell(row)}</td>
@@ -16571,13 +16655,14 @@ function statementCell(row) {
   const transactionId = String(row.transaction_id || "").trim();
   const recordId = tradeId || transactionId;
   const idAttr = tradeId ? `data-trade-id="${safe(tradeId)}"` : `data-transaction-id="${safe(transactionId)}"`;
+  const recordLabel = displayRegisterRecordId(recordId, tradeId ? "trades_register" : "transactions_register");
   return `
     <button
       class="statement-button"
       data-action="show-statement"
       ${idAttr}
       type="button"
-      ${tooltipAttrs(`Show imported statement for ${recordId}`)}
+      ${tooltipAttrs(`Show imported statement for ${recordLabel}`)}
     >
       <span data-icon="fileText"></span>
     </button>
@@ -17998,6 +18083,21 @@ function storedTradeId(value) {
   return storedPrefixedId(value, "trd_");
 }
 
+function displayRegisterRecordId(value, source = "") {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const scope = String(source ?? "").trim().toLowerCase();
+  if (scope === "trades_register" || scope === "trade" || /^trd_/i.test(raw)) return displayTradeId(raw);
+  if (scope === "transactions_register" || scope === "transaction" || /^txn_/i.test(raw)) return displayTransactionId(raw);
+  if (scope === "accounts_register" || scope === "account" || /^acct_/i.test(raw)) return displayAccountId(raw);
+  return raw;
+}
+
+function displayRegisterName(value) {
+  const raw = String(value ?? "").trim();
+  return raw ? labelize(raw) : "";
+}
+
 function categoryPairs() {
   return state.transactions?.filters?.category_pairs || [];
 }
@@ -18252,7 +18352,7 @@ function sourceTruthTable(rows) {
         <tbody>
           ${rows.length ? rows.map((row) => `
             <tr>
-              <td><span class="table-main">${safe(row.name)}</span></td>
+              <td><span class="table-main">${safe(displayRegisterName(row.name) || row.name)}</span></td>
               <td>${safe(row.purpose)}</td>
               <td class="align-right">${formatNumber(row.rows)}</td>
               <td class="align-right">${formatNumber(row.columns)}</td>
@@ -19928,7 +20028,7 @@ async function duplicateTrade(tradeId) {
 async function duplicateSelectedTrades() {
   const ids = Array.from(state.selectedTrades).filter(Boolean);
   if (!ids.length) return;
-  const confirmed = window.confirm(`Duplicate ${formatNumber(ids.length)} selected trades in trades_register?`);
+  const confirmed = window.confirm(`Duplicate ${formatNumber(ids.length)} selected trades in ${displayRegisterName("trades_register")}?`);
   if (!confirmed) return;
 
   try {

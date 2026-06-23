@@ -38,7 +38,7 @@
   --ledger-font-metric: 22px;
   --ledger-font-metric-large: 25px;
   --ledger-font-hero: 64px;
-  --ledger-font-hero-wide: 88px;
+  --ledger-font-hero-wide: 72px;
   --ledger-font-period-hero: 24px;
   --ledger-font-bullet: 18px;
   --table-header-font-size: var(--ledger-font-micro);
@@ -6176,6 +6176,23 @@ button.metric-card {
   scroll-padding-right: 14px;
 }
 
+.page-stage:has(.details-panel) .transactions-table-wrap,
+.page-stage:has(.details-panel) .planning-target-table-wrap,
+.page-stage:has(.details-panel) .monthly-target-table-wrap:not(.monthly-target-detail-wrap),
+.page-stage:has(.details-panel) .portfolio-table-wrap,
+.page-stage:has(.details-panel) .data-table-wrap {
+  scrollbar-width: none;
+}
+
+.page-stage:has(.details-panel) .transactions-table-wrap::-webkit-scrollbar,
+.page-stage:has(.details-panel) .planning-target-table-wrap::-webkit-scrollbar,
+.page-stage:has(.details-panel) .monthly-target-table-wrap:not(.monthly-target-detail-wrap)::-webkit-scrollbar,
+.page-stage:has(.details-panel) .portfolio-table-wrap::-webkit-scrollbar,
+.page-stage:has(.details-panel) .data-table-wrap::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .planning-target-table-wrap,
 .monthly-target-table-wrap:not(.monthly-target-detail-wrap) {
   max-height: 620px;
@@ -6775,7 +6792,7 @@ table.portfolio-table td:nth-child(7) {
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 20;
+  z-index: 240;
   display: flex;
   flex-direction: column;
   width: min(640px, calc(100vw - 72px));
@@ -6805,6 +6822,7 @@ table.portfolio-table td:nth-child(7) {
 .details-body {
   --details-body-padding-start: 24px;
   --details-body-padding-end: 34px;
+  --details-scrollbar-clearance: 16px;
   flex: 1 1 auto;
   min-height: 0;
   padding: 0 var(--details-body-padding-end) 0 var(--details-body-padding-start);
@@ -7432,7 +7450,7 @@ table.portfolio-table td:nth-child(7) {
   align-items: center;
   gap: 8px;
   margin: 4px calc(var(--details-body-padding-end, 24px) * -1) 0 calc(var(--details-body-padding-start, 24px) * -1);
-  padding: 10px var(--details-body-padding-end, 24px) 14px var(--details-body-padding-start, 24px);
+  padding: 10px calc(var(--details-body-padding-end, 24px) + var(--details-scrollbar-clearance, 0px)) 14px var(--details-body-padding-start, 24px);
   border-top: 1px solid var(--line-subtle);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
@@ -7517,6 +7535,7 @@ table.portfolio-table td:nth-child(7) {
   .details-body {
     --details-body-padding-start: 18px;
     --details-body-padding-end: 26px;
+    --details-scrollbar-clearance: 14px;
   }
 
   .drawer-form-section-grid {
