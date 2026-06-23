@@ -13342,7 +13342,6 @@ function transactionInsightsDashboard(data = {}) {
   const savingsRate = income ? percentOf(net, income) : 0;
   const periodLabel = transactionMetricPeriodLabel();
   const includedRows = numericValue(summary.filtered ?? data?.total ?? insights.total);
-  const topExpense = (insights.category_spend || [])[0] || {};
   return metricLineDashboard([
     {
       title: "Cash Flow Snapshot",
@@ -13354,24 +13353,12 @@ function transactionInsightsDashboard(data = {}) {
       ]),
     },
     {
-      title: "Review and Budget Watch",
+      title: "Review Queue",
       html: metricLineItems([
         { label: "Review Queue", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target", options: metricActionOptions("filter-transactions", { "review-status": "open" }, "Show transactions requiring review") },
-        {
-          label: "Top Expense Category",
-          value: formatWholeCurrency(topExpense.amount_eur || 0, "EUR"),
-          meta: [taxonomyLabel(topExpense.category || "expense"), expenses ? `${formatPercent(percentOf(topExpense.amount_eur, expenses))} of expenses` : ""].filter(Boolean).join(" · "),
-          note: `${formatPlural(topExpense.count || 0, "row")} in the selected period.`,
-          icon: insightIconFor(topExpense.category || "expense", "category"),
-          options: topExpense.category
-            ? metricActionOptions("filter-category", { category: topExpense.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(topExpense.category)} transactions`)
-            : {},
-        },
       ]),
     },
     { title: "Income Sources", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
-    { title: "Expense Categories", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
-    { title: "Expense Subcategories", html: transactionSubcategorySpendMetricLines(insights.subcategory_spend || []) },
     { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
     {
       title: "Activity Peaks",
@@ -13381,7 +13368,7 @@ function transactionInsightsDashboard(data = {}) {
       ]),
     },
     ...transactionPlanningStatementSections(data),
-  ], "Cash flow statement", "Selected period cash flow, spend drivers, currency movement, review work, and planning variance from accountable transaction rows.");
+  ], "Cash flow statement", "Selected period cash flow, income sources, currency movement, review work, and planning variance from accountable transaction rows.");
 }
 
 function transactionMetricPeriodLabel() {
@@ -13397,8 +13384,6 @@ function planningTargetModelMetricSections(planning = {}) {
   if (!selection.available) return [];
   const selectedTargets = applyMonthlyTargetOverrides(selection.rows);
   return [
-    { title: "Income Baseline Rules", html: monthlyTargetIncomeCategoryMetricLines(selectedTargets) },
-    { title: "Expense Ceiling Rules", html: monthlyTargetCategoryMetricLines(selectedTargets) },
     { title: "Target Breach Months", html: monthlyTargetAboveCeilingMetricLines(selectedTargets) },
   ].filter((section) => String(section.html || "").trim());
 }
@@ -13509,14 +13494,18 @@ function transactionSubcategorySpendMetricLines(rows = []) {
 
 function transactionIncomeSourceMetricLines(rows = []) {
   const total = rows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
-  return metricLineItems((rows || []).slice(0, 6).map((row) => ({
-    label: row.name || "Income",
-    value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [`${formatPercent(percentOf(row.amount_eur, total))} of income`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: "Selected period income source.",
-    icon: insightIconFor(row.name || "income", "income"),
-    options: metricActionOptions("filter-transactions", { "income-source": row.name || "", "transaction-class": "income" }, `Show ${labelize(row.name || "income")} income`),
-  })));
+  return metricLineItems((rows || []).slice(0, 6).map((row) => {
+    const source = row.name || "income";
+    const sourceLabel = labelize(source);
+    return {
+      label: sourceLabel,
+      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+      meta: [`${formatPercent(percentOf(row.amount_eur, total))} of income`, formatPlural(row.count || 0, "row")].filter(Boolean).join(" · "),
+      note: `Income recorded from ${sourceLabel} in the selected period.`,
+      icon: insightIconFor(source, "income"),
+      options: metricActionOptions("filter-transactions", { "income-source": source, "transaction-class": "income" }, `Show ${sourceLabel} income`),
+    };
+  }));
 }
 
 function transactionCurrencyFlowMetricLines(rows = []) {

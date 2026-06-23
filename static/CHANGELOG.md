@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Corrected Income Sources labels in Transactions > Statement and removed the category-heavy income-baseline and expense-ceiling rule lists.
 - Clarified the Statement pages across Overview, Accounts, Transactions, Trades, and Portfolio, and fixed Overview category concentration so it uses selected-period spending instead of a current-month denominator.
 - Kept debt out of account structure breakdowns so country, provider, type, bucket, and currency rows show active assets while liabilities remain in the balance-sheet and credit-risk sections.
 - Reduced the Net Worth hero to the standard 64px hero scale so the Overview header matches the compact dashboard rhythm.
