@@ -2063,6 +2063,14 @@ kbd {
   max-width: 1760px;
 }
 
+.statement-summary {
+  max-width: 980px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .overview-insight-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

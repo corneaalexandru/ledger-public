@@ -3343,7 +3343,7 @@ function quickFilterValueLabel(chip = {}) {
   if (chip.field === "country_code") return chip.label || chip.value;
   if (chip.field === "liquidity") {
     if (chip.value === "liquid") return "Liquid Capital";
-    if (chip.value === "non_liquid") return "Non Liquid Capital";
+    if (chip.value === "non_liquid") return "Non-Liquid Capital";
   }
   if (chip.field === "portfolio_id") return chip.label || portfolioReferenceLabel(chip.value);
   if (chip.field === "phase_id") return chip.label || displayPhaseId(chip.value);
@@ -4157,7 +4157,12 @@ function overviewInsightsDashboard(insightCards = [], accounts = {}, transaction
 
 function overviewContinuousInsightSection(cards = []) {
   const sections = overviewGroupedInsightSections(cards);
-  return settingsLineSections(sections, "overview-line-grid overview-continuous-list", "Overview statement");
+  return settingsLineSections(
+    sections,
+    "overview-line-grid overview-continuous-list",
+    "Overview statement",
+    "Financial health, liquidity, concentration, planning variance, data quality, and trading exposure across the connected registers.",
+  );
 }
 
 function overviewHeadlineInsightCards(cards = []) {
@@ -4292,8 +4297,8 @@ function overviewMetricActionOptions(card = {}) {
   return {};
 }
 
-function metricLineDashboard(sections = [], ariaLabel = "Metrics") {
-  const content = settingsLineSections(sections, "overview-line-grid overview-continuous-list", ariaLabel);
+function metricLineDashboard(sections = [], ariaLabel = "Metrics", summary = "") {
+  const content = settingsLineSections(sections, "overview-line-grid overview-continuous-list", ariaLabel, summary);
   return `
     <section class="overview-section overview-insights-section register-metrics-section">
       ${content || emptyState("No metrics available.")}
@@ -5490,7 +5495,7 @@ function portfolioStatementDashboard(portfolio = {}) {
   const instrumentLabel = `${formatNumber(summary.instruments || 0)} ${summary.instruments === 1 ? "instrument" : "instruments"}${queryActive ? " shown" : ""}`;
   return metricLineDashboard([
     {
-      title: "Header",
+      title: "Strategy Snapshot",
       html: metricLineItems([
         { label: "Strategy Value", value: formatWholeCurrency(summary.current_value_eur || 0, "EUR"), meta: instrumentLabel, note: "Current value across the portfolio strategy.", icon: "pie", options: metricActionOptions("filter-portfolio", { "portfolio-view": "overview" }, "Show portfolio instruments") },
         { label: "Lifetime P/L", value: signedWholeAmount(performance.profit_loss_eur || 0, "EUR"), meta: `${formatWholeCurrency(performance.cost_base_eur || 0, "EUR")} historical cost`, note: "Realized and open performance versus deployed cost.", icon: "trendUp", options: metricActionOptions("filter-portfolio", { "portfolio-view": "portfolio-performance" }, "Show portfolio performance") },
@@ -5498,17 +5503,17 @@ function portfolioStatementDashboard(portfolio = {}) {
         { label: "Monthly Plan", value: formatWholeCurrency(summary.monthly_contribution_eur || 0, "EUR"), meta: queryActive ? "filtered contribution plan" : "current exit phase", note: "Planned monthly deployment for the active phase.", icon: "calendar", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
       ]),
     },
-    { title: "Portfolio Summary", html: portfolioStatementPortfolioLines(portfolioRows) },
-    { title: "Allocation Policy", html: portfolioStatementAllocationLines(instruments) },
+    { title: "Portfolio Mix", html: portfolioStatementPortfolioLines(portfolioRows) },
+    { title: "Allocation Targets", html: portfolioStatementAllocationLines(instruments) },
     {
-      title: "Contribution vs Growth",
+      title: "Funding vs Growth",
       html: metricLineItems([
         { label: "Paid In", value: formatWholeCurrency(fundingSummary.contributed_eur || 0, "EUR"), meta: `${formatNumber(fundingRows.length || 0)} portfolios`, note: "Reported paid-in capital for the selected portfolio scope.", icon: "wallet", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
         { label: "Current Value", value: formatWholeCurrency(fundingSummary.current_value_eur || 0, "EUR"), meta: `${signedWholeAmount(fundingSummary.achieved_pl_eur || 0, "EUR")} achieved`, note: "Current value compared with paid-in capital.", icon: "pie", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
         { label: "Plan Completion", value: formatPercent(fundingSummary.plan_completion_pct || 0), meta: `${signedWholeAmount(fundingSummary.contribution_gap_eur || 0, "EUR")} gap vs plan to date`, note: "Funding progress against the contribution roadmap.", icon: "target", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
       ]),
     },
-  ], "Portfolio statement");
+  ], "Portfolio statement", "Strategy value, allocation targets, contribution plan, and growth versus paid-in capital across the portfolio model.");
 }
 
 function portfolioStatementPortfolioLines(rows = []) {
@@ -5541,7 +5546,7 @@ function portfolioStatementAllocationLines(rows = []) {
       return {
         label,
         value: formatWholeCurrency(row.current_value_eur || 0, "EUR"),
-        meta: `${formatPercent(percentOf(numericValue(row.current_value_eur), total))} of strategy · ${portfolioAllocationMainLabel(row)}`,
+        meta: `${formatPercent(percentOf(numericValue(row.current_value_eur), total))} of strategy value · ${portfolioAllocationMainLabel(row)}`,
         note: `${portfolioAllocationStatusLabel(row)} · ${portfolioBuyNeededMainLabel(row)}`,
         icon: "target",
         options: metricActionOptions("filter-portfolio", { "portfolio-view": "overview", ticker: row.ticker || "", "asset-name": row.asset_name || "", "portfolio-id": row.portfolio_id || "" }, `Show ${label}`),
@@ -11370,12 +11375,13 @@ function settingsInsightGrid(cards, className = "") {
   return `<section class="overview-insight-grid settings-insight-grid ${safe(className)}">${cards.join("")}</section>`;
 }
 
-function settingsLineSections(sections = [], className = "", ariaLabel = "") {
+function settingsLineSections(sections = [], className = "", ariaLabel = "", summary = "") {
   const visible = sections.filter((section) => section && String(section.html || "").trim());
   if (!visible.length) return "";
   const label = ariaLabel ? ` aria-label="${safe(ariaLabel)}"` : "";
   return `
     <section class="settings-list-sections ${safe(className)}"${label}>
+      ${summary ? `<p class="statement-summary">${safe(summary)}</p>` : ""}
       ${visible.map((section) => settingsLineSection(section.title, section.html, section.className || "")).join("")}
     </section>
   `;
@@ -12094,7 +12100,7 @@ function financialHealthScoreCard(accounts = {}, transactions = {}, trades = {},
     "Financial Health",
     `${assessment.score}/100`,
     `${assessment.grade} · ${assessment.weakest.label} ${assessment.weakest.score}`,
-    "Weighted planning score from liquidity, cashflow, savings, target discipline, retained-capital leakage, compounding deficit, debt, concentration, capital momentum, and data quality.",
+    "Weighted planning score from liquidity, cash flow, savings, target discipline, retained-capital leakage, compounding deficit, debt, concentration, capital momentum, and data quality.",
     "gauge",
     {
       compact: true,
@@ -12226,7 +12232,7 @@ function financialHealthComponents(accounts = {}, transactions = {}, trades = {}
 
   return [
     { label: "liquidity", score: liquidityScore, weight: 12 },
-    { label: "cashflow", score: cashflowScore, weight: 14 },
+    { label: "cash flow", score: cashflowScore, weight: 14 },
     { label: "savings", score: savingsScore, weight: 10 },
     { label: "targets", score: targetDisciplineScore, weight: 14 },
     { label: "leakage", score: leakageScore, weight: 16 },
@@ -12307,7 +12313,7 @@ function overviewSystemInsights(accounts = {}, transactions = {}, trades = {}, p
   if (largestExpense.amount > 0) {
     insights.push(overviewSignal(
       `${largestExpense.category} leads spending`,
-      `${formatWholeCurrency(largestExpense.amount, "EUR")} · ${formatPercent(largestExpense.share)} of period expenses`,
+      `${formatWholeCurrency(largestExpense.amount, "EUR")} · ${formatPercent(largestExpense.share)} of selected-period expenses`,
       "pie",
     ));
   }
@@ -12574,7 +12580,7 @@ function overviewDashboardCards(accounts = {}, transactions = {}, trades = {}) {
 
   return [
     dashboardCard("liquid-capital", "Liquid Capital", formatWholeCurrency(liquidCapital, "EUR"), `${formatPercent(percentOf(liquidCapital, netWorth))} of net worth`, "Cash-like capital and liquid reserves available without selling long-term positions.", "wallet"),
-    dashboardCard("non-liquid-capital", "Non Liquid Capital", formatWholeCurrency(nonLiquidCapital, "EUR"), `${formatPercent(percentOf(nonLiquidCapital, netWorth))} of net worth`, "Capital held in investments, pensions, receivables, and other less liquid buckets.", "wallet"),
+    dashboardCard("non-liquid-capital", "Non-Liquid Capital", formatWholeCurrency(nonLiquidCapital, "EUR"), `${formatPercent(percentOf(nonLiquidCapital, netWorth))} of net worth`, "Capital held in investments, pensions, receivables, and other less liquid buckets.", "wallet"),
     creditUtilizationRiskCard(accounts.credit_cards),
     investmentShareRiskCard(accounts),
     dashboardCard("needs-review", "Review", formatNumber(reviewOpen), "live sheets", "Transactions still requiring manual review in the source truth.", "target"),
@@ -12900,7 +12906,7 @@ function categoryConcentrationCard(transactions = {}) {
     "Category Concentration",
     formatPercent(largestExpense.share),
     `${largestExpense.category} · ${formatWholeCurrency(largestExpense.amount, "EUR")}`,
-    "Share of period spending held by the largest category.",
+    "Share of selected-period spending held by the largest category.",
     "pie",
   );
 }
@@ -12924,7 +12930,7 @@ function positiveCashflowMonthsCard(series = []) {
   const positive = rows.filter((row) => numericValue(row.net_eur) >= 0).length;
   return dashboardCard(
     "positive-cashflow-months",
-    "Positive Cashflow Months",
+    "Positive Cash Flow Months",
     rows.length ? `${formatNumber(positive)} / ${formatNumber(rows.length)}` : "-",
     rows.length ? formatPercent(percentOf(positive, rows.length)) : "",
     "Months in the rolling window where income covered spending.",
@@ -13131,8 +13137,19 @@ function largestExpenseCategory(transactions = {}) {
   return {
     category: row.category ? taxonomyLabel(row.category) : "-",
     amount,
-    share: percentOf(amount, transactions.current_month_expense_eur || transactions.ytd_expense_eur),
+    share: percentOf(amount, transactionExpenseBase(transactions)),
   };
+}
+
+function transactionExpenseBase(transactions = {}) {
+  const periodExpense = numericValue(transactions.period_expense_eur, Number.NaN);
+  if (Number.isFinite(periodExpense) && periodExpense > 0) return periodExpense;
+  const categoryTotal = (transactions.category_spend || [])
+    .reduce((sum, row) => sum + Math.abs(numericValue(row.amount_eur)), 0);
+  if (categoryTotal > 0) return categoryTotal;
+  return transactionTotal(transactions, "lifetime_expense_eur", "expense_eur")
+    || numericValue(transactions.ytd_expense_eur)
+    || numericValue(transactions.current_month_expense_eur);
 }
 
 function breakdownAmount(rows = [], names = []) {
@@ -13150,7 +13167,7 @@ function accountInsightsDashboard(data = {}) {
   const liquidCapital = numericValue(insights.liquid_capital_eur);
   return metricLineDashboard([
     {
-      title: "Balance Sheet Summary",
+      title: "Capital Snapshot",
       html: metricLineItems([
         { label: "Net Worth", value: formatWholeCurrency(netWorth, "EUR"), meta: [`${formatPercent(netWorth ? 100 : 0)} of net worth`, `${formatNumber(insights.active_accounts || 0)} active accounts`].join(" · "), note: "Balance across active account registers.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active" }, "Show active accounts") },
         { label: "Assets", value: formatWholeCurrency(assets, "EUR"), meta: [`${formatPercent(percentOf(assets, netWorth))} of net worth`, "positive balances"].join(" · "), note: "Gross active account value before liabilities.", icon: "trendUp", options: metricActionOptions("filter-accounts", { "balance-sign": "positive", "account-status": "active" }, "Show asset accounts") },
@@ -13158,14 +13175,14 @@ function accountInsightsDashboard(data = {}) {
         { label: "Liquid Capital", value: formatWholeCurrency(liquidCapital, "EUR"), meta: [`${formatPercent(percentOf(liquidCapital, netWorth))} of net worth`, "reserve + trading capital"].join(" · "), note: "Accessible cash-like capital for near-term use.", icon: "wallet", options: metricActionOptions("filter-accounts", { "account-status": "active", liquidity: "liquid" }, "Show liquid capital accounts") },
       ]),
     },
-    { title: "Structure Breakdown: Account Type", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
-    { title: "Structure Breakdown: Provider", html: accountBreakdownMetricLines(tables.provider_breakdown || [], "provider_id", netWorth, "provider", "provider") },
-    { title: "Structure Breakdown: Country", html: accountBreakdownMetricLines(tables.country_breakdown || [], "country_code", netWorth, "country", "country") },
-    { title: "Structure Breakdown: Capital Bucket", html: accountAllocationMetricLines(insights.by_bucket || [], netWorth, "allocation") },
-    { title: "Structure Breakdown: Currency Exposure", html: accountAllocationMetricLines(insights.by_currency || [], netWorth, "currency") },
-    { title: "Top Holdings", html: topAccountsMetricLines(insights.top_accounts || []) },
-    { title: "Risk Signals: Credit Utilization", html: accountCreditMetricLines(tables.credit_cards || []) },
-  ], "Account statement");
+    { title: "Account Mix", html: accountBreakdownMetricLines(tables.account_type_breakdown || [], "account_type", netWorth, "account-type", "account type") },
+    { title: "Provider Concentration", html: accountBreakdownMetricLines(tables.provider_breakdown || [], "provider_id", netWorth, "provider", "provider") },
+    { title: "Country Exposure", html: accountBreakdownMetricLines(tables.country_breakdown || [], "country_code", netWorth, "country", "country") },
+    { title: "Capital Allocation", html: accountAllocationMetricLines(insights.by_bucket || [], netWorth, "allocation") },
+    { title: "Currency Exposure", html: accountAllocationMetricLines(insights.by_currency || [], netWorth, "currency") },
+    { title: "Largest Accounts", html: topAccountsMetricLines(insights.top_accounts || []) },
+    { title: "Credit Utilization", html: accountCreditMetricLines(tables.credit_cards || []) },
+  ], "Account statement", "Active balances, liquidity, concentration, currency exposure, and credit headroom from the accounts register.");
 }
 
 function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, iconContext = "", noteLabel = "group") {
@@ -13206,7 +13223,7 @@ function topAccountsMetricLines(rows = []) {
       label: accountDisplayName(row),
       value: formatWholeCurrency(row.amount_eur, "EUR"),
       meta: [`${formatPercent(row.pct_of_net || 0)} of net worth`, labelize(row.provider_id), formatWholeCurrency(row.native_amount ?? row.amount_eur, row.currency || "EUR")].filter(Boolean).join(" · "),
-      note: "Top active account by project value.",
+      note: "Active account ranked by project value.",
       icon: insightIconFor(row.account_type || row.capital_bucket || row.provider_id, "account"),
       options: metricActionOptions("filter-accounts", { "account-id": row.account_id || "", "account-status": "active" }, `Show ${accountDisplayName(row)}`),
     })));
@@ -13319,16 +13336,16 @@ function accountInsightTable(headers = [], rows = [], rowCells, emptyLabel = "No
 function transactionInsightsDashboard(data = {}) {
   const insights = data?.insights || {};
   const summary = data?.summary || {};
-  const income = numericValue(summary.income_eur ?? insights.current_month_income_eur);
-  const expenses = numericValue(summary.expense_eur ?? insights.current_month_expense_eur);
-  const net = numericValue(summary.net_eur ?? insights.current_month_net_eur);
+  const income = numericValue(summary.income_eur ?? insights.period_income_eur ?? insights.current_month_income_eur);
+  const expenses = numericValue(summary.expense_eur ?? insights.period_expense_eur ?? insights.current_month_expense_eur);
+  const net = numericValue(summary.net_eur ?? insights.period_net_eur ?? insights.current_month_net_eur);
   const savingsRate = income ? percentOf(net, income) : 0;
   const periodLabel = transactionMetricPeriodLabel();
   const includedRows = numericValue(summary.filtered ?? data?.total ?? insights.total);
   const topExpense = (insights.category_spend || [])[0] || {};
   return metricLineDashboard([
     {
-      title: "Cash Flow Summary",
+      title: "Cash Flow Snapshot",
       html: metricLineItems([
         { label: "Total Income", value: formatCurrency(income, "EUR"), meta: periodLabel, note: `${formatNumber(includedRows)} ledger rows included.`, icon: "trendUp", options: metricActionOptions("filter-transactions", { "transaction-class": "income" }, "Show income transactions") },
         { label: "Total Expenses", value: formatCurrency(expenses, "EUR"), meta: percentOfIncomeNote(expenses, income), note: "Recorded accountable spending for the selected period.", icon: "trendDown", options: metricActionOptions("filter-transactions", { "transaction-class": "expense" }, "Show expense transactions") },
@@ -13337,13 +13354,13 @@ function transactionInsightsDashboard(data = {}) {
       ]),
     },
     {
-      title: "Budget Compliance",
+      title: "Review and Budget Watch",
       html: metricLineItems([
         { label: "Review Queue", value: formatNumber(insights.review_open || 0), meta: "transactions", note: "Rows still requiring classification or confirmation.", icon: "target", options: metricActionOptions("filter-transactions", { "review-status": "open" }, "Show transactions requiring review") },
         {
           label: "Top Expense Category",
           value: formatWholeCurrency(topExpense.amount_eur || 0, "EUR"),
-          meta: taxonomyLabel(topExpense.category || "expense"),
+          meta: [taxonomyLabel(topExpense.category || "expense"), expenses ? `${formatPercent(percentOf(topExpense.amount_eur, expenses))} of expenses` : ""].filter(Boolean).join(" · "),
           note: `${formatPlural(topExpense.count || 0, "row")} in the selected period.`,
           icon: insightIconFor(topExpense.category || "expense", "category"),
           options: topExpense.category
@@ -13352,19 +13369,19 @@ function transactionInsightsDashboard(data = {}) {
         },
       ]),
     },
-    { title: "Where Money Comes From", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
-    { title: "Where Money Goes: Categories", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
-    { title: "Where Money Goes: Subcategories", html: transactionSubcategorySpendMetricLines(insights.subcategory_spend || []) },
+    { title: "Income Sources", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
+    { title: "Expense Categories", html: transactionCategorySpendMetricLines(insights.category_spend || []) },
+    { title: "Expense Subcategories", html: transactionSubcategorySpendMetricLines(insights.subcategory_spend || []) },
     { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
     {
-      title: "Key Trends",
+      title: "Activity Peaks",
       html: metricLineItems([
         transactionHeatmapMetric("Income Activity", insights.income_heatmap, "income"),
         transactionHeatmapMetric("Spending Activity", insights.spending_heatmap, "expense"),
       ]),
     },
     ...transactionPlanningStatementSections(data),
-  ], "Cash flow statement");
+  ], "Cash flow statement", "Selected period cash flow, spend drivers, currency movement, review work, and planning variance from accountable transaction rows.");
 }
 
 function transactionMetricPeriodLabel() {
@@ -13380,9 +13397,9 @@ function planningTargetModelMetricSections(planning = {}) {
   if (!selection.available) return [];
   const selectedTargets = applyMonthlyTargetOverrides(selection.rows);
   return [
-    { title: "Planning Rules: Income Baseline Model", html: monthlyTargetIncomeCategoryMetricLines(selectedTargets) },
-    { title: "Planning Rules: Expense Ceiling Model", html: monthlyTargetCategoryMetricLines(selectedTargets) },
-    { title: "Compliance Diagnostics: Target Breach Months", html: monthlyTargetAboveCeilingMetricLines(selectedTargets) },
+    { title: "Income Baseline Rules", html: monthlyTargetIncomeCategoryMetricLines(selectedTargets) },
+    { title: "Expense Ceiling Rules", html: monthlyTargetCategoryMetricLines(selectedTargets) },
+    { title: "Target Breach Months", html: monthlyTargetAboveCeilingMetricLines(selectedTargets) },
   ].filter((section) => String(section.html || "").trim());
 }
 
@@ -13393,7 +13410,7 @@ function transactionPlanningStatementSections(data = {}) {
   const sections = [];
   if (targetRows.length) {
     sections.push({
-      title: "Planning Target Summary",
+      title: "Planning Target Check",
       html: metricLineItems([
         {
           label: "Capital Retention Target",
@@ -13461,8 +13478,8 @@ function transactionCategorySpendMetricLines(rows = []) {
   return metricLineItems((rows || []).slice(0, 6).map((row) => ({
     label: taxonomyLabel(row.category || "expense"),
     value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-    meta: [`${formatPercent(percentOf(row.amount_eur, total))} of category spend`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: "Selected-period accountable expense category.",
+    meta: [`${formatPercent(percentOf(row.amount_eur, total))} of shown expense categories`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+    note: "Selected period accountable expense category.",
     icon: insightIconFor(row.category, "category"),
     options: metricActionOptions("filter-transactions", { category: row.category || "", "transaction-class": "expense" }, `Show ${taxonomyLabel(row.category || "expense")} transactions`),
   })));
@@ -13482,8 +13499,8 @@ function transactionSubcategorySpendMetricLines(rows = []) {
     return {
       label: subcategoryLabel,
       value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
-      meta: [`${formatPercent(percentOf(row.amount_eur, total))} of subcategory spend`, parentLabel, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-      note: "Selected-period accountable expense subcategory.",
+      meta: [`${formatPercent(percentOf(row.amount_eur, total))} of shown expense subcategories`, parentLabel, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: "Selected period accountable expense subcategory.",
       icon: insightIconFor(subcategory || row.category, "category"),
       options: metricActionOptions("filter-transactions", filterAttrs, `Show ${subcategoryLabel} transactions`),
     };
@@ -13496,7 +13513,7 @@ function transactionIncomeSourceMetricLines(rows = []) {
     label: row.name || "Income",
     value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
     meta: [`${formatPercent(percentOf(row.amount_eur, total))} of income`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-    note: "Selected-period income source.",
+    note: "Selected period income source.",
     icon: insightIconFor(row.name || "income", "income"),
     options: metricActionOptions("filter-transactions", { "income-source": row.name || "", "transaction-class": "income" }, `Show ${labelize(row.name || "income")} income`),
   })));
@@ -15681,7 +15698,7 @@ function tradeInsightsDashboard(data = {}) {
     ${portfolioReturnsActions()}
     ${metricLineDashboard([
     {
-      title: "Trading Summary",
+      title: "Trading Snapshot",
       html: metricLineItems([
         { label: "Active Positions", value: formatNumber(insights.active_positions || 0), meta: `${formatNumber(insights.closed_positions || 0)} closed`, note: "Open versus closed trade records.", icon: "pie", options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades") },
         { label: "Total P/L", value: signedWholeAmount(summary.total_pl_eur || 0, "EUR"), meta: `${signedPercent(summary.total_return_pct || 0)} on trade capital`, note: "Realized plus unrealized profit and loss.", icon: summary.total_pl_eur >= 0 ? "trendUp" : "trendDown", options: metricActionOptions("filter-trades", {}, "Show trades") },
@@ -15691,12 +15708,12 @@ function tradeInsightsDashboard(data = {}) {
       ]),
     },
     { title: "Active Exposure", html: tradeReturnActiveExposureMetricLines(data) },
-    { title: "Cost & Fees", html: tradeReturnCapitalMetricLines(data) },
-    { title: "Year Performance", html: tradePerformanceMetricLines(tables.performance_by_year || [], "period") },
-    { title: "P/L Movement: Months", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
-    { title: "P/L Movement: Instruments", html: tradePerformanceMetricLines(tables.instrument_performance || [], "instrument") },
-    { title: "Exposure & Watchlist", html: tradePositionWatchlistMetricLines(data) },
-  ], "Trade statement")}
+    { title: "Capital and Fees", html: tradeReturnCapitalMetricLines(data) },
+    { title: "Annual P/L", html: tradePerformanceMetricLines(tables.performance_by_year || [], "period") },
+    { title: "Monthly P/L", html: tradePerformanceMetricLines(tables.performance_by_month || [], "period") },
+    { title: "Instrument P/L", html: tradePerformanceMetricLines(tables.instrument_performance || [], "instrument") },
+    { title: "Exposure and Watchlist", html: tradePositionWatchlistMetricLines(data) },
+  ], "Trade statement", "Active exposure, realized and unrealized P/L, fee drag, price freshness, and rows that need attention from the trades register.")}
   `;
 }
 
@@ -15754,7 +15771,7 @@ function tradeReturnCapitalMetricLines(data = {}) {
     {
       label: "Closed Cost",
       value: formatWholeCurrency(closedCost, "EUR"),
-      meta: `${formatPercent(percentOf(closedCost, total))} of return capital view · ${signedPercent(summary.realized_pl_pct || 0)} realized return`,
+      meta: `${formatPercent(percentOf(closedCost, total))} of return capital · ${signedPercent(summary.realized_pl_pct || 0)} realized return`,
       note: "Closed-position cost basis.",
       icon: "receipt",
       options: metricActionOptions("filter-trades", { "position-status": "closed" }, "Show closed trades"),
@@ -15762,7 +15779,7 @@ function tradeReturnCapitalMetricLines(data = {}) {
     {
       label: "Active Cost",
       value: formatWholeCurrency(activeCost, "EUR"),
-      meta: `${formatPercent(percentOf(activeCost, total))} of return capital view · ${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
+      meta: `${formatPercent(percentOf(activeCost, total))} of return capital · ${signedPercent(summary.unrealized_pl_pct || 0)} active return`,
       note: "Open-position cost basis.",
       icon: "wallet",
       options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trades"),
@@ -15770,7 +15787,7 @@ function tradeReturnCapitalMetricLines(data = {}) {
     {
       label: "Active Market Value",
       value: formatWholeCurrency(summary.market_value_eur, "EUR"),
-      meta: `${formatPercent(percentOf(summary.market_value_eur, total))} of return capital view · ${formatNumber(summary.active_positions || 0)} active positions`,
+      meta: `${formatPercent(percentOf(summary.market_value_eur, total))} of return capital · ${formatNumber(summary.active_positions || 0)} active positions`,
       note: "Current open-position market exposure.",
       icon: "trendUp",
       options: metricActionOptions("filter-trades", { "position-status": "active" }, "Show active trade exposure"),
@@ -15778,7 +15795,7 @@ function tradeReturnCapitalMetricLines(data = {}) {
     {
       label: "Fees Paid",
       value: signedWholeAmount(-totalFees, "EUR"),
-      meta: `${formatPercent(percentOf(totalFees, total))} of return capital view · reported trade fees`,
+      meta: `${formatPercent(percentOf(totalFees, total))} of return capital · reported trade fees`,
       note: "Fees recorded on trade rows.",
       icon: "receipt",
     },
