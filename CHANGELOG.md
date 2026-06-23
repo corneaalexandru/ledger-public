@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Matched the font-size stepper hover border behavior to the reporting period selector so active segments show a complete outline.
 - Corrected Income Sources labels in Transactions > Statement and removed the category-heavy income-baseline and expense-ceiling rule lists.
 - Clarified the Statement pages across Overview, Accounts, Transactions, Trades, and Portfolio, and fixed Overview category concentration so it uses selected-period spending instead of a current-month denominator.
 - Kept debt out of account structure breakdowns so country, provider, type, bucket, and currency rows show active assets while liabilities remain in the balance-sheet and credit-risk sections.

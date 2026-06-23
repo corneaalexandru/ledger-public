@@ -620,6 +620,7 @@ kbd {
 }
 
 .font-scale-button {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -643,11 +644,12 @@ kbd {
 }
 
 .font-scale-button + .font-scale-button {
-  border-left: 0;
+  margin-left: -1px;
 }
 
 .font-scale-button:hover:not(:disabled),
 .font-scale-button.is-active {
+  z-index: 1;
   border-color: color-mix(in srgb, var(--strong) 26%, var(--line));
   background: color-mix(in srgb, var(--surface-2) 54%, transparent);
   color: var(--strong);
