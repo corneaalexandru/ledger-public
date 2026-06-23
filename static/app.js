@@ -13191,7 +13191,7 @@ function accountBreakdownMetricLines(rows = [], nameKey = "name", netWorth = 0, 
       label: displayLabel,
       value: formatWholeCurrency(amount, "EUR"),
       meta: [`${formatPercent(share)} of net worth`, formatPlural(row.accounts || 0, "account"), native].filter(Boolean).join(" · "),
-      note: `Active account value by ${noteLabel}.`,
+      note: `Active asset value by ${noteLabel}; liabilities are shown separately.`,
       icon: insightIconFor(filterValue || noteLabel, iconContext),
       options: filterField ? metricActionOptions("filter-accounts", { "account-status": "active", [filterField]: filterValue }, `Show accounts for ${displayLabel}`) : {},
     };
@@ -13221,7 +13221,7 @@ function accountAllocationMetricLines(rows = [], netWorth = 0, iconContext = "")
       label: labelize(row.name),
       value: formatWholeCurrency(row.eur, "EUR"),
       meta: [`${formatPercent(percentOf(row.eur, netWorth))} of net worth`, nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
-      note: `Active account value by ${iconContext === "currency" ? "currency" : "capital bucket"}.`,
+      note: `Active asset value by ${iconContext === "currency" ? "currency" : "capital bucket"}; liabilities are shown separately.`,
       icon: insightIconFor(row.name, iconContext),
       options: filterField ? metricActionOptions("filter-accounts", { "account-status": "active", [filterField]: row.name || "" }, `Show accounts for ${labelize(row.name)}`) : {},
     })));

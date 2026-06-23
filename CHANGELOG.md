@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Kept debt out of account structure breakdowns so country, provider, type, bucket, and currency rows show active assets while liabilities remain in the balance-sheet and credit-risk sections.
 - Reduced the Net Worth hero to the standard 64px hero scale so the Overview header matches the compact dashboard rhythm.
 - Uppercased visible account register IDs in Overview, search, and account selection fallbacks so `acct_` identifiers display consistently with other register IDs.
 - Uppercased visible transaction/trade register IDs across the UI, formatted register names in Statements Import, and tightened the Net Worth hero scale for a calmer Overview ratio.

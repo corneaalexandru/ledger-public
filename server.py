@@ -1015,10 +1015,11 @@ def account_summary(rows: list[dict]) -> dict:
     credit_cards = []
     for row in active:
         amount = account_amount_eur(row)
-        by_bucket[row.get("capital_bucket") or "other"] += amount
-        by_provider[row.get("provider_id") or "Unknown"] += amount
-        by_type[row.get("account_type") or "account"] += amount
-        by_currency[row.get("account_currency") or "EUR"] += amount
+        if amount > 0:
+            by_bucket[row.get("capital_bucket") or "other"] += amount
+            by_provider[row.get("provider_id") or "Unknown"] += amount
+            by_type[row.get("account_type") or "account"] += amount
+            by_currency[row.get("account_currency") or "EUR"] += amount
         if "credit" in str(row.get("account_type", "")).lower():
             used = abs(account_native_field_eur(row, "balance_native"))
             limit = account_native_field_eur(row, "credit_limit_native")
