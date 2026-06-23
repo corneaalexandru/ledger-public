@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Uppercased visible account register IDs in Overview, search, and account selection fallbacks so `acct_` identifiers display consistently with other register IDs.
 - Uppercased visible transaction/trade register IDs across the UI, formatted register names in Statements Import, and tightened the Net Worth hero scale for a calmer Overview ratio.
 - Kept table scrollbars from bleeding through open edit drawers and moved sticky drawer actions clear of the drawer scroll thumb.
 - Simplified global keyboard shortcuts: `/` focuses search, `P` cycles the reporting period, and `Esc` backs out of panels before clearing active search and filters.

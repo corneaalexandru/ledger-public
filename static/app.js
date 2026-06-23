@@ -4622,7 +4622,7 @@ function globalAccountResults(rows = []) {
     <button class="global-result-row" data-action="open-global-result" data-view-target="accounts" data-result-id="${safe(row.account_id)}" type="button">
       ${accountTypeMark(row)}
       <span>
-        <strong>${safe(row.account_reference || row.account_id)}</strong>
+        <strong>${safe(accountDisplayName(row))}</strong>
         <small>${safe([row.provider_id, labelize(row.account_type), row.account_currency].filter(Boolean).join(" · "))}</small>
       </span>
       <em>${formatAccountMoney(row.amount_eur_converted, "EUR")}</em>
@@ -11846,7 +11846,9 @@ function topAccountsBars(rows = []) {
 function accountDisplayName(row = {}) {
   const reference = String(row.account_reference || "").trim();
   if (reference && !accountReferenceLooksLikeStatus(reference, row)) return reference;
-  return row.account_id || [labelize(row.provider_id), row.currency].filter(Boolean).join(" · ") || "Unnamed account";
+  return displayAccountId(row.account_id)
+    || [labelize(row.provider_id), row.currency].filter(Boolean).join(" · ")
+    || "Unnamed account";
 }
 
 function accountReferenceLooksLikeStatus(value, row = {}) {
@@ -14734,7 +14736,7 @@ function accountTreemapReferenceCounts(rows = []) {
 }
 
 function accountTreemapBaseLabel(row = {}) {
-  return row.account_reference || row.account_id || "Account";
+  return accountDisplayName(row) || "Account";
 }
 
 function accountTreemapLabel(row = {}, referenceCounts = new Map()) {
@@ -15187,7 +15189,7 @@ function accountTable(rows, data) {
                   type="checkbox"
                   value="${safe(row.account_id)}"
                   ${state.selectedAccounts.has(row.account_id) ? "checked" : ""}
-                  aria-label="Select ${safe(row.account_id)}"
+                  aria-label="Select ${safe(accountDisplayName(row))}"
                 />
               </td>
               <td class="account-reference-col">
