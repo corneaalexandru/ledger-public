@@ -2,6 +2,10 @@
 
 Ledger Public follows the private Ledger development stream. Public releases contain the same shared UI/core behavior where it is safe to publish, without private data or credentials.
 
+## 2026-06-24
+
+- Matched the reporting period center segment border model to the font-size stepper so All, Year, and Month states keep a complete outline.
+
 ## 2026-06-23
 
 - Matched the font-size stepper hover border behavior to the reporting period selector so active segments show a complete outline.
