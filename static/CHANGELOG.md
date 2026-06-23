@@ -4,6 +4,8 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-23
 
+- Added Portfolio > Statement as the first/default Portfolio subpage and constrained statement attachment previews so long source text no longer widens the drawer.
+- Polished edit drawers for easier register entry: uppercase visible IDs, labeled account type/bucket choices, hidden non-credit account credit fields, hidden transaction helper amounts, and a reserved scrollbar lane.
 - Moved Statement to the first tab position on pages that have a Statement subpage, and placed Transactions > Targets second after Statement.
 - Made Accounts, Transactions, and Trades open on the Statement subpage by default.
 - Centralized Statement defaulting so Overview, Accounts, Transactions, and Trades return to Statement when opened from page-entry paths, while explicit Register and Targets tabs stay intentional.

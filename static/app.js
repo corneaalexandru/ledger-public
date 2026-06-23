@@ -253,7 +253,7 @@ const state = {
   exitPhaseActionError: "",
   aboutView: "copyright",
   overviewView: "insights",
-  portfolioView: "overview",
+  portfolioView: "insights",
   portfolioPerformanceWindow: "all",
   portfolioContributionWindow: "all",
   portfolioFundingProgressWindow: "all",
@@ -687,7 +687,7 @@ const transactionFields = [
   ["counterparty_name", "Counterparty"],
   ["memo", "Memo"],
   ["country_code", "Country"],
-  ["statement_currency", "Currency"],
+  ["statement_currency", "Statement Currency"],
   ["statement_amount", "Statement Amount"],
   ["sanitized_statement_amount", "Sanitized Amount"],
   ["amount_usd_converted", "USD Amount"],
@@ -1218,6 +1218,7 @@ function setStatementDefaultSubpage(view) {
   if (view === "accounts") state.accountView = "insights";
   if (view === "transactions") state.transactionView = "insights";
   if (view === "trades") state.tradeView = "insights";
+  if (view === "portfolio") state.portfolioView = "insights";
 }
 
 function bindEvents() {
@@ -2290,7 +2291,7 @@ function bindEvents() {
       }
     }
     if (action.dataset.action === "portfolio-tab") {
-      const nextPortfolioView = action.dataset.portfolioView || "overview";
+      const nextPortfolioView = action.dataset.portfolioView || "insights";
       state.portfolioView = nextPortfolioView === "treemap" ? "overview" : nextPortfolioView;
       state.expandedChartId = "";
       state.portfolioInstrumentOffset = 0;
@@ -4690,7 +4691,9 @@ function renderPortfolio() {
   const data = state.overview;
   if (!data) return loadingState("Loading portfolio");
   const portfolio = data.portfolio || {};
-  const body = state.portfolioView === "portfolio-performance"
+  const body = state.portfolioView === "insights"
+    ? portfolioStatementDashboard(portfolio)
+    : state.portfolioView === "portfolio-performance"
     ? portfolioPortfolioPerformanceDashboard(portfolio)
     : state.portfolioView === "performance"
       ? portfolioPerformanceDashboard(portfolio)
@@ -4707,6 +4710,7 @@ function renderPortfolio() {
 
 function portfolioTabs() {
   const tabs = [
+    { id: "insights", label: "Statement" },
     { id: "overview", label: "Overview" },
     { id: "portfolio-performance", label: "Performance" },
     { id: "performance", label: "Funding" },
@@ -4890,7 +4894,7 @@ function printViewName() {
   if (state.view === "accounts") return state.accountView === "insights" ? "Statement" : labelize(state.accountView || "accounts");
   if (state.view === "transactions") return state.transactionView === "insights" ? "Statement" : labelize(state.transactionView || "transactions");
   if (state.view === "trades") return state.tradeView === "insights" ? "Statement" : labelize(state.tradeView || "trades");
-  if (state.view === "portfolio") return labelize(state.portfolioView || "portfolio");
+  if (state.view === "portfolio") return state.portfolioView === "insights" ? "Statement" : labelize(state.portfolioView || "portfolio");
   if (state.view === "planning") return labelize(state.planningView || "planning");
   return "";
 }
@@ -5388,6 +5392,79 @@ function defaultPortfolioMipValues() {
       ph6: 0,
     },
   };
+}
+
+function portfolioStatementDashboard(portfolio = {}) {
+  const rawInstruments = currentPortfolioInstrumentRows(portfolio);
+  const mipRows = currentPortfolioMipRows(portfolio);
+  const queryActive = portfolioFilterActive();
+  const instruments = filteredPortfolioInstrumentRows(rawInstruments);
+  const filteredMipRows = queryActive ? portfolioMipRowsForVisibleInstruments(mipRows, instruments) : mipRows;
+  const summary = portfolioSummaryFromRows(portfolio.summary || {}, instruments, filteredMipRows);
+  const performance = portfolioPerformanceSummaryFromInstruments(instruments);
+  const portfolioRows = portfolioPerformanceByPortfolioRows(portfolio);
+  const fundingRows = filteredPortfolioPerformanceRows(portfolio.performance?.portfolios || [], portfolio);
+  const fundingSummary = portfolioPerformanceSummary(fundingRows, portfolio.performance?.summary || {});
+  const instrumentLabel = `${formatNumber(summary.instruments || 0)} ${summary.instruments === 1 ? "instrument" : "instruments"}${queryActive ? " shown" : ""}`;
+  return metricLineDashboard([
+    {
+      title: "Header",
+      html: metricLineItems([
+        { label: "Strategy Value", value: formatWholeCurrency(summary.current_value_eur || 0, "EUR"), meta: instrumentLabel, note: "Current value across the portfolio strategy.", icon: "pie", options: metricActionOptions("filter-portfolio", { "portfolio-view": "overview" }, "Show portfolio instruments") },
+        { label: "Lifetime P/L", value: signedWholeAmount(performance.profit_loss_eur || 0, "EUR"), meta: `${formatWholeCurrency(performance.cost_base_eur || 0, "EUR")} historical cost`, note: "Realized and open performance versus deployed cost.", icon: "trendUp", options: metricActionOptions("filter-portfolio", { "portfolio-view": "portfolio-performance" }, "Show portfolio performance") },
+        { label: "Historical Return", value: signedPercent(performance.return_pct || 0), meta: "realized + open vs deployed cost", note: "Lifetime return based on available portfolio records.", icon: "target", options: metricActionOptions("filter-portfolio", { "portfolio-view": "portfolio-performance" }, "Show portfolio performance") },
+        { label: "Monthly Plan", value: formatWholeCurrency(summary.monthly_contribution_eur || 0, "EUR"), meta: queryActive ? "filtered contribution plan" : "current exit phase", note: "Planned monthly deployment for the active phase.", icon: "calendar", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
+      ]),
+    },
+    { title: "Portfolio Summary", html: portfolioStatementPortfolioLines(portfolioRows) },
+    { title: "Allocation Policy", html: portfolioStatementAllocationLines(instruments) },
+    {
+      title: "Contribution vs Growth",
+      html: metricLineItems([
+        { label: "Paid In", value: formatWholeCurrency(fundingSummary.contributed_eur || 0, "EUR"), meta: `${formatNumber(fundingRows.length || 0)} portfolios`, note: "Reported paid-in capital for the selected portfolio scope.", icon: "wallet", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
+        { label: "Current Value", value: formatWholeCurrency(fundingSummary.current_value_eur || 0, "EUR"), meta: `${signedWholeAmount(fundingSummary.achieved_pl_eur || 0, "EUR")} achieved`, note: "Current value compared with paid-in capital.", icon: "pie", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
+        { label: "Plan Completion", value: formatPercent(fundingSummary.plan_completion_pct || 0), meta: `${signedWholeAmount(fundingSummary.contribution_gap_eur || 0, "EUR")} gap vs plan to date`, note: "Funding progress against the contribution roadmap.", icon: "target", options: metricActionOptions("filter-portfolio", { "portfolio-view": "performance" }, "Show portfolio funding") },
+      ]),
+    },
+  ], "Portfolio statement");
+}
+
+function portfolioStatementPortfolioLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + numericValue(row.current_value_eur), 0);
+  return metricLineItems(rows
+    .slice()
+    .sort((a, b) => numericValue(b.current_value_eur) - numericValue(a.current_value_eur))
+    .slice(0, 6)
+    .map((row) => {
+      const label = portfolioReferenceLabel(row.portfolio_id) || row.portfolio_name || "Portfolio";
+      return {
+        label,
+        value: formatWholeCurrency(row.current_value_eur || 0, "EUR"),
+        meta: `${formatPercent(percentOf(numericValue(row.current_value_eur), total))} of strategy value · ${formatNumber(row.instrument_count || 0)} ${row.instrument_count === 1 ? "instrument" : "instruments"}`,
+        note: `${signedWholeAmount(row.profit_loss_eur || 0, "EUR")} lifetime P/L · ${signedPercent(row.return_pct || 0)} return`,
+        icon: "pie",
+        options: metricActionOptions("filter-portfolio", { "portfolio-view": "portfolio-performance", "portfolio-id": row.portfolio_id }, `Show ${label} performance`),
+      };
+    }));
+}
+
+function portfolioStatementAllocationLines(rows = []) {
+  const total = rows.reduce((sum, row) => sum + numericValue(row.current_value_eur), 0);
+  return metricLineItems(rows
+    .slice()
+    .sort((a, b) => numericValue(b.current_value_eur) - numericValue(a.current_value_eur))
+    .slice(0, 6)
+    .map((row) => {
+      const label = String(row.ticker || row.asset_name || row.portfolio_name || "").trim() || "Instrument";
+      return {
+        label,
+        value: formatWholeCurrency(row.current_value_eur || 0, "EUR"),
+        meta: `${formatPercent(percentOf(numericValue(row.current_value_eur), total))} of strategy · ${portfolioAllocationMainLabel(row)}`,
+        note: `${portfolioAllocationStatusLabel(row)} · ${portfolioBuyNeededMainLabel(row)}`,
+        icon: "target",
+        options: metricActionOptions("filter-portfolio", { "portfolio-view": "overview", ticker: row.ticker || "", "asset-name": row.asset_name || "", "portfolio-id": row.portfolio_id || "" }, `Show ${label}`),
+      };
+    }));
 }
 
 function portfolioDashboard(portfolio = {}) {
@@ -15065,11 +15142,12 @@ function accountTable(rows, data) {
 function accountReferenceCell(row = {}) {
   const reference = String(row.account_reference || "").trim();
   const hasReference = Boolean(reference && !accountReferenceLooksLikeStatus(reference, row));
-  const label = hasReference ? reference : row.account_id || "Account";
+  const label = hasReference ? reference : displayAccountId(row.account_id) || "Account";
+  const value = hasReference ? reference : row.account_id;
   const field = hasReference ? "account_reference" : "account_id";
   const subline = hasReference ? "" : [labelize(row.provider_id), currencyText(row.account_currency)].filter(Boolean).join(" · ");
   return `
-    <span class="table-main">${quickFilterControl(label, label, { field })}</span>
+    <span class="table-main">${quickFilterControl(value, label, { field })}</span>
     ${subline ? `<span class="table-sub">${safe(subline)}</span>` : ""}
   `;
 }
@@ -16044,7 +16122,7 @@ function tradePortfolioReference(row = {}) {
     return quickFilterControl(row.portfolio_id, portfolioReferenceLabel(row.portfolio_id), { field: "portfolio_id" });
   }
   if (row.account_id) {
-    return quickFilterControl(row.account_id, row.account_id, { field: "account_id" });
+    return quickFilterControl(row.account_id, displayAccountId(row.account_id), { field: "account_id" });
   }
   return "-";
 }
@@ -16052,15 +16130,18 @@ function tradePortfolioReference(row = {}) {
 function tradeInstrumentCell(row) {
   const symbol = String(row.symbol || "").trim().toUpperCase();
   const tradeId = String(row.trade_id || "").trim();
+  const tradeIdLabel = displayTradeId(tradeId);
   const assetName = String(row.asset_name || "").trim();
-  const primary = symbol || tradeId || "-";
+  const primary = symbol || tradeIdLabel || "-";
+  const primaryValue = symbol || tradeId;
   const primaryField = symbol ? "symbol" : "trade_id";
-  const secondary = assetName || (symbol && tradeId ? tradeId : "");
+  const secondary = assetName || (symbol && tradeId ? tradeIdLabel : "");
+  const secondaryValue = assetName || (symbol && tradeId ? tradeId : "");
   const badges = tradeRowBadges(row);
   const deletedAtLine = tradeDeletedAtLine(row);
   return `
-    <span class="table-main">${quickFilterControl(primary, primary, { field: primaryField })}</span>
-    ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === tradeId ? "trade_id" : "asset_name" })}</span>` : ""}
+    <span class="table-main">${quickFilterControl(primaryValue, primary, { field: primaryField })}</span>
+    ${secondary ? `<span class="table-sub">${quickFilterControl(secondaryValue, secondary, { field: secondaryValue === tradeId ? "trade_id" : "asset_name" })}</span>` : ""}
     ${deletedAtLine ? `<span class="table-sub">${safe(deletedAtLine)}</span>` : ""}
     ${badges ? `<span class="table-badge-row">${badges}</span>` : ""}
   `;
@@ -16467,15 +16548,18 @@ function recordDeletedAtValue(row = {}) {
 
 function transactionDescriptionCell(row = {}) {
   const id = String(row.transaction_id || "").trim();
-  const primary = String(row.memo || "").trim() || String(row.counterparty_name || "").trim() || id;
-  const secondary = [row.counterparty_name, id]
+  const idLabel = displayTransactionId(id);
+  const primary = String(row.memo || "").trim() || String(row.counterparty_name || "").trim() || idLabel;
+  const primaryValue = primary === idLabel ? id : primary;
+  const secondaryRaw = [row.counterparty_name, id]
     .map((value) => String(value || "").trim())
-    .find((value) => value && value !== primary);
+    .find((value) => value && value !== primary && displayTransactionId(value) !== primary);
+  const secondary = secondaryRaw === id ? idLabel : secondaryRaw;
   const badges = transactionRowBadges(row);
   const deletedAtLine = transactionDeletedAtLine(row);
   return `
-    <span class="table-main">${quickFilterControl(primary, primary, { field: primary === id ? "transaction_id" : "" })}</span>
-    ${secondary ? `<span class="table-sub">${quickFilterControl(secondary, secondary, { field: secondary === id ? "transaction_id" : "" })}</span>` : ""}
+    <span class="table-main">${quickFilterControl(primaryValue, primary, { field: primaryValue === id ? "transaction_id" : "" })}</span>
+    ${secondary ? `<span class="table-sub">${quickFilterControl(secondaryRaw, secondary, { field: secondaryRaw === id ? "transaction_id" : "" })}</span>` : ""}
     ${deletedAtLine ? `<span class="table-sub">${safe(deletedAtLine)}</span>` : ""}
     ${badges ? `<span class="table-badge-row">${badges}</span>` : ""}
   `;
@@ -16556,10 +16640,10 @@ function accountDetailsPanel(rows = []) {
   const deletedAtValue = recordDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Account" : "Account Details",
-    row.account_reference || row.account_id,
+    row.account_reference || displayAccountId(row.account_id),
     isEditing ? accountEditForm(row) : `
       <dl>
-        ${detailItem("Account ID", row.account_id)}
+        ${detailItem("Account ID", displayAccountId(row.account_id))}
         ${detailItemHtml("Status", accountStatusInline(row))}
         ${detailItem("Provider", row.provider_id)}
         ${detailItem("Reference", row.account_reference)}
@@ -16570,8 +16654,8 @@ function accountDetailsPanel(rows = []) {
         ${detailItem("Native Balance", formatAccountMoney(row.balance_native, row.account_currency, { project: false }))}
         ${detailItem("Project Value", formatAccountMoney(row.amount_eur_converted, "EUR"))}
         ${detailItem("USD Value", formatAccountMoney(row.amount_usd_converted, "USD", { project: false }))}
-        ${detailItem("Credit Limit", formatAccountMoney(row.credit_limit_native, row.account_currency, { project: false }))}
-        ${detailItem("Available Credit", formatAccountMoney(row.available_credit_native, row.account_currency, { project: false }))}
+        ${accountShowsCreditFields(row) ? detailItem("Credit Limit", formatAccountMoney(row.credit_limit_native, row.account_currency, { project: false })) : ""}
+        ${accountShowsCreditFields(row) ? detailItem("Available Credit", formatAccountMoney(row.available_credit_native, row.account_currency, { project: false })) : ""}
         ${detailItem("Ledger Status", labelize(row.ledger_status))}
         ${deletedAtValue ? detailItem("Deleted At", deletedAtValue) : ""}
         ${detailItem("Review", labelize(row.review_status))}
@@ -16593,14 +16677,14 @@ function tradeDetailsPanel(rows = []) {
   const deletedAtValue = recordDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Trade" : "Trade Details",
-    row.symbol || row.trade_id,
+    row.symbol || displayTradeId(row.trade_id),
     isEditing ? tradeEditForm(row) : `
       <dl>
-        ${detailItem("Trade ID", row.trade_id)}
+        ${detailItem("Trade ID", displayTradeId(row.trade_id))}
         ${detailItemHtml("Status", tradeStatusInline(row))}
         ${detailItem("Provider", labelize(row.provider_id))}
         ${detailItem("Portfolio", portfolioReferenceLabel(row.portfolio_id))}
-        ${detailItem("Account", row.account_id)}
+        ${detailItem("Account", displayAccountId(row.account_id))}
         ${detailItem("Symbol", row.symbol)}
         ${detailItem("Asset", row.asset_name)}
         ${detailItem("Instrument", labelize(row.instrument_type))}
@@ -16640,11 +16724,11 @@ function transactionDetailsPanel(rows = []) {
   const deletedAtValue = transactionDeletedAtValue(row);
   return detailPanel(
     isEditing ? "Edit Transaction" : "Transaction Details",
-    row.memo || row.transaction_id,
+    row.memo || displayTransactionId(row.transaction_id),
     isEditing ? transactionEditForm(row) : `
       <input data-statement-attachment-input type="file" multiple hidden aria-hidden="true" />
       <dl>
-        ${detailItem("Transaction ID", row.transaction_id)}
+        ${detailItem("Transaction ID", displayTransactionId(row.transaction_id))}
         ${detailItem(row.transaction_date ? "Transaction Date" : "Date", formatDisplayDate(primaryDate))}
         ${hasDifferentPostedDate ? detailItem("Posted", formatDisplayDate(postedDate)) : ""}
         ${detailItem("Class", taxonomyLabel(row.transaction_class))}
@@ -16881,6 +16965,12 @@ function drawerSectionFromKeys(title, keys, fields, renderer, row) {
   return drawerFormSection(title, drawerFieldsByKeys(keys, fields, renderer, row));
 }
 
+function drawerHiddenInputs(keys = [], row = {}) {
+  return keys.map((key) => `
+    <input name="${safe(key)}" type="hidden" value="${safe(row[key] ?? "")}" />
+  `).join("");
+}
+
 function drawerFormActions(cancelAction) {
   return `
     <div class="drawer-actions">
@@ -16898,11 +16988,14 @@ function drawerFormActions(cancelAction) {
 }
 
 function accountEditForm(row) {
+  const balanceFields = accountShowsCreditFields(row)
+    ? ["balance_native", "credit_limit_native", "available_credit_native"]
+    : ["balance_native"];
   return `
     <form class="drawer-form account-edit-form" data-account-edit-form data-account-id="${safe(row.account_id)}">
       ${drawerSectionFromKeys("Account", ["account_id", "provider_id", "account_reference"], accountFields, accountFieldInput, row)}
       ${drawerSectionFromKeys("Classification", ["account_status", "capital_bucket", "account_type", "country_code", "account_currency"], accountFields, accountFieldInput, row)}
-      ${drawerSectionFromKeys("Balances", ["balance_native", "credit_limit_native", "available_credit_native"], accountFields, accountFieldInput, row)}
+      ${drawerSectionFromKeys("Balances", balanceFields, accountFields, accountFieldInput, row)}
       ${drawerSectionFromKeys("Review", ["ledger_status", "review_status", "notes"], accountFields, accountFieldInput, row)}
       ${state.accountActionError ? `<p class="drawer-error">${safe(state.accountActionError)}</p>` : ""}
       ${drawerFormActions("cancel-account-edit")}
@@ -16912,6 +17005,7 @@ function accountEditForm(row) {
 
 function accountFieldInput(key, label, row) {
   const value = row[key];
+  const displayValue = key === "account_id" ? displayAccountId(value) : value;
   const comboOptions = accountComboOptions(key);
   const selectOptions = accountSelectOptions(key);
   const className = accountWideFields().has(key) ? " class=\"field-wide\"" : "";
@@ -16928,7 +17022,7 @@ function accountFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <input name="${safe(key)}" type="text" value="${safe(value ?? "")}" list="${listId}" autocomplete="off" />
+        <input name="${safe(key)}" type="text" value="${safe(displayValue ?? "")}" list="${listId}" autocomplete="off" />
         <datalist id="${listId}">
           ${datalistOptionsHtml(comboOptions, key)}
         </datalist>
@@ -16949,7 +17043,7 @@ function accountFieldInput(key, label, row) {
   return `
     <label${className}>
       <span>${safe(label)}</span>
-      <input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off" />
+      <input name="${safe(key)}" type="${type}"${step} value="${safe(displayValue ?? "")}" autocomplete="off" />
     </label>
   `;
 }
@@ -16958,8 +17052,6 @@ function accountComboOptions(key) {
   const options = state.accounts?.edit_options || state.accounts?.filters || {};
   const optionsByField = {
     provider_id: options.provider_ids || [],
-    capital_bucket: options.capital_buckets || [],
-    account_type: options.account_types || [],
   };
   return optionsByField[key] || null;
 }
@@ -16968,6 +17060,8 @@ function accountSelectOptions(key) {
   const options = state.accounts?.edit_options || state.accounts?.filters || {};
   const optionsByField = {
     account_status: withDefaultOptions(options.account_statuses, ["active", "inactive"]),
+    capital_bucket: withDefaultOptions(options.capital_buckets, ["reserve", "liquidity", "cash", "investment", "debt", "liability"]),
+    account_type: withDefaultOptions(options.account_types, ["bank_account", "brokerage_account", "pension_account", "credit_card", "mortgage", "loan_account"]),
     account_currency: withDefaultOptions(options.account_currencies, ["EUR", "USD", "AED", "RON"]),
     ledger_status: withDefaultOptions(options.ledger_statuses, ["accountable", "not_accountable", "deleted"]),
     review_status: withDefaultOptions(options.review_statuses, ["review_required", "review_done"]),
@@ -17002,6 +17096,23 @@ function accountWideFields() {
   ]);
 }
 
+function accountShowsCreditFields(row = {}) {
+  const text = [
+    row.account_type,
+    row.capital_bucket,
+    row.account_reference,
+  ].map((value) => canonicalCodeValue(value)).join(" ");
+  return [
+    "credit",
+    "credit_card",
+    "liability",
+    "loan",
+    "mortgage",
+    "overdraft",
+    "debt",
+  ].some((token) => text.includes(token));
+}
+
 function tradeEditForm(row) {
   return `
     <form class="drawer-form trade-edit-form" data-trade-edit-form data-trade-id="${safe(row.trade_id)}">
@@ -17017,6 +17128,7 @@ function tradeEditForm(row) {
 
 function tradeFieldInput(key, label, row) {
   const value = row[key];
+  const displayValue = tradeFieldDisplayValue(key, value);
   const comboOptions = tradeComboOptions(key);
   const selectOptions = tradeSelectOptions(key);
   const className = tradeWideFields().has(key) ? " class=\"field-wide\"" : "";
@@ -17025,7 +17137,7 @@ function tradeFieldInput(key, label, row) {
     return `
       <label${className}>
         <span>${safe(label)}</span>
-        <input name="${safe(key)}" type="text" value="${safe(value ?? "")}" list="${listId}" autocomplete="off" />
+        <input name="${safe(key)}" type="text" value="${safe(displayValue ?? "")}" list="${listId}" autocomplete="off" />
         <datalist id="${listId}">
           ${datalistOptionsHtml(comboOptions, key)}
         </datalist>
@@ -17049,9 +17161,16 @@ function tradeFieldInput(key, label, row) {
       <span>${safe(label)}</span>
       ${isDateField
         ? drawerDateInputHtml(key, value)
-        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off" />`}
+        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(displayValue ?? "")}" autocomplete="off" />`}
     </label>
   `;
+}
+
+function tradeFieldDisplayValue(key, value) {
+  if (key === "trade_id") return displayTradeId(value);
+  if (key === "account_id") return displayAccountId(value);
+  if (key === "portfolio_id") return displayPortfolioId(value);
+  return value;
 }
 
 function tradeComboOptions(key) {
@@ -17095,7 +17214,8 @@ function transactionEditForm(row) {
     <form class="drawer-form transaction-edit-form" data-transaction-edit-form data-transaction-id="${safe(row.transaction_id)}">
       ${drawerSectionFromKeys("Transaction", ["transaction_id", "source_system", "transaction_date", "posted_date"], transactionFields, transactionFieldInput, row)}
       ${drawerSectionFromKeys("Classification", ["transaction_class", "transfer_scope", "category_id", "subcategory_id", "counterparty_name", "country_code"], transactionFields, transactionFieldInput, row)}
-      ${drawerSectionFromKeys("Amounts", ["statement_currency", "statement_amount", "sanitized_statement_amount", "amount_usd_converted", "amount_eur_converted"], transactionFields, transactionFieldInput, row)}
+      ${drawerSectionFromKeys("Amounts", ["statement_currency", "statement_amount", "amount_eur_converted"], transactionFields, transactionFieldInput, row)}
+      ${drawerHiddenInputs(["sanitized_statement_amount", "amount_usd_converted"], row)}
       ${drawerSectionFromKeys("Review", ["imported_transaction", "ledger_status", "review_status", "memo"], transactionFields, transactionFieldInput, row)}
       ${state.transactionActionError ? `<p class="drawer-error">${safe(state.transactionActionError)}</p>` : ""}
       ${drawerFormActions("cancel-transaction-edit")}
@@ -17105,6 +17225,7 @@ function transactionEditForm(row) {
 
 function transactionFieldInput(key, label, row) {
   const value = row[key];
+  const displayValue = key === "transaction_id" ? displayTransactionId(value) : value;
   const comboOptions = transactionComboOptions(key, row);
   const className = transactionWideFields().has(key) ? " class=\"field-wide\"" : "";
   if (key === "country_code") {
@@ -17152,7 +17273,7 @@ function transactionFieldInput(key, label, row) {
       <span>${safe(label)}</span>
       ${isDateField
         ? drawerDateInputHtml(key, value, `${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}"`)
-        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(value ?? "")}" autocomplete="off"${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}" />`}
+        : `<input name="${safe(key)}" type="${type}"${step} value="${safe(displayValue ?? "")}" autocomplete="off"${readonly}${readonlyTitle}${fxAttribute}${sanitizedAttribute} class="${readonlyClass.trim()}" />`}
     </label>
   `;
 }
@@ -17833,6 +17954,48 @@ function comboInputValue(value, key = "") {
   if (!text) return "";
   if (key === "country_code") return countryCodeFromInput(text) || text.toUpperCase();
   return taxonomyFields.has(key) ? taxonomyLabel(text) : text;
+}
+
+function canonicalCodeValue(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function displayPrefixedId(value, prefix) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return raw.replace(new RegExp(`^${escapedPrefix}`, "i"), prefix.toUpperCase());
+}
+
+function storedPrefixedId(value, prefix) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return raw.replace(new RegExp(`^${escapedPrefix}`, "i"), prefix.toLowerCase());
+}
+
+function displayAccountId(value) {
+  return displayPrefixedId(value, "acct_");
+}
+
+function storedAccountId(value) {
+  return storedPrefixedId(value, "acct_");
+}
+
+function displayTransactionId(value) {
+  return displayPrefixedId(value, "txn_");
+}
+
+function storedTransactionId(value) {
+  return storedPrefixedId(value, "txn_");
+}
+
+function displayTradeId(value) {
+  return displayPrefixedId(value, "trd_");
+}
+
+function storedTradeId(value) {
+  return storedPrefixedId(value, "trd_");
 }
 
 function categoryPairs() {
@@ -19249,6 +19412,9 @@ function defaultNewAccountValues() {
 async function saveTransaction(form) {
   const transactionId = form.dataset.transactionId || state.selectedTransactionId;
   const values = Object.fromEntries(new FormData(form).entries());
+  if (Object.prototype.hasOwnProperty.call(values, "transaction_id")) {
+    values.transaction_id = storedTransactionId(values.transaction_id);
+  }
   taxonomyFields.forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(values, field)) {
       values[field] = canonicalTaxonomyValue(values[field]);
@@ -19284,6 +19450,17 @@ async function saveTransaction(form) {
 async function saveAccount(form) {
   const accountId = form.dataset.accountId || state.selectedAccountId;
   const values = Object.fromEntries(new FormData(form).entries());
+  if (Object.prototype.hasOwnProperty.call(values, "account_id")) {
+    values.account_id = storedAccountId(values.account_id);
+  }
+  ["account_status", "capital_bucket", "account_type", "ledger_status", "review_status"].forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(values, field)) {
+      values[field] = canonicalCodeValue(values[field]);
+    }
+  });
+  if (Object.prototype.hasOwnProperty.call(values, "account_currency")) {
+    values.account_currency = String(values.account_currency || "").trim().toUpperCase();
+  }
   if (Object.prototype.hasOwnProperty.call(values, "country_code")) {
     values.country_code = countryCodeFromInput(values.country_code);
   }
@@ -19330,6 +19507,15 @@ async function saveProfile(form) {
 async function saveTrade(form) {
   const tradeId = form.dataset.tradeId || state.selectedTradeId;
   const values = Object.fromEntries(new FormData(form).entries());
+  if (Object.prototype.hasOwnProperty.call(values, "trade_id")) {
+    values.trade_id = storedTradeId(values.trade_id);
+  }
+  if (Object.prototype.hasOwnProperty.call(values, "account_id")) {
+    values.account_id = storedAccountId(values.account_id);
+  }
+  if (Object.prototype.hasOwnProperty.call(values, "portfolio_id")) {
+    values.portfolio_id = storedPortfolioId(values.portfolio_id);
+  }
   setDrawerFormSaving(form);
   state.tradeActionError = "";
   try {
