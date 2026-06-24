@@ -647,8 +647,7 @@ kbd {
   margin-left: -1px;
 }
 
-.font-scale-button:hover:not(:disabled),
-.font-scale-button.is-active {
+.font-scale-button:hover:not(:disabled) {
   z-index: 1;
   border-color: color-mix(in srgb, var(--strong) 26%, var(--line));
   background: color-mix(in srgb, var(--surface-2) 54%, transparent);
@@ -835,8 +834,7 @@ kbd {
   font-weight: 660;
 }
 
-.period-trigger:hover,
-.period-trigger.is-active {
+.period-trigger:hover {
   z-index: 1;
   border-color: color-mix(in srgb, var(--strong) 26%, var(--line));
   background: color-mix(in srgb, var(--surface-2) 54%, transparent);
