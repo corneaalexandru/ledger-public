@@ -4,6 +4,7 @@ Ledger Public follows the private Ledger development stream. Public releases con
 
 ## 2026-06-24
 
+- Added achieved/used percentages beside actual amounts in the single-month income and expense target category detail view.
 - Limited topbar segmented-control glow to hover so selected font and period controls stay visually quiet at rest.
 - Matched the reporting period center segment border model to the font-size stepper so All, Year, and Month states keep a complete outline.
 

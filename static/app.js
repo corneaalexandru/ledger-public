@@ -13975,7 +13975,7 @@ function monthlyTargetCategoryDetailRow(row = {}, category = {}, mode = "expense
         </span>
       </td>
       <td class="align-right">${targetAmountCell(category.target_eur, "EUR", mode === "income" ? "income target" : "expense target")}</td>
-      <td class="align-right">${targetAmountCell(category.actual_eur, "EUR", mode === "expense" ? "actual spend" : "actual income")}</td>
+      <td class="align-right">${targetAmountCell(category.actual_eur, "EUR", monthlyTargetActualCategoryDetail(category, mode, standalone))}</td>
       <td class="align-right ${mode === "expense" && categoryOverspending > 0 ? "negative" : ""}">
         ${mode === "expense"
           ? targetAmountCell(categoryOverspending, "EUR", categoryOverspending > 0 ? "above category ceiling" : "on target")
@@ -14009,7 +14009,7 @@ function monthlyTargetCategoryTotalRow(row = {}, categories = [], mode = "expens
         </span>
       </td>
       <td class="align-right">${targetAmountCell(total.target_eur, "EUR", mode === "income" ? "income target" : "expense target")}</td>
-      <td class="align-right">${targetAmountCell(total.actual_eur, "EUR", mode === "expense" ? "actual spend" : "actual income")}</td>
+      <td class="align-right">${targetAmountCell(total.actual_eur, "EUR", monthlyTargetActualCategoryDetail(total, mode, standalone))}</td>
       <td class="align-right ${mode === "expense" && overAmount > 0 ? "negative" : ""}">
         ${mode === "expense"
           ? targetAmountCell(overAmount, "EUR", overAmount > 0 ? "above total ceiling" : "on target")
@@ -14024,6 +14024,16 @@ function monthlyTargetCategoryTotalRow(row = {}, categories = [], mode = "expens
 
 function monthlyTargetCategoryTotalAvailable(row = {}, categories = [], mode = "expense") {
   return monthlyTargetCategoryTotal(row, categories, mode).available ? 1 : 0;
+}
+
+function monthlyTargetActualCategoryDetail(category = {}, mode = "expense", standalone = false) {
+  const baseDetail = mode === "expense" ? "actual spend" : "actual income";
+  if (!standalone) return baseDetail;
+  const target = numericValue(category.target_eur);
+  if (target <= 0) return baseDetail;
+  const actual = numericValue(category.actual_eur);
+  const progressLabel = mode === "expense" ? "used" : "achieved";
+  return `${baseDetail} · ${formatPercent(percentOf(actual, target))} ${progressLabel}`;
 }
 
 function monthlyTargetCategoryTotal(row = {}, categories = [], mode = "expense") {
