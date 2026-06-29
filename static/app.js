@@ -438,6 +438,8 @@ const elements = {
   search: document.querySelector("#globalSearch"),
   filterChips: document.querySelector("#activeFilterChips"),
   fontScaleControl: document.querySelector("#fontScaleControl"),
+  projectCurrencyControl: document.querySelector("#projectCurrencyControl"),
+  topbarUtilityControl: document.querySelector("#topbarUtilityControl"),
   pagePrintControl: document.querySelector("#pagePrintControl"),
   periodControl: document.querySelector("#periodControl"),
 };
@@ -1007,10 +1009,13 @@ function setTheme(theme) {
   const themeMeta = themeOptionMeta(nextTheme);
   document.documentElement.dataset.theme = nextTheme;
   storageSet(THEME_STORAGE_KEY, nextTheme);
-  elements.themeToggle.innerHTML = `
-    <span class="nav-glyph">${icons[themeMeta.icon]}</span>
-    <span>${themeMeta.toggleLabel || `${themeMeta.label} Mode`}</span>
-  `;
+  if (elements.themeToggle) {
+    elements.themeToggle.innerHTML = `
+      <span class="nav-glyph">${icons[themeMeta.icon]}</span>
+      <span>${themeMeta.toggleLabel || `${themeMeta.label} Mode`}</span>
+    `;
+  }
+  renderTopbarUtilityControl();
 }
 
 function normalizedTheme(theme) {
@@ -1147,6 +1152,29 @@ function projectMoneyValue(value, currency = "EUR", options = {}) {
   };
 }
 
+function rowProjectMoneyValue(row = {}, options = {}) {
+  const target = normalizeCurrencyCode(options.targetCurrency) || projectCurrencyCode();
+  const convertedField = `amount_${target.toLowerCase()}_converted`;
+  const converted = row[convertedField];
+  if (converted !== undefined && converted !== null && String(converted).trim() !== "") {
+    return {
+      value: numericValue(converted),
+      currency: target,
+    };
+  }
+  return projectMoneyValue(row.amount_eur_converted, "EUR", { targetCurrency: target });
+}
+
+function formatProjectMoney(row = {}) {
+  const money = rowProjectMoneyValue(row);
+  return formatCurrency(money.value, money.currency, { project: false });
+}
+
+function formatWholeProjectMoney(row = {}) {
+  const money = rowProjectMoneyValue(row);
+  return formatWholeCurrency(money.value, money.currency, { project: false });
+}
+
 function setProjectCurrency(currency) {
   const normalized = normalizeCurrencyCode(currency);
   state.projectCurrency = supportedProjectCurrencies().includes(normalized) ? normalized : defaultProjectCurrency();
@@ -1195,20 +1223,25 @@ function renderNavigation() {
 }
 
 function renderSidebarActions() {
-  elements.refreshAction.innerHTML = `
-    <span class="nav-glyph">${icons.refresh}</span>
-    <span>Refresh</span>
-  `;
+  if (elements.refreshAction) {
+    elements.refreshAction.innerHTML = `
+      <span class="nav-glyph">${icons.refresh}</span>
+      <span>Refresh</span>
+    `;
+  }
   renderPrivacyAction();
+  renderTopbarUtilityControl();
 }
 
 function renderPrivacyAction() {
-  if (!elements.privacyAction) return;
-  elements.privacyAction.classList.toggle("is-active", state.privacyMode);
-  elements.privacyAction.innerHTML = `
-    <span class="nav-glyph">${icons.eyeOff}</span>
-    <span>${state.privacyMode ? "Privacy On" : "Privacy"}</span>
-  `;
+  if (elements.privacyAction) {
+    elements.privacyAction.classList.toggle("is-active", state.privacyMode);
+    elements.privacyAction.innerHTML = `
+      <span class="nav-glyph">${icons.eyeOff}</span>
+      <span>${state.privacyMode ? "Privacy On" : "Privacy"}</span>
+    `;
+  }
+  renderTopbarUtilityControl();
 }
 
 function setStatementDefaultSubpage(view) {
@@ -1253,7 +1286,7 @@ function bindEvents() {
     loadDataForView();
   });
 
-  elements.themeToggle.addEventListener("click", () => {
+  elements.themeToggle?.addEventListener("click", () => {
     const current = document.documentElement.dataset.theme || "dark";
     setTheme(nextTheme(current));
   });
@@ -1287,7 +1320,7 @@ function bindEvents() {
     }
   });
 
-  elements.refreshAction.addEventListener("click", () => {
+  elements.refreshAction?.addEventListener("click", () => {
     resetReportForecastOverrides();
     resetMonthlyTargetOverrides();
     refreshData();
@@ -1295,6 +1328,25 @@ function bindEvents() {
 
   elements.privacyAction?.addEventListener("click", () => {
     setPrivacyMode(!state.privacyMode);
+  });
+
+  elements.topbarUtilityControl?.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-topbar-utility]");
+    if (!action) return;
+    event.preventDefault();
+    const value = action.dataset.topbarUtility || "";
+    if (value === "theme") {
+      const current = document.documentElement.dataset.theme || "dark";
+      setTheme(nextTheme(current));
+    }
+    if (value === "refresh") {
+      resetReportForecastOverrides();
+      resetMonthlyTargetOverrides();
+      refreshData();
+    }
+    if (value === "privacy") {
+      setPrivacyMode(!state.privacyMode);
+    }
   });
 
   elements.fontScaleControl?.addEventListener("click", (event) => {
@@ -1305,6 +1357,12 @@ function bindEvents() {
     if (value === "decrease") adjustFontScale(-1);
     if (value === "increase") adjustFontScale(1);
     if (value === "reset") setFontScale(0);
+  });
+
+  elements.projectCurrencyControl?.addEventListener("change", (event) => {
+    const projectCurrencyControl = event.target.closest("[data-project-currency]");
+    if (!projectCurrencyControl) return;
+    setProjectCurrency(projectCurrencyControl.value);
   });
 
   elements.pagePrintControl?.addEventListener("click", (event) => {
@@ -3637,6 +3695,8 @@ function render(options = {}) {
   const config = topbarConfig();
   elements.search.placeholder = config.search;
   renderFontScaleControl();
+  renderProjectCurrencyControl();
+  renderTopbarUtilityControl();
   renderPagePrintControl();
   elements.periodControl.innerHTML = periodTrigger();
   renderActiveFilterChips();
@@ -4630,7 +4690,7 @@ function globalAccountResults(rows = []) {
         <strong>${safe(accountDisplayName(row))}</strong>
         <small>${safe([row.provider_id, labelize(row.account_type), row.account_currency].filter(Boolean).join(" · "))}</small>
       </span>
-      <em>${formatAccountMoney(row.amount_eur_converted, "EUR")}</em>
+      <em>${formatWholeProjectMoney(row)}</em>
     </button>
   `).join("");
 }
@@ -4910,6 +4970,52 @@ function renderFontScaleControl() {
         ${scale >= FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1] ? "disabled" : ""}
         ${tooltipAttrs("Increase text size")}
       >A+</button>
+    </div>
+  `;
+}
+
+function renderProjectCurrencyControl() {
+  if (!elements.projectCurrencyControl) return;
+  const selected = projectCurrencyCode();
+  const selectedLabel = currencyOptionLabel(selected, projectCurrencyName(selected));
+  elements.projectCurrencyControl.innerHTML = `
+    <label class="project-currency-switch" ${tooltipAttrs(`Project currency: ${selectedLabel}`)}>
+      <span class="project-currency-icon" data-icon="currency" aria-hidden="true"></span>
+      <span class="project-currency-select-wrap">
+        <select data-project-currency aria-label="Project currency">
+          ${supportedProjectCurrencies().map((currency) => `<option value="${safe(currency)}" ${currency === selected ? "selected" : ""}>${safe(projectCurrencyCompactLabel(currency))}</option>`).join("")}
+        </select>
+      </span>
+    </label>
+  `;
+}
+
+function renderTopbarUtilityControl() {
+  if (!elements.topbarUtilityControl) return;
+  const themeMeta = themeOptionMeta(document.documentElement.dataset.theme);
+  const themeLabel = `${themeMeta.label} Mode`;
+  const privacyLabel = state.privacyMode ? "Privacy On" : "Privacy";
+  elements.topbarUtilityControl.innerHTML = `
+    <div class="topbar-utility-stepper" aria-label="Theme, refresh, and privacy controls">
+      <button
+        class="topbar-utility-button"
+        data-topbar-utility="theme"
+        type="button"
+        ${tooltipAttrs(themeLabel)}
+      >${icons[themeMeta.icon]}</button>
+      <button
+        class="topbar-utility-button"
+        data-topbar-utility="refresh"
+        type="button"
+        ${tooltipAttrs("Refresh")}
+      >${icons.refresh}</button>
+      <button
+        class="topbar-utility-button ${state.privacyMode ? "is-active" : ""}"
+        data-topbar-utility="privacy"
+        type="button"
+        aria-pressed="${state.privacyMode ? "true" : "false"}"
+        ${tooltipAttrs(privacyLabel)}
+      >${icons.eyeOff}</button>
     </div>
   `;
 }
@@ -11561,7 +11667,7 @@ function settingsSyncCards() {
       ? "local cache"
       : "runtime store";
   return [
-    settingsMetricCard({ label: "Refresh Policy", value: "Manual refresh", meta: "sidebar refresh", note: "Use refresh when Google Sheets changes.", icon: "refresh" }),
+    settingsMetricCard({ label: "Refresh Policy", value: "Manual refresh", meta: "topbar refresh", note: "Use refresh when Google Sheets changes.", icon: "refresh" }),
     settingsMetricCard({ label: "Memory Cache", value: `${formatNumber(memorySheets)} sheets`, meta: `TTL ${formatNumber(cache.ttl_seconds || 0)} seconds`, note: "Live in-memory cache for loaded sheets.", icon: "database" }),
     settingsMetricCard({ label: "Snapshot Cache", value: snapshotLabel, meta: snapshotMeta, note: "Startup snapshot store for faster reloads.", icon: "database" }),
     settingsMetricCard({ label: "Refresh Now", value: "Source truth", meta: "manual action", note: "Refresh all loaded ledger data.", icon: "refresh", actionsHtml: settingsRefreshButton() }),
@@ -11679,7 +11785,7 @@ function settingsThresholdCards() {
 function settingsPreferencesCards() {
   const themeMeta = themeOptionMeta(document.documentElement.dataset.theme);
   return settingsRowsToMetricCards([
-    ["Theme", themeMeta.label, "Cycles Dark, Navy, and Light from the sidebar."],
+    ["Theme", themeMeta.label, "Cycles Dark, Navy, and Light from the topbar."],
     ["Reporting period", periodValueLabel(), "Controls Overview and default Transactions scope."],
     ["Manual entries", "Review required", "New and duplicated transactions are kept visible for review."],
   ], "settings");
@@ -11693,6 +11799,13 @@ function settingsProjectCurrencyControl(selected = "EUR") {
       `).join("")}
     </select>
   `;
+}
+
+function projectCurrencyCompactLabel(currency = "") {
+  const code = normalizeCurrencyCode(currency);
+  if (!code) return String(currency || "");
+  const symbol = currencySymbol(code);
+  return symbol && symbol !== code ? `${code} ${symbol}` : code;
 }
 
 function projectCurrencyName(currency = "") {
@@ -13359,6 +13472,8 @@ function transactionInsightsDashboard(data = {}) {
       ]),
     },
     { title: "Income Sources", html: transactionIncomeSourceMetricLines(insights.income_sources || []) },
+    { title: "Income by Country", html: transactionCountryMetricLines(insights.income_by_country || [], "income") },
+    { title: "Expenses by Country", html: transactionCountryMetricLines(insights.expense_by_country || [], "expense") },
     { title: "Currency Flow", html: transactionCurrencyFlowMetricLines(insights.currency_flow || []) },
     {
       title: "Activity Peaks",
@@ -13504,6 +13619,29 @@ function transactionIncomeSourceMetricLines(rows = []) {
       note: `Income recorded from ${sourceLabel} in the selected period.`,
       icon: insightIconFor(source, "income"),
       options: metricActionOptions("filter-transactions", { "income-source": source, "transaction-class": "income" }, `Show ${sourceLabel} income`),
+    };
+  }));
+}
+
+function transactionCountryMetricLines(rows = [], type = "expense") {
+  const visibleRows = (rows || []).slice(0, 6);
+  const total = visibleRows.reduce((sum, row) => sum + numericValue(row.amount_eur), 0);
+  const isIncome = type === "income";
+  return metricLineItems(visibleRows.map((row) => {
+    const code = normalizeCountryCode(row.country_code);
+    const label = code
+      ? countryOptionLabel(code, countryName(code) || countryDisplayName(code))
+      : "Unassigned Country";
+    const typeLabel = isIncome ? "income" : "expense";
+    return {
+      label,
+      value: formatWholeCurrency(row.amount_eur || 0, "EUR"),
+      meta: [`${formatPercent(percentOf(row.amount_eur, total))} of shown ${typeLabel}`, formatPlural(row.count || 0, "row"), nativeCurrencySummaryOrBlank(row.native_amounts)].filter(Boolean).join(" · "),
+      note: `Selected period accountable ${typeLabel} by transaction country.`,
+      icon: "globe",
+      options: code
+        ? metricActionOptions("filter-transactions", { "country-code": code, "transaction-class": type }, `Show ${label} ${typeLabel}`)
+        : {},
     };
   }));
 }
@@ -15224,7 +15362,7 @@ function accountTable(rows, data) {
               <td class="account-country-col">${quickFilterHtml(row.country_code, countryCell(row.country_code), { field: "country_code" })}</td>
               <td class="account-currency-col">${quickFilterHtml(row.account_currency, currencyCell(row.account_currency), { field: "account_currency" })}</td>
               <td class="account-money-col align-right ${signedClass(row.balance_native)}">${formatAccountMoney(row.balance_native, row.account_currency, { project: false })}</td>
-              <td class="account-money-col align-right ${signedClass(row.amount_eur_converted)}">${formatAccountMoney(row.amount_eur_converted, "EUR")}</td>
+              <td class="account-money-col align-right ${signedClass(row.amount_eur_converted)}">${formatWholeProjectMoney(row)}</td>
             </tr>
           `).join("") : emptyRow(10)}
         </tbody>
@@ -15378,6 +15516,25 @@ function transactionMetric(label, value, note, options = {}) {
   return metricCard(label, value, note, "", "", options);
 }
 
+function summaryProjectAmount(summary = {}, baseKey = "", fallback) {
+  const target = projectCurrencyCode();
+  const directKey = `${baseKey}_${target.toLowerCase()}`;
+  const directValue = summary[directKey];
+  if (directValue !== undefined && directValue !== null && String(directValue).trim() !== "") {
+    return numericValue(directValue);
+  }
+  if (fallback !== undefined) return numericValue(fallback);
+  return convertCurrencyValue(summary[`${baseKey}_eur`] ?? 0, "EUR", target);
+}
+
+function formatProjectCurrencyAmount(value) {
+  return formatCurrency(value, projectCurrencyCode(), { project: false });
+}
+
+function signedProjectCurrencyAmount(value) {
+  return signedAmount(value, projectCurrencyCode(), { project: false });
+}
+
 function transactionMetricFilterOptions(activeClass = "", label = "Show transactions") {
   const attrs = {};
   if (activeClass === DELETED_TRANSACTION_TAB) attrs["ledger-status"] = "deleted";
@@ -15391,7 +15548,7 @@ function transactionMetricFilterOptions(activeClass = "", label = "Show transact
 function accountableNote(notAccountableValue) {
   const notAccountable = numericValue(notAccountableValue);
   if (!notAccountable) return "accountable";
-  return `accountable · ${formatCurrency(notAccountable, "EUR")} not accountable`;
+  return `accountable · ${formatProjectCurrencyAmount(notAccountable)} not accountable`;
 }
 
 function nativeAmountsNote(rows = []) {
@@ -15403,8 +15560,8 @@ function ledgerBreakdownNote(accountableValue, notAccountableValue, nativeRows =
   const accountable = numericValue(accountableValue);
   const notAccountable = numericValue(notAccountableValue);
   const notes = [];
-  if (accountable || notAccountable) notes.push(`${formatCurrency(accountable, "EUR")} accountable`);
-  if (notAccountable) notes.push(`${formatCurrency(notAccountable, "EUR")} not accountable`);
+  if (accountable || notAccountable) notes.push(`${formatProjectCurrencyAmount(accountable)} accountable`);
+  if (notAccountable) notes.push(`${formatProjectCurrencyAmount(notAccountable)} not accountable`);
   const native = nativeAmountsNote(nativeRows);
   if (native) notes.push(native);
   return notes.join(" · ") || fallback;
@@ -15424,21 +15581,24 @@ function combineMetricNotes(...notes) {
 
 function transactionMetrics(summary = {}, activeClass = "", data = {}) {
   const isNotAccountableTab = activeClass === NOT_ACCOUNTABLE_TRANSACTION_TAB;
-  const accountableIncome = numericValue(summary.income_eur);
-  const accountableExpenses = numericValue(summary.expense_eur);
-  const accountableTotal = numericValue(summary.total_eur);
-  const notAccountableIncome = numericValue(summary.not_accountable_income_eur);
-  const notAccountableExpenses = numericValue(summary.not_accountable_expense_eur);
-  const notAccountableTotal = numericValue(summary.not_accountable_total_eur);
-  const activityIncome = numericValue(summary.activity_income_eur, accountableIncome + notAccountableIncome);
-  const activityExpenses = numericValue(summary.activity_expense_eur, accountableExpenses + notAccountableExpenses);
-  const activityTotal = numericValue(summary.activity_total_eur, accountableTotal + notAccountableTotal);
-  const income = numericValue(isNotAccountableTab ? summary.not_accountable_income_eur : summary.income_eur);
-  const expenses = numericValue(isNotAccountableTab ? summary.not_accountable_expense_eur : summary.expense_eur);
+  const accountableIncome = summaryProjectAmount(summary, "income");
+  const accountableExpenses = summaryProjectAmount(summary, "expense");
+  const accountableTotal = summaryProjectAmount(summary, "total");
+  const notAccountableIncome = summaryProjectAmount(summary, "not_accountable_income");
+  const notAccountableExpenses = summaryProjectAmount(summary, "not_accountable_expense");
+  const notAccountableTotal = summaryProjectAmount(summary, "not_accountable_total");
+  const notAccountableNet = summaryProjectAmount(summary, "not_accountable_net", notAccountableIncome - notAccountableExpenses);
+  const activityIncome = summaryProjectAmount(summary, "activity_income", accountableIncome + notAccountableIncome);
+  const activityExpenses = summaryProjectAmount(summary, "activity_expense", accountableExpenses + notAccountableExpenses);
+  const activityTotal = summaryProjectAmount(summary, "activity_total", accountableTotal + notAccountableTotal);
+  const income = isNotAccountableTab ? notAccountableIncome : accountableIncome;
+  const expenses = isNotAccountableTab ? notAccountableExpenses : accountableExpenses;
   const net = isNotAccountableTab
-    ? numericValue(summary.not_accountable_net_eur, income - expenses)
-    : numericValue(summary.net_eur);
-  const total = numericValue(isNotAccountableTab ? summary.not_accountable_total_eur : summary.activity_total_eur, activityTotal);
+    ? notAccountableNet
+    : summaryProjectAmount(summary, "net", income - expenses);
+  const total = isNotAccountableTab
+    ? notAccountableTotal
+    : summaryProjectAmount(summary, "activity_total", activityTotal);
   const transactionsMetric = transactionMetric(
     "Transactions",
     formatNumber(summary.filtered ?? 0),
@@ -15455,12 +15615,12 @@ function transactionMetrics(summary = {}, activeClass = "", data = {}) {
 
   if (activeClass === REVIEW_REQUIRED_TAB) {
     const reviewAmount = numericValue(
-      summary.review_open_amount_eur,
-      numericValue(summary.total_eur) + numericValue(summary.not_accountable_total_eur),
+      summaryProjectAmount(summary, "review_open_amount", activityTotal),
+      activityTotal,
     );
     return [
       transactionMetric("Review", formatNumber(summary.filtered ?? 0), reviewBreakdownNote(summary), transactionMetricFilterOptions(REVIEW_REQUIRED_TAB, "Show transactions requiring review")),
-      transactionMetric("Review Total", formatCurrency(reviewAmount, "EUR"), "project amount under review", transactionMetricFilterOptions(REVIEW_REQUIRED_TAB, "Show transactions under review")),
+      transactionMetric("Review Total", formatProjectCurrencyAmount(reviewAmount), "project amount under review", transactionMetricFilterOptions(REVIEW_REQUIRED_TAB, "Show transactions under review")),
       transactionsMetric,
     ].join("");
   }
@@ -15468,56 +15628,56 @@ function transactionMetrics(summary = {}, activeClass = "", data = {}) {
   if (activeClass === NOT_ACCOUNTABLE_TRANSACTION_TAB) {
     const nativeNote = nativeAmountsNote(summary.not_accountable_native_amounts);
     return [
-      transactionMetric("Not Accountable Total", formatCurrency(notAccountableTotal, "EUR"), combineMetricNotes(nativeNote, `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(NOT_ACCOUNTABLE_TRANSACTION_TAB, "Show not-accountable transactions")),
-      transactionMetric("Total Income", formatCurrency(notAccountableIncome, "EUR"), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "income" }, "Show not-accountable income transactions")),
-      transactionMetric("Total Expenses", formatCurrency(notAccountableExpenses, "EUR"), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "expense" }, "Show not-accountable expense transactions")),
+      transactionMetric("Not Accountable Total", formatProjectCurrencyAmount(notAccountableTotal), combineMetricNotes(nativeNote, `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(NOT_ACCOUNTABLE_TRANSACTION_TAB, "Show not-accountable transactions")),
+      transactionMetric("Total Income", formatProjectCurrencyAmount(notAccountableIncome), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "income" }, "Show not-accountable income transactions")),
+      transactionMetric("Total Expenses", formatProjectCurrencyAmount(notAccountableExpenses), "not accountable", metricActionOptions("filter-transactions", { "ledger-status": "not_accountable", "transaction-class": "expense" }, "Show not-accountable expense transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass === ACCOUNTABLE_TRANSACTION_TAB) {
     return [
-      transactionMetric("Total Income", formatCurrency(income, "EUR"), "accountable", metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "income" }, "Show matching income transactions")),
-      transactionMetric("Total Expenses", formatCurrency(expenses, "EUR"), percentOfIncomeNote(expenses, income), metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "expense" }, "Show matching expense transactions")),
-      transactionMetric("Net Flow", signedAmount(net, "EUR"), combineMetricNotes(percentOfIncomeNote(net, income, { signed: true, fallback: "" }), `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(activeClass, "Show matching transactions")),
+      transactionMetric("Total Income", formatProjectCurrencyAmount(income), "accountable", metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "income" }, "Show matching income transactions")),
+      transactionMetric("Total Expenses", formatProjectCurrencyAmount(expenses), percentOfIncomeNote(expenses, income), metricActionOptions("filter-transactions", { "ledger-status": "accountable", "transaction-class": "expense" }, "Show matching expense transactions")),
+      transactionMetric("Net Flow", signedProjectCurrencyAmount(net), combineMetricNotes(percentOfIncomeNote(net, income, { signed: true, fallback: "" }), `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions(activeClass, "Show matching transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass === "income") {
     return [
-      transactionMetric("Total Income", formatCurrency(activityIncome, "EUR"), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
+      transactionMetric("Total Income", formatProjectCurrencyAmount(activityIncome), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass === "expense") {
     return [
-      transactionMetric("Total Expenses", formatCurrency(activityExpenses, "EUR"), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
+      transactionMetric("Total Expenses", formatProjectCurrencyAmount(activityExpenses), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
       transactionsMetric,
     ].join("");
   }
 
   if (activeClass) {
     return [
-      transactionMetric(`Total ${taxonomyLabel(activeClass)}`, formatCurrency(total, "EUR"), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions(activeClass, `Show ${taxonomyLabel(activeClass)} transactions`)),
+      transactionMetric(`Total ${taxonomyLabel(activeClass)}`, formatProjectCurrencyAmount(total), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions(activeClass, `Show ${taxonomyLabel(activeClass)} transactions`)),
       transactionsMetric,
     ].join("");
   }
 
   if (activityTotal && !accountableIncome && !accountableExpenses && notAccountableTotal) {
     return [
-      transactionMetric("Selected Activity", formatCurrency(activityTotal, "EUR"), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions("", "Show transactions for selected activity")),
-      transactionMetric("Total Income", formatCurrency(activityIncome, "EUR"), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
-      transactionMetric("Total Expenses", formatCurrency(activityExpenses, "EUR"), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
+      transactionMetric("Selected Activity", formatProjectCurrencyAmount(activityTotal), ledgerBreakdownNote(accountableTotal, notAccountableTotal, summary.native_amounts), transactionMetricFilterOptions("", "Show transactions for selected activity")),
+      transactionMetric("Total Income", formatProjectCurrencyAmount(activityIncome), ledgerBreakdownNote(accountableIncome, notAccountableIncome, summary.native_amounts), transactionMetricFilterOptions("income", "Show income transactions")),
+      transactionMetric("Total Expenses", formatProjectCurrencyAmount(activityExpenses), ledgerBreakdownNote(accountableExpenses, notAccountableExpenses, summary.native_amounts), transactionMetricFilterOptions("expense", "Show expense transactions")),
       transactionsMetric,
     ].join("");
   }
 
   return [
-    transactionMetric("Total Income", formatCurrency(summary.income_eur || 0, "EUR"), accountableNote(summary.not_accountable_income_eur), transactionMetricFilterOptions("income", "Show income transactions")),
-    transactionMetric("Total Expenses", formatCurrency(expenses, "EUR"), combineMetricNotes(percentOfIncomeNote(expenses, income), accountableNote(summary.not_accountable_expense_eur)), transactionMetricFilterOptions("expense", "Show expense transactions")),
-    transactionMetric("Net Flow", signedAmount(net, "EUR"), combineMetricNotes(percentOfIncomeNote(net, income, { signed: true, fallback: "" }), `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions("", "Show transactions for selected period")),
+    transactionMetric("Total Income", formatProjectCurrencyAmount(accountableIncome), accountableNote(notAccountableIncome), transactionMetricFilterOptions("income", "Show income transactions")),
+    transactionMetric("Total Expenses", formatProjectCurrencyAmount(expenses), combineMetricNotes(percentOfIncomeNote(expenses, income), accountableNote(notAccountableExpenses)), transactionMetricFilterOptions("expense", "Show expense transactions")),
+    transactionMetric("Net Flow", signedProjectCurrencyAmount(net), combineMetricNotes(percentOfIncomeNote(net, income, { signed: true, fallback: "" }), `${formatNumber(summary.filtered ?? 0)} rows`), transactionMetricFilterOptions("", "Show transactions for selected period")),
     transactionsMetric,
   ].join("");
 }
@@ -16755,7 +16915,7 @@ function accountDetailsPanel(rows = []) {
         ${detailItemHtml("Country", countryCell(row.country_code))}
         ${detailItemHtml("Currency", currencyCell(row.account_currency))}
         ${detailItem("Native Balance", formatAccountMoney(row.balance_native, row.account_currency, { project: false }))}
-        ${detailItem("Project Value", formatAccountMoney(row.amount_eur_converted, "EUR"))}
+        ${detailItem("Project Value", formatWholeProjectMoney(row))}
         ${detailItem("USD Value", formatAccountMoney(row.amount_usd_converted, "USD", { project: false }))}
         ${accountShowsCreditFields(row) ? detailItem("Credit Limit", formatAccountMoney(row.credit_limit_native, row.account_currency, { project: false })) : ""}
         ${accountShowsCreditFields(row) ? detailItem("Available Credit", formatAccountMoney(row.available_credit_native, row.account_currency, { project: false })) : ""}
@@ -21320,10 +21480,11 @@ function signedClass(value) {
 
 function signedCurrency(row) {
   if (state.privacyMode) return privacyAmount();
-  const amount = Math.abs(Number(row.amount_eur_converted || 0));
-  if (row.transaction_class === "income") return `+${formatCurrency(amount, "EUR")}`;
-  if (row.transaction_class === "expense") return `-${formatCurrency(amount, "EUR")}`;
-  return formatCurrency(amount, "EUR");
+  const money = rowProjectMoneyValue(row);
+  const amount = Math.abs(money.value);
+  if (row.transaction_class === "income") return `+${formatCurrency(amount, money.currency, { project: false })}`;
+  if (row.transaction_class === "expense") return `-${formatCurrency(amount, money.currency, { project: false })}`;
+  return formatCurrency(amount, money.currency, { project: false });
 }
 
 function signedNativeCurrency(row) {

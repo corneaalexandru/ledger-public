@@ -604,7 +604,8 @@ kbd {
   flex: 0 0 auto;
 }
 
-.topbar-print-control {
+.topbar-print-control,
+.topbar-utility-control {
   display: inline-flex;
   align-items: center;
 }
@@ -614,7 +615,13 @@ kbd {
   align-items: center;
 }
 
-.font-scale-stepper {
+.project-currency-control {
+  display: inline-flex;
+  align-items: center;
+}
+
+.font-scale-stepper,
+.topbar-utility-stepper {
   display: inline-flex;
   align-items: center;
 }
@@ -661,6 +668,126 @@ kbd {
 
 .font-scale-reset-button:disabled {
   opacity: 1;
+}
+
+.topbar-utility-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-height: var(--control-height);
+  padding: 0;
+  border: 1px solid var(--control-line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.topbar-utility-button:first-child {
+  border-radius: var(--control-radius) 0 0 var(--control-radius);
+}
+
+.topbar-utility-button:last-child {
+  border-radius: 0 var(--control-radius) var(--control-radius) 0;
+}
+
+.topbar-utility-button + .topbar-utility-button {
+  margin-left: -1px;
+}
+
+.topbar-utility-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar-utility-button:hover,
+.topbar-utility-button.is-active {
+  z-index: 1;
+  border-color: color-mix(in srgb, var(--strong) 26%, var(--line));
+  background: color-mix(in srgb, var(--surface-2) 54%, transparent);
+  color: var(--strong);
+}
+
+.project-currency-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: var(--control-height);
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.project-currency-switch:hover,
+.project-currency-switch:focus-within {
+  border-color: color-mix(in srgb, var(--strong) 26%, var(--line));
+  background: color-mix(in srgb, var(--surface-2) 54%, transparent);
+  color: var(--strong);
+}
+
+.project-currency-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+
+.project-currency-switch:hover .project-currency-icon,
+.project-currency-switch:focus-within .project-currency-icon {
+  color: currentColor;
+}
+
+.project-currency-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.project-currency-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.project-currency-select-wrap::after {
+  position: absolute;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  opacity: 0.65;
+  pointer-events: none;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.project-currency-switch select {
+  width: 72px;
+  min-height: calc(var(--control-height) - 2px);
+  padding: 0 15px 0 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--strong);
+  cursor: pointer;
+  font-size: var(--ledger-font-control);
+  font-weight: 760;
+  line-height: 1;
+  outline: 0;
 }
 
 .topbar-print-control:empty {
@@ -1995,6 +2122,7 @@ kbd {
 
 .period-trigger,
 .period-step-button,
+.topbar-utility-button,
 .control-button,
 .small-button,
 .icon-button {
@@ -8042,6 +8170,8 @@ table.portfolio-table td:nth-child(7) {
   .settings-about-tabs,
   .settings-page-divider,
   .font-scale-control,
+  .project-currency-control,
+  .topbar-utility-control,
   .topbar-print-control,
   .period-control,
   .active-filter-chips,

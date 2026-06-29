@@ -1054,6 +1054,34 @@ def transaction_amount(row: dict) -> float:
     return transaction_amount_eur(row)
 
 
+def transaction_amount_usd(row: dict) -> float:
+    if has_value(row.get("amount_usd_converted")):
+        return num(row.get("amount_usd_converted"))
+    amount = row_amount(row, "sanitized_statement_amount", "statement_amount")
+    return convert_currency(amount, row.get("statement_currency", "EUR"), "USD")
+
+
+def currency_amount_rows(values: dict[str, float]) -> list[dict]:
+    return [
+        {"currency": key, "amount": money(value)}
+        for key, value in sorted(values.items(), key=lambda item: abs(item[1]), reverse=True)
+        if value
+    ]
+
+
+def country_amount_rows(values: dict[str, dict]) -> list[dict]:
+    return [
+        {
+            "country_code": key,
+            "amount_usd": money(row["amount_usd"]),
+            "amount_eur": money(row["amount_eur"]),
+            "native_amounts": currency_amount_rows(row["native_amounts"]),
+            "count": int(row["count"]),
+        }
+        for key, row in sorted(values.items(), key=lambda item: item[1]["amount_eur"], reverse=True)[:8]
+    ]
+
+
 def transaction_summary(rows: list[dict]) -> dict:
     active = active_rows(rows)
     monthly = defaultdict(
@@ -1068,9 +1096,16 @@ def transaction_summary(rows: list[dict]) -> dict:
         }
     )
     income_by_source = defaultdict(float)
+    income_by_country = defaultdict(lambda: {"amount_usd": 0.0, "amount_eur": 0.0, "count": 0, "native_amounts": defaultdict(float)})
+    expense_by_country = defaultdict(lambda: {"amount_usd": 0.0, "amount_eur": 0.0, "count": 0, "native_amounts": defaultdict(float)})
     spend_by_category = defaultdict(float)
     for row in active:
         amount = transaction_amount(row)
+        amount_usd = abs(transaction_amount_usd(row))
+        amount_eur = abs(amount)
+        native_amount = abs(row_amount(row, "sanitized_statement_amount", "statement_amount"))
+        statement_currency = str(row.get("statement_currency") or "").strip().upper() or "N/A"
+        country = normalize_country(row.get("country_code")) or "N/A"
         month = str(row.get("transaction_date") or row.get("posted_date") or "")[:7]
         if not month:
             continue
@@ -1081,12 +1116,20 @@ def transaction_summary(rows: list[dict]) -> dict:
             bucket["income_eur"] += amount
             bucket["income_categories"][row.get("category_id") or "Income"] += amount
             income_by_source[row.get("income_source") or row.get("category_id") or "Income"] += amount
+            income_by_country[country]["amount_usd"] += amount_usd
+            income_by_country[country]["amount_eur"] += amount_eur
+            income_by_country[country]["count"] += 1
+            income_by_country[country]["native_amounts"][statement_currency] += native_amount
         elif row.get("transaction_class") == "transfer":
             bucket["transfers_eur"] += abs(amount)
         else:
             bucket["expense_eur"] += abs(amount)
             bucket["expense_categories"][row.get("category_id") or "Expense"] += abs(amount)
             spend_by_category[row.get("category_id") or "Expense"] += abs(amount)
+            expense_by_country[country]["amount_usd"] += amount_usd
+            expense_by_country[country]["amount_eur"] += amount_eur
+            expense_by_country[country]["count"] += 1
+            expense_by_country[country]["native_amounts"][statement_currency] += native_amount
     monthly_series = [
         {
             "month": month,
@@ -1128,6 +1171,8 @@ def transaction_summary(rows: list[dict]) -> dict:
         "current_month_net_eur": money(current_month.get("net_eur", 0)),
         "monthly_series": monthly_series,
         "income_sources": [{"label": key, "amount_eur": money(value), "value": money(value)} for key, value in sorted(income_by_source.items(), key=lambda item: -item[1])],
+        "income_by_country": country_amount_rows(income_by_country),
+        "expense_by_country": country_amount_rows(expense_by_country),
         "category_spend": [{"label": key, "amount_eur": money(value), "value": money(value)} for key, value in sorted(spend_by_category.items(), key=lambda item: -item[1])],
         "capital_targets": {
             "income_baseline_eur": money(sum(num(row.get("income_baseline_eur")) for row in yearly_targets)),
