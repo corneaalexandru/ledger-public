@@ -2,7 +2,7 @@
 
 Ledger development happens in the private `corneaalexandru/ledger` repository first. Public-safe changes are mirrored to `corneaalexandru/ledger-public` before release.
 
-## 2026-06-25
+## 2026-06-29
 
 - Moved Theme, Refresh, and Privacy into a compact topbar utility control beside the currency, print, and period controls.
 - Added Income by Country and Expenses by Country sections to Transactions > Statement with country drill-downs into the transaction register.
