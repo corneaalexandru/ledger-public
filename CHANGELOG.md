@@ -4,6 +4,7 @@ Ledger development happens in the private `corneaalexandru/ledger` repository fi
 
 ## 2026-06-29
 
+- Replaced the left sidebar with compact icon navigation in the topbar so app content can use the full browser width.
 - Moved Theme, Refresh, and Privacy into a compact topbar utility control beside the currency, print, and period controls.
 - Added Income by Country and Expenses by Country sections to Transactions > Statement with country drill-downs into the transaction register.
 - Added a compact topbar Project Currency switch beside the text-size controls so currency views can be changed from any page.

@@ -3,14 +3,10 @@ const PRIVACY_MODE_STORAGE_KEY = "ledger-privacy-mode";
 const INTELLIGENCE_THRESHOLDS_STORAGE_KEY = "ledger-intelligence-thresholds";
 const INTELLIGENCE_THRESHOLDS_SCHEMA_VERSION = 4;
 const PROJECT_CURRENCY_STORAGE_KEY = "ledger-project-currency";
-const SIDEBAR_WIDTH_STORAGE_KEY = "ledger-sidebar-width";
 const FONT_SCALE_STORAGE_KEY = "ledger-font-scale";
 const DEFAULT_THEME = "navy";
 const THEME_STORAGE_KEY = "ledger-theme-v2";
 const THEME_OPTIONS = ["dark", "navy", "light"];
-const SIDEBAR_DEFAULT_WIDTH = 214;
-const SIDEBAR_MIN_WIDTH = 168;
-const SIDEBAR_MAX_WIDTH = 360;
 const FONT_SCALE_STEPS = [-2, -1, 0, 1, 2];
 const FONT_SCALE_TOKENS = {
   "-2": {
@@ -431,10 +427,6 @@ const icons = {
 const elements = {
   navList: document.querySelector("#navList"),
   pageStage: document.querySelector("#pageStage"),
-  sidebarResizer: document.querySelector("#sidebarResizer"),
-  themeToggle: document.querySelector("#themeToggle"),
-  refreshAction: document.querySelector("#refreshAction"),
-  privacyAction: document.querySelector("#privacyAction"),
   search: document.querySelector("#globalSearch"),
   filterChips: document.querySelector("#activeFilterChips"),
   fontScaleControl: document.querySelector("#fontScaleControl"),
@@ -904,9 +896,7 @@ function init() {
   initPrivacyMode();
   initFontScale();
   initKeyboardShortcutLabel();
-  initResizableSidebar();
   renderNavigation();
-  renderSidebarActions();
   bindEvents();
   render();
   loadOverview();
@@ -920,85 +910,6 @@ function renderStartupError(error) {
   }
 }
 
-function initResizableSidebar() {
-  if (!elements.sidebarResizer) return;
-  setSidebarWidth(readSidebarWidth(), { persist: false });
-  elements.sidebarResizer.setAttribute("aria-valuemin", String(SIDEBAR_MIN_WIDTH));
-  elements.sidebarResizer.setAttribute("aria-valuemax", String(SIDEBAR_MAX_WIDTH));
-  elements.sidebarResizer.addEventListener("pointerdown", startSidebarResize);
-  elements.sidebarResizer.addEventListener("dblclick", () => {
-    setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
-  });
-  elements.sidebarResizer.addEventListener("keydown", (event) => {
-    const step = event.shiftKey ? 24 : 8;
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      setSidebarWidth(currentSidebarWidth() + (event.key === "ArrowRight" ? step : -step));
-    }
-    if (event.key === "Home") {
-      event.preventDefault();
-      setSidebarWidth(SIDEBAR_MIN_WIDTH);
-    }
-    if (event.key === "End") {
-      event.preventDefault();
-      setSidebarWidth(SIDEBAR_MAX_WIDTH);
-    }
-  });
-}
-
-function readSidebarWidth() {
-  const saved = Number.parseFloat(storageGet(SIDEBAR_WIDTH_STORAGE_KEY) || "");
-  return clampSidebarWidth(Number.isFinite(saved) ? saved : SIDEBAR_DEFAULT_WIDTH);
-}
-
-function currentSidebarWidth() {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue("--sidebar-width");
-  const value = Number.parseFloat(raw);
-  return clampSidebarWidth(Number.isFinite(value) ? value : SIDEBAR_DEFAULT_WIDTH);
-}
-
-function clampSidebarWidth(width) {
-  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
-}
-
-function setSidebarWidth(width, options = {}) {
-  const nextWidth = clampSidebarWidth(width);
-  document.documentElement.style.setProperty("--sidebar-width", `${nextWidth}px`);
-  elements.sidebarResizer?.setAttribute("aria-valuenow", String(nextWidth));
-  if (options.persist !== false) {
-    storageSet(SIDEBAR_WIDTH_STORAGE_KEY, String(nextWidth));
-  }
-}
-
-function startSidebarResize(event) {
-  if (event.pointerType === "mouse" && event.button !== 0) return;
-  event.preventDefault();
-  const startX = event.clientX;
-  const startWidth = currentSidebarWidth();
-  const controller = new AbortController();
-  const { signal } = controller;
-  const finishResize = () => {
-    document.body.classList.remove("is-resizing-sidebar");
-    controller.abort();
-  };
-
-  document.body.classList.add("is-resizing-sidebar");
-  try {
-    event.currentTarget.setPointerCapture(event.pointerId);
-  } catch {
-    // Pointer capture can fail on older engines; window listeners still cover the drag.
-  }
-  window.addEventListener(
-    "pointermove",
-    (moveEvent) => {
-      setSidebarWidth(startWidth + moveEvent.clientX - startX);
-    },
-    { signal },
-  );
-  window.addEventListener("pointerup", finishResize, { signal, once: true });
-  window.addEventListener("pointercancel", finishResize, { signal, once: true });
-}
-
 function initTheme() {
   const theme = normalizedTheme(storageGet(THEME_STORAGE_KEY));
   setTheme(theme);
@@ -1009,12 +920,6 @@ function setTheme(theme) {
   const themeMeta = themeOptionMeta(nextTheme);
   document.documentElement.dataset.theme = nextTheme;
   storageSet(THEME_STORAGE_KEY, nextTheme);
-  if (elements.themeToggle) {
-    elements.themeToggle.innerHTML = `
-      <span class="nav-glyph">${icons[themeMeta.icon]}</span>
-      <span>${themeMeta.toggleLabel || `${themeMeta.label} Mode`}</span>
-    `;
-  }
   renderTopbarUtilityControl();
 }
 
@@ -1205,43 +1110,21 @@ function setPrivacyMode(enabled, options = {}) {
   state.privacyMode = Boolean(enabled);
   document.documentElement.dataset.privacy = state.privacyMode ? "on" : "off";
   storageSet(PRIVACY_MODE_STORAGE_KEY, state.privacyMode ? "on" : "off");
-  renderPrivacyAction();
+  renderTopbarUtilityControl();
   if (options.render !== false) render();
 }
 
 function renderNavigation() {
+  if (!elements.navList) return;
   elements.navList.innerHTML = navItems
     .map(
       (item) => `
-        <button class="nav-item" data-view="${item.id}" type="button">
+        <button class="nav-item" data-view="${item.id}" type="button" ${tooltipAttrs(item.label)}>
           <span class="nav-glyph">${icons[item.icon]}</span>
-          <span>${item.label}</span>
         </button>
       `,
     )
     .join("");
-}
-
-function renderSidebarActions() {
-  if (elements.refreshAction) {
-    elements.refreshAction.innerHTML = `
-      <span class="nav-glyph">${icons.refresh}</span>
-      <span>Refresh</span>
-    `;
-  }
-  renderPrivacyAction();
-  renderTopbarUtilityControl();
-}
-
-function renderPrivacyAction() {
-  if (elements.privacyAction) {
-    elements.privacyAction.classList.toggle("is-active", state.privacyMode);
-    elements.privacyAction.innerHTML = `
-      <span class="nav-glyph">${icons.eyeOff}</span>
-      <span>${state.privacyMode ? "Privacy On" : "Privacy"}</span>
-    `;
-  }
-  renderTopbarUtilityControl();
 }
 
 function setStatementDefaultSubpage(view) {
@@ -1253,7 +1136,7 @@ function setStatementDefaultSubpage(view) {
 }
 
 function bindEvents() {
-  elements.navList.addEventListener("click", (event) => {
+  elements.navList?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
     if (!button) return;
     const nextView = button.dataset.view;
@@ -1286,11 +1169,6 @@ function bindEvents() {
     loadDataForView();
   });
 
-  elements.themeToggle?.addEventListener("click", () => {
-    const current = document.documentElement.dataset.theme || "dark";
-    setTheme(nextTheme(current));
-  });
-
   elements.search.addEventListener("input", (event) => {
     state.query = event.target.value;
     clearTimeout(searchDebounce);
@@ -1318,16 +1196,6 @@ function bindEvents() {
     if (action.dataset.action === "clear-filter-chips") {
       clearQuickFilterChips(action.dataset.filterView || state.view);
     }
-  });
-
-  elements.refreshAction?.addEventListener("click", () => {
-    resetReportForecastOverrides();
-    resetMonthlyTargetOverrides();
-    refreshData();
-  });
-
-  elements.privacyAction?.addEventListener("click", () => {
-    setPrivacyMode(!state.privacyMode);
   });
 
   elements.topbarUtilityControl?.addEventListener("click", (event) => {
